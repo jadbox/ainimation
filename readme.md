@@ -212,40 +212,121 @@ Before approving any shot layout or prompt matrix, verify:
 
 ---
 
-## 10. Character Style-Guide Generator
+## 10. Blueprint Generator (Characters & Scenes)
 
-The Python project generates and reviews a Don Bluth character reference sheet
-for **any** character defined in `src/character_blueprint_generator/characters.py`
-(see Section 2 for the character roster). Gemini's Nano Banana 2 image model
-(`gemini-3.1-flash-image-preview`) creates each 720p 16:9 candidate; a reviewer
-LLM (Gemini Flash 3.6 or an OpenRouter model such as `moonshotai/kimi-k3`)
-directly reviews it via the API and provides a replacement prompt when it is not
-acceptable. The loop stops on acceptance or after four attempts, whichever occurs
-first.
+The Python project in `src/blueprint_generator/` generates and reviews Don Bluth
+production blueprints. It operates on two kinds of subjects:
+
+* **Characters** (`--character`): any character defined in
+  `src/blueprint_generator/characters.py` (see Section 2 for the roster),
+  producing a character style-guide sheet.
+* **Scenes** (`--scene`): any scene defined in
+  `src/blueprint_generator/scenes.py`. A scene describes **1-2 background
+  plates**, and each plate runs through its own generate/review loop,
+  producing a clean, character-free production background.
+
+Gemini's Nano Banana 2 image model (`gemini-3.1-flash-image-preview`) creates
+each 720p 16:9 candidate; a reviewer LLM (Gemini Flash 3.6 or an OpenRouter
+model such as `moonshotai/kimi-k3`) directly reviews it via the API and
+provides a replacement prompt when it is not acceptable. The loop stops on
+acceptance or after four attempts, whichever occurs first.
 
 1. Install project dependencies with `uv`: `uv sync`
 2. Set `GEMINI_API_KEY` (or `GOOGLE_API_KEY`). For OpenRouter review models, also
    set `OPENROUTER_API_KEY`.
-3. Run, passing a character name:
+3. Run, passing a character or scene name:
 
    * `uv run generate-character --character "Mr. Ages"`
+   * `uv run generate-blueprint --scene great-owl-hollow`
    * `./generate.sh "Mrs. Brisby"`
    * `./generate.sh Nicodemus --max-iterations 3`
 
-If no `--character` is supplied, or the name does not match a registered
-character, the command prints an error listing every available character.
+If the name does not match a registered character or scene, the command prints
+an error listing every available subject of that kind.
 
-The command writes these generated artifacts to a per-character output directory
-(default `./out/blueprint/<character-slug>/`, e.g. `./out/blueprint/mr-ages/`;
-override with `--output`):
+The command writes generated artifacts to a per-subject output directory
+(default `./out/blueprint/<character-slug>/` for characters, e.g.
+`./out/blueprint/mr-ages/`; `./out/blueprint/<scene-slug>/<background-key>/`
+for scene background plates, e.g. `./out/blueprint/great-owl-hollow/hollow-interior/`;
+override the base directory with `--output`):
 
-* `<character-slug>-style.jpg`: the most recent 720p candidate, which is the accepted image when the reviewer approves one.
-* `prompt.txt`: the complete prompt used for that final image. On a later run targeting the same output directory, an existing `prompt.txt` is loaded as the initial prompt for the image generator instead of rebuilding the default prompt from the character spec.
+* `<subject-slug>-style.jpg`: the most recent 720p candidate, which is the accepted image when the reviewer approves one.
+* `prompt.txt`: the complete prompt used for that final image. On a later run targeting the same output directory, an existing `prompt.txt` is loaded as the initial prompt for the image generator instead of rebuilding the default prompt from the spec.
 * `iterations.md`: iteration count, acceptance status, reviewer findings, and the lesson learned at every attempt.
 * `attempt-01.jpg` through `attempt-04.jpg`: retained candidates for visual comparison.
 
-Use `--image-model` or `--review-model` to select model IDs, and `--max-iterations` to set any limit from 1 through 4. A run that reaches the cap without acceptance exits with status `2`, but still preserves the final candidate and all review notes.
+Use `--image-model` or `--review-model` to select model IDs, and `--max-iterations` to set any limit from 1 through 4. A run that reaches the cap without acceptance exits with status `2`, but still preserves the final candidate and all review notes. In scene mode, each background plate is evaluated independently; the command exits `2` if any plate fails to earn acceptance.
 
 ### Available characters
 
 Mrs. Brisby, Mr. Ages, Nicodemus, Timothy Frisby, Justin, Jenner, Dragon, The Great Owl.
+
+### Available scenes
+
+The Great Owl's Hollow (`great-owl-hollow`, 2 backgrounds), Mr. Ages' Apothecary (`mr-ages-apothecary`, 1 background), Brisby Cinderblock Home (`brisby-cinderblock-home`, 1 background).
+
+---
+
+## 11. Scene Script Generator
+
+`src/scene_script.py` expands a short scene description into a detailed scene
+design document tailored for **30 seconds of screen time, structured as three
+clearly marked 10-second segments**, using Gemini 3.6 Flash
+(`gemini-3.6-flash`). Scene-wide information is kept to three sections —
+`## Logline`, `## Characters in Scene` (roster names, so `src/animator.py` can
+find blueprints), and `## Setting & Light` (the shared stage, key story
+object, practical light source, and palette). Everything else lives inside
+the three segment sections (`## Segment 0 (0:00-0:10)`,
+`## Segment 1 (0:10-0:20)`, `## Segment 2 (0:20-0:30)`), each of which is
+**fully self-contained** with its own `### Story Beat`,
+`### Blocking & Character Locations`, `### Camera`, `### Animation & Acting`,
+`### Dialogue`, `### Sound & Music`, and `### Shot Steps` sub-sections, chained
+into a miniature three-act arc (arrival & want → confrontation & turn →
+resolution & hook). Because every segment is self-contained, the animator can
+prompt the video model with exactly one segment at a time without leaking the
+others.
+
+```bash
+uv run python src/scene_script.py \
+    --prompt "Mrs. Brisby meets the Great Owl" \
+    --name "frisby_meets_greatowl"
+```
+
+The scene document is written to `out/scripts/<name>.md`. Re-running with the
+same `--name` refuses to overwrite an existing script unless `--force` is
+passed. Use `--model` to select a different Gemini text model.
+
+---
+
+## 12. Animator (Gemini Omni Flash)
+
+`src/animator.py` turns a scene script into animated clips using Google
+Gemini Omni Flash (`gemini-omni-flash-preview`). It:
+
+1. Reads `out/scripts/<scene>.md` and splits it into its marked 10-second
+   segments.
+2. Parses the `## Characters in Scene` section and, for just those characters,
+   collects the final character design — the **last `attempt-*.jpg`** in each
+   character's `out/blueprint/<character-slug>/` folder.
+3. Generates **one 10-second, 720p, 24fps, 16:9 clip per segment**, saved to
+   `out/animations/<scene>/part-<N>.mp4`. Each video prompt contains only the
+   shared `## Setting & Light` section plus that one segment's script — the
+   other segments are deliberately omitted so the model stays focused. Parts
+   that already exist are skipped unless `--force` is passed. For visual
+   continuity, each clip's last frame is extracted to `part-<N>.jpg`
+   (requires `ffmpeg`), and when generating segment `N` the previous segment's
+   frame (`part-<N-1>.jpg`) is sent as an additional reference image with an
+   instruction to continue the video from that exact frame.
+4. When every segment is present in the output folder at the end of a run,
+   concatenates them in order into `out/animations/<scene>/full.mp4`
+   (requires `ffmpeg` on `PATH`).
+
+```bash
+uv run python src/animator.py --scene frisby_meets_greatowl            # all missing parts
+uv run python src/animator.py --scene frisby_meets_greatowl --parts 2  # only the 3rd segment
+```
+
+Use `--video-model`, `--duration`, `--timeout`, `--scripts-dir`,
+`--blueprint-dir`, and `--output` to override the defaults. The command fails
+with a helpful error when the scene script is missing, `--parts` does not
+match a segment index, or a scene character has no blueprint attempts yet.

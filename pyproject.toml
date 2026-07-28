@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nimh-character-generator"
 version = "0.1.0"
-description = "Generate and visually review Don Bluth character style guides for the Rats of NIMH project."
+description = "Art pipeline for generating Don Bluth style character blueprints, scene background plates, scene scripts, and animated clips for the Rats of NIMH project."
 requires-python = ">=3.11"
 dependencies = [
     "google-genai>=1.0.0",
@@ -14,7 +14,14 @@ dependencies = [
 ]
 
 [project.scripts]
-generate-character = "character_blueprint_generator.generate:main"
+generate-blueprint = "blueprint_generator.generate:main"
+generate-character = "blueprint_generator.generate:main"
+scene-script = "scene_script:main"
+animator = "animator:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+py-modules = ["scene_script", "animator"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

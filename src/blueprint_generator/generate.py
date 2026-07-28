@@ -1,9 +1,16 @@
-"""Generate, review, and refine a Don Bluth character style guide.
+"""Generate, review, and refine Don Bluth style blueprints.
 
-The generator is generic over any character defined in
-:mod:`character_blueprint_generator.characters`. Pass ``--character <name>`` to
-select the subject; the pipeline builds a tailored image prompt and reviewer
-system instruction from that character's spec.
+The generator operates on two kinds of subjects:
+
+* **Characters** defined in :mod:`blueprint_generator.characters` — pass
+  ``--character <name>`` to generate a character style-guide sheet.
+* **Scene backgrounds** defined in :mod:`blueprint_generator.scenes` — pass
+  ``--scene <name>`` to generate the 1-2 clean background plates a scene
+  describes. Every plate runs through its own generate/review loop.
+
+In both modes the pipeline builds a tailored image prompt and reviewer system
+instruction from the subject's spec, then iterates until the reviewer accepts
+or the iteration cap is reached.
 """
 
 from __future__ import annotations
@@ -24,13 +31,20 @@ from google import genai
 from google.genai import types
 from PIL import Image
 
-from character_blueprint_generator.characters import (
+from blueprint_generator import slug
+from blueprint_generator.characters import (
     CharacterSpec,
     get_character,
     list_character_names,
 )
+from blueprint_generator.scenes import (
+    SCENES,
+    BackgroundSpec,
+    SceneSpec,
+    get_scene,
+)
 
-logger = logging.getLogger("character_blueprint_generator")
+logger = logging.getLogger("blueprint_generator")
 
 
 # Review model constants
@@ -54,6 +68,22 @@ class Attempt:
     feedback: str
     prompt_change: str
     prompt_used: str = ""
+
+
+@dataclass
+class Subject:
+    """One blueprint image to generate: a character sheet or a scene background plate."""
+
+    label: str
+    """Human-readable subject label for logs, e.g. ``scene 'X' background 'y'``."""
+
+    display_name: str
+    """Title used in iterations.md."""
+
+    output_dir: Path
+    style_slug: str
+    initial_prompt: str
+    review_instruction: str
 
 
 def build_initial_prompt(character: CharacterSpec) -> str:
@@ -89,6 +119,56 @@ Apply Don Bluth's strict 1980s aesthetic & technical visual criteria for {charac
 5. Character Style Befitting the Narrative (HARD GATE): The design itself must make the viewer FEEL this character's role in the story at first glance; it must read as {character.pose_mood}. Apply the Bluth character-design DNA: grotesque-yet-appealing shapes, asymmetry and age/wear etched into the silhouette, tufted spiky fur or feathers breaking every contour, and oversized glossy eyes that carry the entire emotional performance. Ask yourself: "Could this exact design only exist in The Secret of NIMH (1982), and does it trigger the precise emotional reaction the narrative demands (awe, fear, tenderness, menace)?" A competent, cute, symmetrical, or generic rendering that could be dropped into any modern cartoon or children's book FAILS this criterion even when every technical box above is checked.
 
 Be exacting and demanding. Do NOT accept merely because an image is visually pleasing or artistic if it misses key Don Bluth style mandates or reference sheet layout needs. NEVER accept an image that fails criterion 5, no matter how polished or technically correct it is: "generic but well-executed" is always a rejection. When rejecting, provide a complete, self-contained revised image prompt that precisely remedies all identified defects — especially any missing narrative emotional register or Bluth-specific character-style DNA — while preserving all correct details.
+
+Return JSON only with this schema:
+{{"accepted": boolean, "score": integer from 0 to 100, "learning": "one concise lesson for the next iteration", "feedback": "specific visual findings", "revised_prompt": "a complete replacement image prompt when rejected; empty string when accepted"}}."""
+
+
+def build_scene_initial_prompt(scene: SceneSpec, background: BackgroundSpec) -> str:
+    return f"""Create a polished production background plate for a hand-painted,
+early-1980s dark fantasy animated feature (The Secret of NIMH, 1982 era).
+Deliver one cohesive 16:9 background with NO characters or creatures in frame —
+a clean plate ready for cel compositing.
+
+Scene: {scene.name} — {scene.logline}.
+This plate depicts {background.description}.
+
+Paint in dense opaque gouache with transparent watercolor washes on heavy-tooth
+textured paper, using sponge-dabbing, dry-brush work on bark and stone, and fine
+splatter for dirt and damp mist. Gothic organic forms only — gnarled tangled
+roots, arched burrows, sagging beams — with zero straight edges or digital
+symmetry. Human-scale objects, if any, loom gargantuan from this rodent
+macro perspective.
+
+Lighting: {background.lighting}. Keep 60-70% of the frame in deep shadow, warm
+amber/gold light at the epicenter shifting to cool teal/indigo ambient shadow,
+a soft airbrushed glow radiating from the light source, and volumetric dust
+motes in the light path. Mood: {background.mood}.
+
+Frame from a low rodent macro camera (2-12 inches above ground) with the
+environment dominating the frame, a heavy vignette, and soft-focus dark
+foreground silhouettes (roots, vines, cracked edges) occluding 20-30% of the
+frame borders. No characters, no text, no watermarks."""
+
+
+def build_scene_review_system_instruction(scene: SceneSpec, background: BackgroundSpec) -> str:
+    return f"""You are a world-class background art director and production designer specializing in Don Bluth's iconic 1980s dark fantasy feature animation style (e.g., The Secret of NIMH, 1982).
+
+Your job is to critically review the supplied background plate for the scene "{scene.name}" ({scene.logline}) against the requested prompt, analyze any previous review iterations you gave on earlier images, and decide whether the current image meets feature-film production standards.
+
+When past review iterations are provided:
+- Treat them as clearly labeled historical feedback from previous rounds in this review process.
+- Critique the results of your past instructions: evaluate whether the image generator successfully implemented your prior feedback/revised prompt, or if it introduced new flaws.
+- Refine and improve your review process based on how effectively previous prompt changes moved the artwork toward the target aesthetic.
+
+Apply Don Bluth's strict 1980s aesthetic & technical visual criteria for this background plate:
+1. Environment Content: The plate must depict {background.description}. Gothic organic forms only (gnarled roots, arched burrows, sagging beams); zero straight edges, zero modern props, zero digital symmetry. Rodent macro scale: human objects must loom gargantuan.
+2. Medium & Texture: Dense opaque gouache and transparent watercolor on heavy-tooth paper with sponge-dabbing, dry-brush, and fine splatter texture. Reject clean vector art, 3D CGI, smooth plastic gradients, photographic realism, or digital glow filters.
+3. Lighting & Palette: {background.lighting}. A single clearly identifiable practical light source; 60-70% of frame in deep shadow; warm amber/gold key against cool teal/indigo ambient shadow; soft airbrushed bloom around the source; volumetric dust motes in the light path.
+4. Staging & Depth: Low rodent macro camera (2-12 inches above ground); environment dominating the frame; soft-focus dark foreground silhouettes occluding 20-30% of frame borders; heavy vignette. The plate must feel {background.mood}.
+5. Clean Plate & Narrative Register (HARD GATE): NO characters or creatures anywhere in frame, no text, logos, or watermarks — this is a production background for cel compositing. And the environment itself must make the viewer FEEL the scene's role in the story at first glance ({scene.logline}). Ask yourself: "Could this exact background only exist in The Secret of NIMH (1982), and does it trigger the precise emotional reaction the narrative demands?" A competent, pretty, generic fantasy backdrop that could be dropped into any modern cartoon FAILS this criterion even when every technical box above is checked.
+
+Be exacting and demanding. Do NOT accept merely because an image is visually pleasing or artistic if it misses key Don Bluth style mandates or background plate needs. NEVER accept an image that fails criterion 5, no matter how polished or technically correct it is: "generic but well-executed" is always a rejection. When rejecting, provide a complete, self-contained revised image prompt that precisely remedies all identified defects — especially any missing narrative emotional register or Bluth-specific environment DNA — while preserving all correct details.
 
 Return JSON only with this schema:
 {{"accepted": boolean, "score": integer from 0 to 100, "learning": "one concise lesson for the next iteration", "feedback": "specific visual findings", "revised_prompt": "a complete replacement image prompt when rejected; empty string when accepted"}}."""
@@ -322,10 +402,10 @@ def fallback_revision(prompt: str, feedback: str) -> str:
     return f"{prompt}\n\nCorrection focus from visual review: {feedback.strip()}"
 
 
-def write_iterations(destination: Path, character_name: str, attempts: list[Attempt], accepted: bool) -> None:
+def write_iterations(destination: Path, subject_name: str, attempts: list[Attempt], accepted: bool) -> None:
     result = "accepted" if accepted else f"not accepted within the {MAX_ITERATIONS}-iteration limit"
     lines = [
-        f"# {character_name} Generation Iterations",
+        f"# {subject_name} Generation Iterations",
         "",
         f"- Iterations run: {len(attempts)}",
         f"- Final result: {result}",
@@ -352,32 +432,58 @@ def write_iterations(destination: Path, character_name: str, attempts: list[Atte
     destination.write_text("\n".join(lines), encoding="utf-8")
 
 
-def run(args: argparse.Namespace) -> int:
-    if not 1 <= args.max_iterations <= MAX_ITERATIONS:
-        raise ValueError(f"--max-iterations must be between 1 and {MAX_ITERATIONS}.")
+def build_subjects(args: argparse.Namespace) -> list[Subject]:
+    """Resolve the CLI target into the list of blueprint subjects to generate."""
+    if args.character:
+        character = get_character(args.character)
+        output = (
+            Path(args.output)
+            if args.output
+            else Path("out") / "blueprint" / slug(character.name)
+        )
+        return [
+            Subject(
+                label=f"character {character.name!r}",
+                display_name=character.name,
+                output_dir=output,
+                style_slug=slug(character.name),
+                initial_prompt=build_initial_prompt(character),
+                review_instruction=build_review_system_instruction(character),
+            )
+        ]
 
-    character = get_character(args.character)
+    scene = get_scene(args.scene)
+    base = Path(args.output) if args.output else Path("out") / "blueprint" / scene.slug
+    return [
+        Subject(
+            label=f"scene {scene.name!r} background {background.key!r}",
+            display_name=f"{scene.name} — {background.key} background",
+            output_dir=base / background.key,
+            style_slug=f"{scene.slug}-{background.key}",
+            initial_prompt=build_scene_initial_prompt(scene, background),
+            review_instruction=build_scene_review_system_instruction(scene, background),
+        )
+        for background in scene.backgrounds
+    ]
 
-    gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-    openrouter_key = os.environ.get("OPENROUTER_API_KEY")
 
-    if "/" in args.review_model:
-        if not openrouter_key:
-            raise RuntimeError("Set OPENROUTER_API_KEY before running with an OpenRouter review model.")
-    else:
-        if not gemini_key:
-            require_environment("GEMINI_API_KEY", "GOOGLE_API_KEY")
+def run_subject(
+    client: genai.Client,
+    openrouter_key: str | None,
+    args: argparse.Namespace,
+    subject: Subject,
+) -> int:
+    """Run the generate/review loop for one blueprint subject.
 
-    if not gemini_key:
-        require_environment("GEMINI_API_KEY", "GOOGLE_API_KEY")
-
-    output = Path(args.output)
+    Returns 0 when the reviewer accepts an image, 2 when the iteration cap is
+    reached without acceptance.
+    """
+    output = subject.output_dir
     output.mkdir(parents=True, exist_ok=True)
     for old_attempt in output.glob("attempt-*.jpg"):
         logger.info("Removing old attempt file: %s", old_attempt)
         old_attempt.unlink()
 
-    client = genai.Client(api_key=gemini_key)
     existing_prompt_path = output / "prompt.txt"
     existing_prompt = (
         existing_prompt_path.read_text(encoding="utf-8").strip()
@@ -391,17 +497,14 @@ def run(args: argparse.Namespace) -> int:
             existing_prompt_path, len(current_prompt),
         )
     else:
-        current_prompt = build_initial_prompt(character)
-        logger.info("No existing prompt.txt found; built initial prompt from the character spec")
+        current_prompt = subject.initial_prompt
+        logger.info("No existing prompt.txt found; built initial prompt from the subject spec")
     last_used_prompt = current_prompt
-    review_system_instruction = build_review_system_instruction(character)
     attempts: list[Attempt] = []
     history: list[tuple[Attempt, bytes]] = []
     accepted = False
 
-    logger.info("=== Starting %s generation pipeline ===", character.name)
-    logger.info("Image model: %s | Review model: %s | Max iterations: %d",
-                args.image_model, args.review_model, args.max_iterations)
+    logger.info("=== Starting generation pipeline for %s ===", subject.label)
     logger.info("Output directory: %s", output)
 
     for number in range(1, args.max_iterations + 1):
@@ -421,7 +524,7 @@ def run(args: argparse.Namespace) -> int:
             client=client,
             openrouter_key=openrouter_key,
             model=args.review_model,
-            system_instruction=review_system_instruction,
+            system_instruction=subject.review_instruction,
             prompt=current_prompt,
             image_data=image_data,
             history=history,
@@ -454,8 +557,8 @@ def run(args: argparse.Namespace) -> int:
         attempts.append(attempt_record)
         history.append((attempt_record, image_data))
 
-        save_jpeg(image_data, output / f"{slug(character.name)}-style.jpg")
-        write_iterations(output / "iterations.md", character.name, attempts, accepted)
+        save_jpeg(image_data, output / f"{subject.style_slug}-style.jpg")
+        write_iterations(output / "iterations.md", subject.display_name, attempts, accepted)
 
         if accepted:
             logger.info("✓ Iteration %d ACCEPTED (score: %s). Pipeline complete.", number, score)
@@ -465,17 +568,45 @@ def run(args: argparse.Namespace) -> int:
             logger.info("Updated prompt for next iteration (%d chars)", len(current_prompt))
 
     (output / "prompt.txt").write_text(last_used_prompt + "\n", encoding="utf-8")
-    style_path = output / f"{slug(character.name)}-style.jpg"
     print(
-        f"Wrote {style_path}, {output / 'prompt.txt'}, and "
+        f"Wrote {output / f'{subject.style_slug}-style.jpg'}, {output / 'prompt.txt'}, and "
         f"{output / 'iterations.md'} after {len(attempts)} iteration(s)."
     )
     return 0 if accepted else 2
 
 
-def slug(name: str) -> str:
-    """Return a filesystem-safe lowercase slug for a character name."""
-    return name.lower().replace(" ", "-").replace(".", "")
+def run(args: argparse.Namespace) -> int:
+    if not 1 <= args.max_iterations <= MAX_ITERATIONS:
+        raise ValueError(f"--max-iterations must be between 1 and {MAX_ITERATIONS}.")
+
+    subjects = build_subjects(args)
+
+    gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+    openrouter_key = os.environ.get("OPENROUTER_API_KEY")
+
+    if "/" in args.review_model:
+        if not openrouter_key:
+            raise RuntimeError("Set OPENROUTER_API_KEY before running with an OpenRouter review model.")
+    else:
+        if not gemini_key:
+            require_environment("GEMINI_API_KEY", "GOOGLE_API_KEY")
+
+    if not gemini_key:
+        require_environment("GEMINI_API_KEY", "GOOGLE_API_KEY")
+
+    client = genai.Client(api_key=gemini_key)
+
+    logger.info("Image model: %s | Review model: %s | Max iterations: %d",
+                args.image_model, args.review_model, args.max_iterations)
+    logger.info("Subjects to generate: %d (%s)",
+                len(subjects), ", ".join(subject.label for subject in subjects))
+
+    exit_code = 0
+    for subject in subjects:
+        result = run_subject(client, openrouter_key, args, subject)
+        if result != 0:
+            exit_code = result
+    return exit_code
 
 
 def main() -> None:
@@ -484,27 +615,34 @@ def main() -> None:
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
         datefmt="%H:%M:%S",
     )
-    available = ", ".join(list_character_names())
+    available_characters = ", ".join(list_character_names())
+    available_scenes = ", ".join(f"{spec.name} ({spec.slug})" for spec in SCENES.values())
     parser = argparse.ArgumentParser(
         description=(
-            "Generate and review a Don Bluth character style guide for any "
-            "character defined in the Rats of NIMH project."
+            "Generate and review Don Bluth blueprints for the Rats of NIMH "
+            "project: either a character style guide (--character) or the 1-2 "
+            "background plates of a scene (--scene)."
         )
     )
-    parser.add_argument(
+    target = parser.add_mutually_exclusive_group(required=True)
+    target.add_argument(
         "--character",
-        required=True,
-        help=(
-            f"Name of the character to generate (required). "
-            f"Available characters: {available}."
-        ),
+        default=None,
+        help=f"Name of the character to generate. Available characters: {available_characters}.",
+    )
+    target.add_argument(
+        "--scene",
+        default=None,
+        help=f"Name or slug of the scene whose background plates to generate. Available scenes: {available_scenes}.",
     )
     parser.add_argument(
         "--output",
         default=None,
         help=(
-            "Output directory (default: auto-derived from the character name, "
-            "e.g. ./out/blueprint/mr-ages/)."
+            "Output directory (default: auto-derived from the subject name, "
+            "e.g. ./out/blueprint/mr-ages/ for a character or "
+            "./out/blueprint/great-owl-hollow/ for a scene, with one "
+            "subdirectory per background plate)."
         ),
     )
     parser.add_argument(
@@ -521,20 +659,20 @@ def main() -> None:
         "--max-iterations",
         type=int,
         default=MAX_ITERATIONS,
-        help=f"Maximum generation/review attempts, 1-{MAX_ITERATIONS} (default: {MAX_ITERATIONS}).",
+        help=f"Maximum generation/review attempts per subject, 1-{MAX_ITERATIONS} (default: {MAX_ITERATIONS}).",
     )
 
     args = parser.parse_args()
 
-    # Validate the character name early so a bad name lists all available
-    # characters in a clean error message before any API work begins.
+    # Validate the subject name early so a bad name lists all available
+    # subjects in a clean error message before any API work begins.
     try:
-        character = get_character(args.character)
+        if args.character:
+            get_character(args.character)
+        else:
+            get_scene(args.scene)
     except ValueError as error:
         parser.error(str(error))
-
-    if args.output is None:
-        args.output = str(Path("out") / "blueprint" / slug(character.name))
 
     try:
         raise SystemExit(run(args))

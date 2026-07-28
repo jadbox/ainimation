@@ -11,14 +11,14 @@ fi
 
 cd "$SCRIPT_DIR"
 
-# Available characters, mirrored from character_blueprint_generator/characters.py
+# Available characters, mirrored from blueprint_generator/characters.py
 # for shell-side error messages.
 CHARACTERS="Mrs. Brisby, Mr. Ages, Nicodemus, Timothy Frisby, Justin, Jenner, Dragon, The Great Owl"
 
 err_no_character() {
     echo "Error: a character name is required." >&2
     echo "Available characters: $CHARACTERS" >&2
-    echo "Usage: $0 <character-name>   or   $0 --character <character-name>" >&2
+    echo "Usage: $0 <character-name>   or   $0 --character <character-name>   or   $0 --scene <scene-name>" >&2
     exit 2
 }
 
@@ -27,7 +27,7 @@ err_no_character() {
 if [ "$#" -gt 0 ] && [[ "$1" != -* ]]; then
     CHARACTER="$1"
     shift
-    exec "$PYTHON" -m character_blueprint_generator.generate --character "$CHARACTER" "$@"
+    exec "$PYTHON" -m blueprint_generator.generate --character "$CHARACTER" "$@"
 fi
 
 # Scan for a bare --character with no following value (either it is the last
@@ -43,4 +43,4 @@ if [ "$prev" = "--character" ]; then
     err_no_character
 fi
 
-exec "$PYTHON" -m character_blueprint_generator.generate "$@"
+exec "$PYTHON" -m blueprint_generator.generate "$@"

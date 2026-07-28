@@ -1,4 +1,4 @@
-"""Character specifications for the Rats of NIMH Don Bluth style-guide generator.
+"""Character specifications for the Rats of NIMH Don Bluth blueprint generator.
 
 Each character is derived from the design specifications in ``readme.md`` and
 provides the data needed to build a generation prompt and a review system

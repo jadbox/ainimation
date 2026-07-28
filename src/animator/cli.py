@@ -5,10 +5,11 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import subprocess
+from pathlib import Path
 
 from google import genai
 import requests
-from pathlib import Path
 
 from animator.api import create_video_interaction, extract_video_bytes, wait_for_completion
 from animator.config import (
@@ -23,13 +24,106 @@ from animator.config import (
 from animator.media import combine_parts, extract_last_frame, frame_path, part_path, previous_frame
 from animator.prompt import build_direction, build_input_items
 from animator.script import (
-    latest_attempt_image,
     parse_global_section,
     parse_scene_characters,
     parse_segments,
 )
+from blueprint_generator import slug
+from movie_config import get_scene, get_story_scene
 
 logger = logging.getLogger("animator")
+
+
+def latest_attempt(folder: Path) -> Path | None:
+    """Return the newest attempt-*.jpg directly in a blueprint folder, if any."""
+    attempts = sorted(folder.glob("attempt-*.jpg"))
+    return attempts[-1] if attempts else None
+
+
+def run_blueprint_generator(command: list[str]) -> None:
+    """Run the blueprint generator CLI, echoing the exact command first."""
+    printable = " ".join(f'"{part}"' if " " in part else part for part in command)
+    print(f"CREATING BLUEPRINT: {printable}")
+    try:
+        subprocess.run(command, check=True)
+    except subprocess.CalledProcessError as error:
+        raise RuntimeError(
+            f"Blueprint generation failed (exit {error.returncode}): {printable}"
+        ) from error
+
+
+def ensure_character_reference(character: str, blueprint_dir: Path) -> Path:
+    """Return the character's latest blueprint image, generating it if missing."""
+    folder = blueprint_dir / slug(character)
+    image = latest_attempt(folder)
+    if image is None:
+        run_blueprint_generator(["uv", "run", "generate-blueprint", "--character", character])
+        image = latest_attempt(folder)
+    if image is None:
+        raise RuntimeError(
+            f"Blueprint generation produced no attempt-*.jpg in {folder} for {character!r}."
+        )
+    return image
+
+
+def resolve_scene_slug(script_name: str) -> str | None:
+    """Map a scene-script name to its scene-location slug in movie.yml, if any."""
+    try:
+        location = get_story_scene(script_name).scene
+        if location:
+            return get_scene(location).slug
+    except ValueError:
+        pass
+    try:
+        return get_scene(script_name).slug
+    except ValueError:
+        return None
+
+
+def find_scene_background_plate(
+    scene_slug: str, blueprint_dir: Path, script_text: str = ""
+) -> Path | None:
+    """Find the newest background plate in subfolders defined by movie.yml for a scene."""
+    try:
+        scene = get_scene(scene_slug)
+    except ValueError:
+        scene = None
+
+    if scene and scene.backgrounds:
+        ordered_backgrounds = sorted(
+            scene.backgrounds,
+            key=lambda bg: 0 if bg.key in script_text else 1,
+        )
+        for bg in ordered_backgrounds:
+            folder = blueprint_dir / scene_slug / bg.key
+            plate = latest_attempt(folder)
+            if plate is not None:
+                return plate
+
+    return latest_attempt(blueprint_dir / scene_slug)
+
+
+def ensure_background_plate(
+    scene_slug: str, blueprint_dir: Path, script_text: str = ""
+) -> Path:
+    """Return the scene's latest background plate, generating it if missing."""
+    plate = find_scene_background_plate(scene_slug, blueprint_dir, script_text)
+    if plate is None:
+        run_blueprint_generator(["uv", "run", "generate-blueprint", "--scene", scene_slug])
+        plate = find_scene_background_plate(scene_slug, blueprint_dir, script_text)
+    if plate is None:
+        try:
+            scene = get_scene(scene_slug)
+            expected_paths = ", ".join(
+                str(blueprint_dir / scene_slug / bg.key) for bg in scene.backgrounds
+            )
+        except ValueError:
+            expected_paths = str(blueprint_dir / scene_slug)
+        raise RuntimeError(
+            f"Blueprint generation produced no attempt-*.jpg in {expected_paths} "
+            f"for scene {scene_slug!r}."
+        )
+    return plate
 
 
 def run(args: argparse.Namespace) -> int:
@@ -38,7 +132,7 @@ def run(args: argparse.Namespace) -> int:
     if not script_path.is_file():
         raise RuntimeError(
             f"Scene script {script_path} not found. "
-            f"Generate it first with src/scene_script.py --name \"{args.scene}\" --prompt \"...\"."
+            f"Generate it first with: uv run scene-script --name \"{args.scene}\""
         )
     script = script_path.read_text(encoding="utf-8")
     logger.info("Loaded scene script: %s (%d chars)", script_path, len(script))
@@ -80,12 +174,6 @@ def run(args: argparse.Namespace) -> int:
         selected = segments
 
     blueprint_dir = Path(args.blueprint_dir)
-    references = [
-        (character, latest_attempt_image(character, blueprint_dir))
-        for character in characters
-    ]
-    for character, image_path in references:
-        logger.info("Reference for %s: %s", character, image_path)
 
     pending = [
         segment
@@ -106,6 +194,23 @@ def run(args: argparse.Namespace) -> int:
             raise RuntimeError("Set GEMINI_API_KEY or GOOGLE_API_KEY before running this command.")
         client = genai.Client(api_key=gemini_key)
 
+        references = [
+            (character, ensure_character_reference(character, blueprint_dir))
+            for character in characters
+        ]
+        for character, image_path in references:
+            logger.info("Reference for %s: %s", character, image_path)
+
+        scene_slug = resolve_scene_slug(args.scene)
+        if scene_slug:
+            logger.info("Scene location for the background plate: %s", scene_slug)
+        else:
+            logger.info(
+                "No movie.yml scene location matches %r; generating without a "
+                "background plate reference.",
+                args.scene,
+            )
+
         for segment in pending:
             logger.info(
                 "=== Generating segment %d of %d (%s) ===",
@@ -114,6 +219,14 @@ def run(args: argparse.Namespace) -> int:
                 segment.span or "whole script",
             )
             continuity_frame = previous_frame(scene_dir, segment)
+            background_plate = None
+            if scene_slug and segment.index == segments[0].index and continuity_frame is None:
+                background_plate = ensure_background_plate(scene_slug, blueprint_dir, script)
+                logger.info(
+                    "Background plate reference for segment %d: %s",
+                    segment.index,
+                    background_plate,
+                )
             direction = build_direction(
                 args.scene,
                 logline,
@@ -122,8 +235,11 @@ def run(args: argparse.Namespace) -> int:
                 characters,
                 args.duration,
                 has_continuity=continuity_frame is not None,
+                has_background_reference=background_plate is not None,
             )
-            input_items = build_input_items(direction, references, continuity_frame)
+            input_items = build_input_items(
+                direction, references, continuity_frame, background_plate
+            )
             interaction = create_video_interaction(
                 client, args.video_model, input_items, args.duration
             )

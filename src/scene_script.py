@@ -1,18 +1,20 @@
 #!/usr/bin/env python3
-"""Expand a short scene idea into a detailed 30-second scene design document.
+"""Expand an abridged story scene from ``movie.yml`` into a detailed 30-second scene design document.
 
-Uses Gemini 3.6 Flash to turn a one-line scene description into a
-production-ready scene script covering character locations, camera location,
-camera movement, scene animations, sounds, and music — all held to the direction
-and lighting rules in ``movie.yml``. The scene is structured as three clearly
-marked 10-second segments (``## Segment 0 (0:00-0:10)`` ...) so ``animator``
-can generate each segment as its own clip.
+Uses Gemini 3.6 Flash to turn the ``story:`` section's abridged scene beats
+(scene reference, characters, key emotions, important actions/talking points,
+and character eyelines/expressions) into a production-ready scene script
+covering character locations, camera location, camera movement, scene
+animations, sounds, and music — all held to the direction and lighting rules in
+``movie.yml``. The scene is structured as three clearly marked 10-second
+segments (``## Segment 0 (0:00-0:10)`` ...) so ``animator`` can generate each
+segment as its own clip.
 
 The result is written to ``out/scripts/<name>.md``.
 
 Usage:
-    python src/scene_script.py --prompt "Mrs. Brisby meets the Great Owl" \
-        --name "frisby_meets_greatowl"
+    python src/scene_script.py                      # list available story scenes
+    python src/scene_script.py --name "frisby_visits_mr_ages"
 """
 
 from __future__ import annotations
@@ -26,7 +28,15 @@ from pathlib import Path
 from google import genai
 from google.genai import types
 
-from movie_config import get_movie_info, list_character_names
+from movie_config import (
+    SceneSpec,
+    StorySceneSpec,
+    get_movie_info,
+    get_scene,
+    get_story_scene,
+    list_character_names,
+    list_story_scenes,
+)
 
 logger = logging.getLogger("scene_script")
 
@@ -40,7 +50,7 @@ def build_system_instruction() -> str:
     rules = "\n".join(f"- {rule}" for rule in movie_info.hard_direction_rules)
     return f"""You are a world-class animation director and production designer specializing in {movie_info.style}. You are designing a scene for {movie_info.adaptation}.
 
-Expand the user's short scene description into a detailed, production-ready scene design document tailored for exactly 30 seconds of screen time, structured as THREE 10-second segments. The document must cover character locations, camera location, camera movement, scene animations, sounds, and music.
+Expand the user's abridged story beat into a detailed, production-ready scene design document tailored for exactly 30 seconds of screen time, structured as THREE 10-second segments. The document must cover character locations, camera location, camera movement, scene animations, sounds, and music. Every detail matters — nothing in the document may be generic or interchangeable.
 
 HARD DIRECTION RULES (from the project style bible — every choice must obey them):
 {rules}
@@ -57,7 +67,46 @@ DRAMATIC ARCHITECTURE (required — this is what makes the scene a powerful shor
 - Give the scene ONE key story object (e.g., a glowing medicine vial) that embodies its meaning; the camera and lighting must treat it as sacred when it appears.
 - Design ONE unforgettable story image — the single frame a viewer would remember — and build a held beat around it.
 - WORK ALL THE ELEMENTS AT THE TURN: when the emotion pivots, the camera distance, lighting temperature/pool size, sound bed, and music must all shift together to tell the story wordlessly.
-- Dialogue is minimal and essential: 2-4 short lines total, each carrying story weight.
+
+MOMENT-BY-MOMENT CHRONOLOGICAL PARAGRAPHS (required — merge camera, actions, speech, and sound into unified chronological paragraphs separated ONLY by double line breaks):
+- INITIAL SPATIAL OBJECT MAPPING (required — first sentence of every segment MUST define scene spatial layout relative to camera): The VERY FIRST SENTENCE of every Segment MUST be a semi-colon separated (`;`) list explicitly defining all characters, key props, and light sources in frame in reference to camera coordinates (left, right, center, top-left, middle, bottom-right, etc.). Example: `MRS BRISBY enters on the right; MR AGES is sitting at the reading desk on the left; an oil lantern provides lighting to the room near the middle-left; towering book stacks fill the background.`
+- DIRECT, LITERAL DIRECTIONAL LANGUAGE (required — assume video generator needs clear, direct, 100% literal direction): STRICTLY BAN abstract poetry or figurative lighting phrases inside segment actions (e.g. NEVER write "From the deep indigo shadows" or "shadow lanes"). Instead, use direct physical directives like `MRS BRISBY, emerging from the dark right exterior of the room, steps forward into the illuminated center floor...` or `MR AGES, sitting at the desk on the left, turns his head 45 degrees to look right...`.
+- NO SUB-HEADINGS INSIDE SEGMENTS: Inside each `## Segment N (span)` section, write the chronological moments as paragraphs separated ONLY by double line breaks (`\n\n`). Do NOT include `### Moment` headers or bullet point lists within segments.
+- SINGLE CONTINUOUS CAMERA CUT: Each segment must represent a single continuous camera shot with a consistent camera perspective — strictly NO sudden scene cuts, jump cuts, or camera angle changes during the segment.
+- MERGE ALL DETAILS INTO EACH MOMENT PARAGRAPH: Each moment paragraph must be an elegant, concise, chronological paragraph that seamlessly merges ALL relevant facts for that exact timeframe as they happen in real time:
+  1. What the camera is doing (height, smooth continuous movement, composition, lens framing).
+  2. Character locations, ground planes, depth planes (midground/foreground/background, left/right), and eyelines.
+  3. Ongoing physical tasks and physical engagement with props/environment (e.g. reading a book, tracing text with a claw, wringing a cape, sorting herbs).
+  4. Physical reactions to dialogue and arrivals (body language, paws freezing mid-gesture, head turns, chest breathing, whisker/ear twitches).
+  5. Attributed dialogue spoken during that moment.
+  6. Sounds and music occurring in sync with the action.
+
+DIALOGUE ATTRIBUTION FORMAT (required — explicitly identify speaker species/descriptor and frame location):
+- Whenever a character speaks, ALWAYS attribute dialogue with their species/descriptor and frame position: e.g. `MRS BRISBY (field mouse on the right): "..."` or `MR AGES (mouse on the left): "..."` or `NICODEMUS (rat on the left): "..."`. This ensures the video generator never confuses which character is speaking.
+
+EYELINES, BODY & CAMERA AS NARRATIVE (required — the audience reads the story in the eyes, the body, and the lens):
+- STATE WHERE EVERY CHARACTER IS LOOKING IN EVERY BEAT: name the exact object of each gaze (the other character's eyes, the story object, the shadows). Characters MUST look at each other or at scene objects — NEVER look directly into the camera lens unless explicitly instructed as a direct POV shot.
+- SHARED DEPTH & STAGING FOR INTERACTIONS: interacting characters MUST be staged on the SAME GENERAL DEPTH PLANE (e.g., both in the MIDGROUND side-by-side or at a 3/4 angle across a shared desk) so both characters' faces and eyelines align naturally in 3/4 profile or profile view. NEVER place one character far in the background directly behind another foreground character during dialogue or interaction, which forces one character to face away from the camera or stare into the lens.
+- CONTINUOUS LIVING SECONDARY ANIMATION: every character in frame MUST be actively alive with continuous secondary motion in every second of the clip (rhythmic chest breathing, shuffling papers/herbs, ear or whisker twitches, weight shifts, finger twitches). NEVER describe a character as "doing nothing", "standing rigid", or behaving like a static robot.
+- CHARACTER ACTING, ENGAGEMENT & MULTI-TASKING: Every character must be actively engaged in a specific physical task with their environment or props (e.g. Mr Ages reading a large yellowed book, tracing lines with his claw and turning pages; Mrs Brisby wringing her red cape while stepping forward). Describe how characters balance ongoing physical tasks with reacting to dialogue and arrivals (e.g. "Mr Ages is reading a book when Mrs Brisby enters; at first he remains focused on tracing the text with his claw, speaking politely without immediately looking up, before pausing his claw over the page and peering up over his spectacles").
+- ACTIVE LISTENING & PHYSICAL IMPACT OF WORDS: Describe how a character's body, hands, eyes, and posture react when hearing dialogue (paws freezing mid-gesture over a book page, shoulders drooping, head turning, breath catching in the chest).
+- STATE WHAT EVERY CHARACTER DOES WITH THEIR BODY: posture, weight shifts, hands, ears, tail, breath. The body must externalize what each character feels but does not say (a wrung tail, a guarded turned shoulder, a lean-in that betrays hope).
+- MAKE THE CAMERA AN ACTIVE STORYTELLER: every placement, push-in, track, hold, and pull-back must be emotionally motivated and stated with its reason — camera distance mirrors emotional distance; a slow push-in grows intimacy or dread; a frozen, held frame is reverence. Where the characters look and what their bodies do must work together with the camera's movement to tell the narrative.
+
+DEPTH & OCCLUSION (required — generative video flattens space unless depth is spelled out):
+- Assign every character and every key set piece an explicit depth plane in every Moment: FOREGROUND (soft-focus occluders at the frame edges), MIDGROUND (furniture and props the camera looks past), or BACKGROUND (walls, stacks, deep shadow).
+- State the exact ground plane each character stands on (the floor, a path, a ledge). Characters NEVER stand on top of furniture or props (tables, desks, jars, lanterns, books) unless the scene specifically calls for climbing; when in doubt, feet stay on the floor.
+- For every set piece sitting between the camera and a character, state the occlusion explicitly — what it hides and when.
+
+DIALOGUE CRAFT & LITERARY ELEGANCE (required — dialogue must be poetic, emotional, and deeply character-driven):
+- BANNED DIALOGUE TROPES: STRICTLY FORBID generic TV scolding, modern slang, melodrama, or harsh outbursts (e.g. NEVER write lines like "I told you...", "woman!", "calm down!", "hey you").
+- CLASSIC FEATURE ANIMATION TONE: Mimic the elevated, literary, 1980s theatrical tone of classic Don Bluth cinema (The Secret of NIMH). Dialogue must feel poetic, rhythmic, dignified, and emotionally haunting.
+- CHARACTER-SPECIFIC VOCABULARY & SUBTEXT:
+  * Mr. Ages: An elderly scholar and physician; speaks with weary gravity, precision, and reluctant tenderness. Uses terms like "madam", "child", "lung-fever", "bright eyes". Never barks or insults.
+  * Mrs. Brisby: A devoted, vulnerable mother; speaks in breathless, tender, courageous pleas. Every word is weighted with love for her children.
+  * Nicodemus: An ancient, monumental leader; speaks with quiet, resonant wisdom and storybook poetry.
+- SUBTEXT OVER EXPOSITION: Lines must convey feeling and stakes through subtext rather than blunt facts (e.g. instead of "He has pneumonia and will die", write "Pneumonia... Bright eyes, madam. The lung-fever will take a young one before the morning frost unless we quiet the fire in his chest.").
+- MINIMAL & ESSENTIAL: Keep dialogue to 2-4 short, impactful lines total across the entire 30-second scene. Every spoken word must carry immense narrative and emotional weight.
 
 OUTPUT FORMAT — return Markdown with EXACTLY these section headers, in this order:
 # <evocative scene title>
@@ -66,40 +115,46 @@ OUTPUT FORMAT — return Markdown with EXACTLY these section headers, in this or
 ## Characters in Scene
 (one bullet per character, using the exact roster names, e.g. "- Mrs Brisby")
 ## Setting & Light
-(the shared stage, kept brief: the environment and its key props, the scene's ONE story object if any, the single dominant practical light source, and the baseline warm-vs-cool palette — everything here is constant across all three segments)
+(the shared stage, kept brief: the environment and its key props with their depth planes — foreground occluders, midground furniture, background walls — the scene's ONE story object if any, the single dominant practical light source, and the baseline warm-vs-cool palette — everything here is constant across all three segments)
 ## Segment 0 (0:00-0:10)
-### Story Beat
-(one sentence: this segment's role in the three-act arc and its emotional register)
-### Blocking & Character Locations
-(where each character is and how they move within this segment — blocking must express the power dynamic between them)
-### Camera
-(camera placement/height for this segment plus every movement — push-ins, tracking, cuts, held beats — with timings; note how camera distance closes or widens with the emotion)
-### Animation & Acting
-(the animation beats for this segment, noting ones/twos, anticipation, drag, follow-through, held poses, and micro-movements; acting must externalize what each character feels but does not say)
-### Dialogue
-(the line(s) spoken in this segment, attributed, e.g. `MRS BRISBY: "..."` — or the word None)
-### Sound & Music
-(the sound bed, key sync sounds, and music behavior inside this segment; both must shift with the emotional turn)
-### Shot Steps
-(3-5 numbered, timed steps covering the full 10 seconds, e.g. `1. (0:00-0:03) ...`)
+(detailed chronological moment paragraphs separated ONLY by double line breaks — NO ### headers or sub-headings within the segment. The camera remains one single continuous cut with consistent framing)
+
 ## Segment 1 (0:10-0:20)
-(the same seven ### sub-sections)
+(detailed chronological moment paragraphs separated ONLY by double line breaks — NO ### headers or sub-headings within the segment)
+
 ## Segment 2 (0:20-0:30)
-(the same seven ### sub-sections)
+(detailed chronological moment paragraphs separated ONLY by double line breaks — NO ### headers or sub-headings within the segment)
 
 SEGMENT RULES — the three Segment sections are the shooting plan and must:
 - Use the exact headers shown above (`## Segment 0 (0:00-0:10)`, etc.) so tooling can parse the 10-second boundaries.
-- Be FULLY SELF-CONTAINED: every production detail lives inside a Segment's own ### sub-sections. Tooling extracts each Segment individually (with only the Logline and Setting & Light attached) to prompt a video model, so a Segment must NEVER reference information defined in another Segment or in a section that no longer exists.
-- Chain into the three-act arc described above; each Segment must state in its Shot Steps the exact pose/composition it begins on (matching the previous Segment's final frame) so the generated clips can be concatenated seamlessly.
+- Be FULLY SELF-CONTAINED: every production detail lives inside a Segment's paragraphs. Tooling extracts each Segment individually (with only the Logline and Setting & Light attached) to prompt a video model, so a Segment must NEVER reference information defined in another Segment or in a section that no longer exists.
+- Chain into the three-act arc described above; each Segment must state in its opening paragraph the exact pose/composition it begins on (matching the previous Segment's final frame) so the generated clips can be concatenated seamlessly.
 
 Be specific and cinematic. Every visual choice must be filmable under the direction rules above, and every element must serve the story."""
 
 
-def build_user_prompt(scene_name: str, prompt: str) -> str:
+def build_user_prompt(story: StorySceneSpec, scene: SceneSpec) -> str:
+    characters = ", ".join(story.characters)
+    emotions = "\n".join(f"  - {item}" for item in story.emotions)
+    actions = "\n".join(f"  - {item}" for item in story.actions)
+    looks = "\n".join(f"  - {item}" for item in story.looks)
+    backgrounds = "\n".join(
+        f"  - ({bg.key}) {bg.description}\n"
+        f"    Lighting: {bg.lighting}\n"
+        f"    Mood: {bg.mood}"
+        for bg in scene.backgrounds
+    )
     return (
-        f"Scene name (production slug): {scene_name}\n"
-        f"Short scene description: {prompt}\n\n"
-        "Expand this into the full 30-second scene design document now, "
+        f"Scene name (production slug): {story.name}\n"
+        f"Story beat: {story.title}\n"
+        f"Location: {scene.name} — {scene.logline}\n"
+        "Setting reference (production background plates — keep the Setting & Light "
+        f"section consistent with them):\n{backgrounds}\n\n"
+        f"Characters in scene: {characters}\n"
+        f"Key emotions & feelings:\n{emotions}\n"
+        f"Important actions & talking points:\n{actions}\n"
+        f"Where the characters are looking & their facial expressions:\n{looks}\n\n"
+        "Expand this abridged story beat into the full 30-second scene design document now, "
         "following the exact output format (including the three 10-second "
         "Segment sections) and direction rules."
     )
@@ -124,7 +179,9 @@ def require_api_key() -> str:
 
 
 def run(args: argparse.Namespace) -> int:
-    scene_name = slugify_name(args.name)
+    story = get_story_scene(args.name)
+    scene = get_scene(story.scene)
+    scene_name = slugify_name(story.name)
     output = Path(args.output) if args.output else DEFAULT_SCRIPTS_DIR / f"{scene_name}.md"
     if output.exists() and not args.force:
         raise RuntimeError(
@@ -133,11 +190,11 @@ def run(args: argparse.Namespace) -> int:
 
     client = genai.Client(api_key=require_api_key())
 
-    logger.info("=== Expanding scene %r with model=%s ===", scene_name, args.model)
-    logger.info("Short prompt: %s", args.prompt)
+    logger.info("=== Expanding story scene %r with model=%s ===", scene_name, args.model)
+    logger.info("Story beat: %s (location: %s)", story.title, scene.name)
     response = client.models.generate_content(
         model=args.model,
-        contents=build_user_prompt(scene_name, args.prompt),
+        contents=build_user_prompt(story, scene),
         config=types.GenerateContentConfig(
             system_instruction=build_system_instruction(),
             temperature=0.7,
@@ -153,8 +210,8 @@ def run(args: argparse.Namespace) -> int:
         )
 
     header = (
-        f"<!-- Generated by scene_script.py (model: {args.model}) from prompt: "
-        f"{args.prompt!r} -->\n\n"
+        f"<!-- Generated by scene_script.py (model: {args.model}) from story scene: "
+        f"{story.name!r} (movie.yml story section) -->\n\n"
     )
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(header + document + "\n", encoding="utf-8")
@@ -171,22 +228,19 @@ def main() -> None:
     movie_info = get_movie_info()
     parser = argparse.ArgumentParser(
         description=(
-            f"Expand a short scene description for {movie_info.title} into a "
-            "detailed 30-second scene design document (three 10-second segments) "
-            "written to out/scripts/<name>.md."
+            f"Expand an abridged story scene from movie.yml for {movie_info.title} "
+            "into a detailed 30-second scene design document (three 10-second "
+            "segments) written to out/scripts/<name>.md. Run without --name to "
+            "list the available story scenes."
         )
     )
     parser.add_argument(
-        "--prompt",
-        required=True,
-        help="Short scene description to expand, e.g. 'Mrs. Brisby meets the Great Owl'.",
-    )
-    parser.add_argument(
         "--name",
-        required=True,
+        default=None,
         help=(
-            "Production slug for the scene; the script is written to "
-            "out/scripts/<name>.md (e.g. frisby_meets_greatowl)."
+            "Story scene name from the movie.yml `story:` section; the script is "
+            "written to out/scripts/<name>.md (e.g. frisby_visits_mr_ages). "
+            "Omit to list all available story scenes."
         ),
     )
     parser.add_argument(
@@ -205,6 +259,15 @@ def main() -> None:
         help="Overwrite an existing scene script.",
     )
     args = parser.parse_args()
+
+    if not args.name:
+        print("Available story scenes in movie.yml (pass one to --name):\n")
+        for spec in list_story_scenes():
+            print(f"  {spec.name}")
+            if spec.title:
+                print(f"      {spec.title}")
+            print(f"      scene: {spec.scene} | characters: {', '.join(spec.characters)}")
+        return
 
     try:
         raise SystemExit(run(args))

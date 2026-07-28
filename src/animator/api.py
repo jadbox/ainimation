@@ -10,7 +10,7 @@ from typing import Any
 import requests
 from google import genai
 
-from animator.config import DEFAULT_ASPECT_RATIO, POLL_INTERVAL_SECONDS
+from animator.config import POLL_INTERVAL_SECONDS, get_aspect_ratio
 
 logger = logging.getLogger("animator.api")
 
@@ -23,9 +23,9 @@ def create_video_interaction(
 ) -> Any:
     """Request the video from Omni Flash, falling back to a minimal request.
 
-    The full request asks for the reference_to_video task with an inline 16:9
-    video response; if the API rejects those parameters, retry with just the
-    model and input (the documented minimal usage).
+    The full request asks for the reference_to_video task with an inline
+    video response matching the configured ASPECT orientation; if the API
+    rejects those parameters, retry with just the model and input.
     """
     logger.info("Requesting video generation from model=%s ...", model)
     t0 = time.monotonic()
@@ -37,7 +37,7 @@ def create_video_interaction(
             generation_config={"video_config": {"task": "reference_to_video"}},
             response_format={
                 "type": "video",
-                "aspect_ratio": DEFAULT_ASPECT_RATIO,
+                "aspect_ratio": get_aspect_ratio(),
                 "delivery": "inline",
                 "duration": f"{duration}s",
             },

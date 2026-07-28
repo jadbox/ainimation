@@ -14,3 +14,5 @@
    * Obscure 20–30% of frame borders with soft-focus dark foreground elements.
 4. **Follow Character & Movement Specifications**: Ensure character recipes (Mrs. Brisby, Mr. Ages, Nicodemus) and animation mechanics (animating on ones/twos, anticipation, recoil, drag on ears/tails, follow-through) are strictly applied.
 5. **Use the Standard Prompt Template & Pipeline**: Refer to Section 8 & Section 9 of `readme.md` for generation prompt templates and multi-pass AI compositing graphs.
+6. NEVER run animator.py or generate movies. Instead request the user to run commands to test any video generation action or test.
+7. NEVER update out/scripts contents directly. This should always be written to only by scene_script.py.

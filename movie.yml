@@ -92,33 +92,60 @@ characters:
     avoid: "clean vector lines, smooth plastic rendering, modern clothing, flat lighting, extra limbs, duplicate features, text, watermarks, and logos"
 
 scenes:
-  - name: "The Great Owl's Hollow"
-    slug: "great-owl-hollow"
-    logline: "Mrs. Brisby's terrifying pilgrimage to the ancient owl's hollow tree, where counsel is given amid bones and moonlight"
+  - name: "Old Barn Field"
+    slug: "old-barn-field"
+    logline: "the vast overgrown field Mrs. Brisby must cross to reach the abandoned barn where Mr. Ages hides, its sagging timbers swallowed by vines"
     backgrounds:
-      - key: "hollow-interior"
-        description: "the cavernous interior of an ancient hollow oak at night: gnarled curved bark walls ribbed like a gothic nave, a floor littered with tiny rodent bones, dried husks, and owl pellets, cobweb veils hanging from above, deep knotholes receding into pitch black"
-        lighting: "one cold shaft of moonlight spearing down through a crack in the trunk as the single dominant practical source, with deep indigo and slate-purple shadows carrying blood-crimson and magenta accents (the Immediate Danger palette), faint icy-cyan edge light on bark ridges"
-        mood: "immediate danger and mortality; reverent dread before an ancient predator"
-      - key: "forest-approach"
-        description: "the night forest floor approaching the hollow oak: the tree looms as a towering twisted monolith seen from mouse height, overgrown thorn bushes and tangled roots framing the view, giant mushrooms and dew-covered grass blades, drifting ground mist"
-        lighting: "cold moonlight backlighting the oak's silhouette as the single dominant practical source, deep indigo and slate-purple shadows with faint crimson accents, thin fog catching the light in volumetric layers"
-        mood: "vulnerability at small scale; a tiny pilgrim before a looming sacred terror"
+      - key: "field-approach"
+        description: "an overgrown field at mouse scale: towering grass blades and clover stalks rising like a forest canopy, giant dew-beaded dandelions, thistles and drifting seed tufts catching the light, and at the field's edge a sagging abandoned barn whose weathered gray timbers are swallowed by thick climbing vines and ivy, a black gaping gap beneath its leaning door"
+        lighting: "one low shaft of late golden sunlight spearing down through the cloud cover and striking the barn's vine-covered face as the single dominant practical source, warm amber highlights on grass seed heads against deep teal and indigo shadow at the roots, thin ground mist catching the light in volumetric layers"
+        mood: "vulnerability at small scale; a tiny pilgrim crossing an enormous world toward a beckoning shelter"
 
-  - name: "Mr. Ages' Apothecary"
-    slug: "mr-ages-apothecary"
-    logline: "the cluttered hermit den where Mr. Ages brews remedies among towering glass jars and dried herbs"
+  - name: "Mr. Ages' Barn Library"
+    slug: "mr-ages-barn-library"
+    logline: "the cavernous barn interior where Mr. Ages keeps his secret library and remedies hidden among the rafters"
     backgrounds:
-      - key: "apothecary-interior"
-        description: "a cluttered apothecary den burrowed under roots: giant found objects repurposed as furniture (a glass canning jar as a cupboard, a rusted thimble as a pot, a spool as a table), hanging bundles of dried herbs, shelves of corked bottles, scattered parchment scraps, arched root ceiling"
-        lighting: "one amber oil lantern on the workbench as the single dominant practical source, warm gold highlights against deep teal and indigo shadows in the background jars, soft airbrushed glow around the flame, floating dust motes"
-        mood: "ancient alchemy and intellectual mystery; cozy but reclusive"
+      - key: "barn-library-interior"
+        description: "a cavernous abandoned barn interior at mouse scale: colossal leaning timber posts and shadowed rafters overhead, vines poking through knotholes and cracked boards, and built into the stalls Mr. Ages' secret library — towering stacks of mildewed human books repurposed as walls and staircases, a spool reading desk, corked bottles and jars of dried herbs, hanging bundles of lavender and thyme, scattered parchment scraps, cobweb veils"
+        lighting: "one amber oil lantern glowing on the spool reading desk as the single dominant practical source, warm gold highlights on book spines and bottle glass against deep teal and indigo shadow swallowing the rafters, soft airbrushed bloom around the flame, floating dust motes in a faint cool light leak through the vines"
+        mood: "ancient alchemy and intellectual mystery; cozy but reclusive; reverent awe"
 
-  - name: "Brisby Cinderblock Home"
-    slug: "brisby-cinderblock-home"
-    logline: "the warm, cramped cinderblock burrow where the Frisby family shelters from the coming plow"
-    backgrounds:
-      - key: "burrow-interior"
-        description: "a cozy cinderblock home interior at mouse scale: rough concrete block walls with arched nooks, a scrap of red fabric as a curtain, a spool bed with patchwork bedding, a bottle-cap table, stored seeds and a cracked teacup, roots poking through the ceiling"
-        lighting: "one amber oil lantern as the single dominant practical source, rich ochres, terracotta, and candlelight golds against deep umber and teal shadows (the Sanctuary palette), gentle bloom around the flame, floating dust motes"
-        mood: "sanctuary and safety; a small pocket of warmth inside overwhelming darkness"
+story:
+  - name: "frisby_walks_to_ages_barn"
+    title: "The Walk to the Old Barn"
+    scene: "old-barn-field"
+    characters:
+      - "Mrs Brisby"
+    emotions:
+      - "worry for Timothy's cough pressing on her like a stone"
+      - "exposure and smallness crossing the vast overgrown field"
+      - "fear of what rustles in the grass, mastered by determination"
+      - "relief and reverence as the vine-covered barn finally rises before her"
+    actions:
+      - "Mrs Brisby hurries through towering grass toward the distant barn, her red cape snagging on seed heads"
+      - "she freezes at a sudden rustle in the grass, listening, then presses on harder"
+      - "she reaches the barn and squeezes through the dark gap beneath its sagging door"
+    looks:
+      - "her eyes stay locked on the barn's dark doorway — her single fixed goal"
+      - "one fearful upward glance at the swaying towers of grass and enormous sky before she steels herself"
+      - "face: anxious resolve — brow tight, ears pinned low, whiskers pushed forward"
+
+  - name: "frisby_visits_mr_ages"
+    title: "A Cure for Timothy"
+    scene: "mr-ages-barn-library"
+    characters:
+      - "Mrs Brisby"
+      - "Mr Ages"
+    emotions:
+      - "awe at the towering hidden library"
+      - "desperate hope as she pleads for her son"
+      - "Mr Ages' crotchety detachment melting into grave, gentle care"
+    actions:
+      - "Mrs Brisby slips out of the dark into the lantern light and discovers the library among the rafters"
+      - "she asks Mr Ages for a cure for Timothy's cough"
+      - "Mr Ages listens, grumbles, then climbs his book stacks to fetch a glowing medicine vial and warns her about the cold night air"
+    looks:
+      - "Mrs Brisby's gaze wanders upward in wonder across the towering books before fixing on Mr Ages"
+      - "she holds his eyes while pleading — wide, wet, unblinking"
+      - "Mr Ages peers down over his crooked spectacles, then looks away toward the vials, hiding how much he cares"
+      - "Mr Ages' face: heavy-lidded gruffness softening into solemn tenderness"

@@ -9,7 +9,7 @@ REVIEW_MODEL_GEMINI_FLASH_3_6 = "gemini-3.6-flash"
 REVIEW_MODEL_KIMI_K3 = "moonshotai/kimi-k3"
 
 # Static configuration variables
-REVIEW_MODEL = REVIEW_MODEL_KIMI_K3
+REVIEW_MODEL = REVIEW_MODEL_GEMINI_FLASH_3_6 # REVIEW_MODEL_KIMI_K3
 MAX_ITERATIONS = 4
 
 DEFAULT_IMAGE_MODEL = "gemini-3.1-flash-image-preview"

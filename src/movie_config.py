@@ -60,6 +60,19 @@ class SceneSpec:
     backgrounds: tuple[BackgroundSpec, ...]
 
 
+@dataclass(frozen=True)
+class StorySceneSpec:
+    """An abridged story beat that ``scene_script`` expands into a full scene design."""
+
+    name: str
+    title: str
+    scene: str
+    characters: tuple[str, ...]
+    emotions: tuple[str, ...]
+    actions: tuple[str, ...]
+    looks: tuple[str, ...]
+
+
 def _find_movie_file() -> Path:
     env_path = os.environ.get("MOVIE_YML_PATH")
     if env_path:
@@ -77,7 +90,9 @@ def _find_movie_file() -> Path:
     raise FileNotFoundError("movie.yml not found in root or current working directory.")
 
 
-def load_movie_config(path: Path | None = None) -> tuple[MovieInfo, dict[str, CharacterSpec], dict[str, SceneSpec]]:
+def load_movie_config(
+    path: Path | None = None,
+) -> tuple[MovieInfo, dict[str, CharacterSpec], dict[str, SceneSpec], dict[str, StorySceneSpec]]:
     movie_path = path or _find_movie_file()
     with movie_path.open("r", encoding="utf-8") as file:
         raw = yaml.safe_load(file)
@@ -125,10 +140,23 @@ def load_movie_config(path: Path | None = None) -> tuple[MovieInfo, dict[str, Ch
         )
         scenes[spec.slug] = spec
 
-    return movie_info, characters, scenes
+    story: dict[str, StorySceneSpec] = {}
+    for story_raw in raw.get("story", []):
+        spec = StorySceneSpec(
+            name=story_raw["name"],
+            title=story_raw.get("title", ""),
+            scene=story_raw.get("scene", ""),
+            characters=tuple(story_raw.get("characters", [])),
+            emotions=tuple(story_raw.get("emotions", [])),
+            actions=tuple(story_raw.get("actions", [])),
+            looks=tuple(story_raw.get("looks", [])),
+        )
+        story[spec.name] = spec
+
+    return movie_info, characters, scenes, story
 
 
-_MOVIE_INFO, CHARACTERS, SCENES = load_movie_config()
+_MOVIE_INFO, CHARACTERS, SCENES, STORY = load_movie_config()
 
 
 def get_movie_info() -> MovieInfo:
@@ -163,3 +191,19 @@ def get_scene(name: str) -> SceneSpec:
             return spec
     available = ", ".join(f"{spec.name} ({spec.slug})" for spec in SCENES.values())
     raise ValueError(f"No scene named {name!r}. Available scenes: {available}.")
+
+
+def list_story_scenes() -> list[StorySceneSpec]:
+    return list(STORY.values())
+
+
+def get_story_scene(name: str) -> StorySceneSpec:
+    key = name.strip().lower().replace(" ", "-")
+    if key in STORY:
+        return STORY[key]
+    normalized = "".join(ch for ch in name.lower() if ch.isalnum())
+    for spec in STORY.values():
+        if normalized == "".join(ch for ch in spec.name.lower() if ch.isalnum()):
+            return spec
+    available = ", ".join(spec.name for spec in STORY.values())
+    raise ValueError(f"No story scene named {name!r}. Available story scenes: {available}.")

@@ -34,6 +34,8 @@ from __future__ import annotations
 from animator.api import create_video_interaction, extract_video_bytes, wait_for_completion
 from animator.cli import main, run
 from animator.config import (
+    ASPECT,
+    ASPECT_RATIO_MAP,
     CONTINUITY_MESSAGE,
     DEFAULT_ANIMATIONS_DIR,
     DEFAULT_ASPECT_RATIO,
@@ -45,6 +47,7 @@ from animator.config import (
     FULL_VIDEO_NAME,
     POLL_INTERVAL_SECONDS,
     TRANSITION_SECONDS,
+    get_aspect_ratio,
 )
 from animator.media import (
     build_crossfade_filter,
@@ -67,6 +70,8 @@ from animator.script import (
 )
 
 __all__ = [
+    "ASPECT",
+    "ASPECT_RATIO_MAP",
     "CONTINUITY_MESSAGE",
     "DEFAULT_ANIMATIONS_DIR",
     "DEFAULT_ASPECT_RATIO",
@@ -89,6 +94,7 @@ __all__ = [
     "extract_last_frame",
     "extract_video_bytes",
     "frame_path",
+    "get_aspect_ratio",
     "latest_attempt_image",
     "main",
     "normalize_name",

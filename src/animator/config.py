@@ -4,9 +4,27 @@ from __future__ import annotations
 
 from pathlib import Path
 
+ASPECT = "landscape"
+"""Static configuration for aspect ratio orientation. Options: 'landscape' or 'portrait'."""
+
+ASPECT_RATIO_MAP = {
+    "landscape": "16:9",
+    "portrait": "9:16",
+}
+
+
+def get_aspect_ratio(aspect: str = ASPECT) -> str:
+    """Return the aspect ratio string ('16:9' or '9:16') based on the orientation option."""
+    key = aspect.lower().strip()
+    if key not in ASPECT_RATIO_MAP:
+        valid = ", ".join(f"{k!r}" for k in ASPECT_RATIO_MAP)
+        raise ValueError(f"Invalid ASPECT configuration {aspect!r}. Expected one of {valid}.")
+    return ASPECT_RATIO_MAP[key]
+
+
 DEFAULT_VIDEO_MODEL = "gemini-omni-flash-preview"
 DEFAULT_DURATION_SECONDS = 10
-DEFAULT_ASPECT_RATIO = "16:9"
+DEFAULT_ASPECT_RATIO = get_aspect_ratio(ASPECT)
 DEFAULT_SCRIPTS_DIR = Path("out") / "scripts"
 DEFAULT_BLUEPRINT_DIR = Path("out") / "blueprint"
 DEFAULT_ANIMATIONS_DIR = Path("out") / "animations"
@@ -14,7 +32,7 @@ DEFAULT_TIMEOUT_SECONDS = 600
 POLL_INTERVAL_SECONDS = 5
 
 FULL_VIDEO_NAME = "full.mp4"
-TRANSITION_SECONDS = 0.8
+TRANSITION_SECONDS = 0.5
 """Duration of the transparent crossfade between clips (~6 frames at 30fps)."""
 
 CONTINUITY_MESSAGE = (

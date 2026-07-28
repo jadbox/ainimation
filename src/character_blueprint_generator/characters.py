@@ -37,7 +37,7 @@ class CharacterSpec:
 # ---------------------------------------------------------------------------
 
 MRS_BRISBY = CharacterSpec(
-    name="Mrs. Brisby",
+    name="Mrs Brisby",
     species="field mouse",
     identity=(
         "a widowed field mouse and the story's determined protagonist, seeking a "
@@ -67,7 +67,7 @@ MRS_BRISBY = CharacterSpec(
 )
 
 MR_AGES = CharacterSpec(
-    name="Mr. Ages",
+    name="Mr Ages",
     species="mouse",
     identity=(
         "an elderly, reclusive mouse physician and herbalist who treats Timothy "

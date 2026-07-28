@@ -86,8 +86,9 @@ Apply Don Bluth's strict 1980s aesthetic & technical visual criteria for {charac
 2. Linework & Rendering: Expressive hand-inked tapered lines (dark brown, not black/vector), rich 2-tone cel shading, dense gouache/watercolor textured paint effect. Reject clean vector art, 3D CGI, smooth plastic gradients, or digital glow filters.
 3. Staging & Lighting: Low rodent-eye perspective (2-12 inches high). Strong single practical light source producing rich amber/gold highlights contrasted with deep teal/indigo shadows and continuous cool-gold rim lighting. Dark, soft-focus foreground elements framing 20-30% of edges. Target staging: {character.staging}.
 4. Sheet Organization & Quality: Clear 16:9 reference sheet with a prominent three-quarter hero pose plus turnaround views (front, profile, back) and detail callouts. Zero anatomy glitches, zero extra limbs, zero text/logos/watermarks/labels.
+5. Character Style Befitting the Narrative (HARD GATE): The design itself must make the viewer FEEL this character's role in the story at first glance; it must read as {character.pose_mood}. Apply the Bluth character-design DNA: grotesque-yet-appealing shapes, asymmetry and age/wear etched into the silhouette, tufted spiky fur or feathers breaking every contour, and oversized glossy eyes that carry the entire emotional performance. Ask yourself: "Could this exact design only exist in The Secret of NIMH (1982), and does it trigger the precise emotional reaction the narrative demands (awe, fear, tenderness, menace)?" A competent, cute, symmetrical, or generic rendering that could be dropped into any modern cartoon or children's book FAILS this criterion even when every technical box above is checked.
 
-Be exacting and demanding. Do NOT accept merely because an image is visually pleasing or artistic if it misses key Don Bluth style mandates or reference sheet layout needs. When rejecting, provide a complete, self-contained revised image prompt that precisely remedies all identified defects while preserving all correct details.
+Be exacting and demanding. Do NOT accept merely because an image is visually pleasing or artistic if it misses key Don Bluth style mandates or reference sheet layout needs. NEVER accept an image that fails criterion 5, no matter how polished or technically correct it is: "generic but well-executed" is always a rejection. When rejecting, provide a complete, self-contained revised image prompt that precisely remedies all identified defects — especially any missing narrative emotional register or Bluth-specific character-style DNA — while preserving all correct details.
 
 Return JSON only with this schema:
 {{"accepted": boolean, "score": integer from 0 to 100, "learning": "one concise lesson for the next iteration", "feedback": "specific visual findings", "revised_prompt": "a complete replacement image prompt when rejected; empty string when accepted"}}."""
@@ -377,7 +378,21 @@ def run(args: argparse.Namespace) -> int:
         old_attempt.unlink()
 
     client = genai.Client(api_key=gemini_key)
-    current_prompt = build_initial_prompt(character)
+    existing_prompt_path = output / "prompt.txt"
+    existing_prompt = (
+        existing_prompt_path.read_text(encoding="utf-8").strip()
+        if existing_prompt_path.is_file()
+        else ""
+    )
+    if existing_prompt:
+        current_prompt = existing_prompt
+        logger.info(
+            "Loaded existing %s as the initial prompt (%d chars)",
+            existing_prompt_path, len(current_prompt),
+        )
+    else:
+        current_prompt = build_initial_prompt(character)
+        logger.info("No existing prompt.txt found; built initial prompt from the character spec")
     last_used_prompt = current_prompt
     review_system_instruction = build_review_system_instruction(character)
     attempts: list[Attempt] = []
@@ -489,7 +504,7 @@ def main() -> None:
         default=None,
         help=(
             "Output directory (default: auto-derived from the character name, "
-            "e.g. ./mr-ages/)."
+            "e.g. ./out/blueprint/mr-ages/)."
         ),
     )
     parser.add_argument(
@@ -519,7 +534,7 @@ def main() -> None:
         parser.error(str(error))
 
     if args.output is None:
-        args.output = slug(character.name)
+        args.output = str(Path("out") / "blueprint" / slug(character.name))
 
     try:
         raise SystemExit(run(args))

@@ -236,10 +236,11 @@ If no `--character` is supplied, or the name does not match a registered
 character, the command prints an error listing every available character.
 
 The command writes these generated artifacts to a per-character output directory
-(default `./<character-slug>/`, e.g. `./mr-ages/`; override with `--output`):
+(default `./out/blueprint/<character-slug>/`, e.g. `./out/blueprint/mr-ages/`;
+override with `--output`):
 
 * `<character-slug>-style.jpg`: the most recent 720p candidate, which is the accepted image when the reviewer approves one.
-* `prompt.txt`: the complete prompt used for that final image.
+* `prompt.txt`: the complete prompt used for that final image. On a later run targeting the same output directory, an existing `prompt.txt` is loaded as the initial prompt for the image generator instead of rebuilding the default prompt from the character spec.
 * `iterations.md`: iteration count, acceptance status, reviewer findings, and the lesson learned at every attempt.
 * `attempt-01.jpg` through `attempt-04.jpg`: retained candidates for visual comparison.
 

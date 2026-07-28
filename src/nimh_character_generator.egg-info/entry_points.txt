@@ -1,0 +1,2 @@
+[console_scripts]
+generate-character = character_blueprint_generator.generate:main

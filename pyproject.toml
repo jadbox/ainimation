@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nimh-character-generator"
+version = "0.1.0"
+description = "Generate and visually review Don Bluth character style guides for the Rats of NIMH project."
+requires-python = ">=3.11"
+dependencies = [
+    "google-genai>=1.0.0",
+    "Pillow>=10.0.0",
+    "requests>=2.28.0",
+]
+
+[project.scripts]
+generate-character = "character_blueprint_generator.generate:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

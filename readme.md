@@ -319,13 +319,17 @@ Gemini Omni Flash (`gemini-omni-flash-preview`). It:
    mandatory-opening-frame instruction: the generated video's first frame must
    reproduce that reference exactly before the action continues.
 4. When every segment is present in the output folder at the end of a run,
-   concatenates them in order into `out/animations/<scene>/full.mp4`
-   (requires `ffmpeg` on `PATH`; `full.mp4` is always overwritten so it
-   reflects the current part clips).
+   combines them in order into `out/animations/<scene>/full.mp4` with a
+   **0.2s crossfade transition** (video `xfade` + audio `acrossfade`) between
+   clips, so the full scene plays seamlessly. Requires `ffmpeg` on `PATH`;
+   `full.mp4` is always overwritten so it reflects the current part clips.
+   `--compose-only` runs just this combination step against the existing
+   clips — no generation and no API key needed.
 
 ```bash
-uv run python src/animator.py --scene frisby_meets_greatowl            # all missing parts
-uv run python src/animator.py --scene frisby_meets_greatowl --parts 2  # only the 3rd segment
+uv run python src/animator.py --scene frisby_meets_greatowl              # all missing parts
+uv run python src/animator.py --scene frisby_meets_greatowl --parts 2    # only the 3rd segment
+uv run python src/animator.py --scene frisby_meets_greatowl --compose-only  # just rebuild full.mp4
 ```
 
 Use `--video-model`, `--duration`, `--timeout`, `--scripts-dir`,

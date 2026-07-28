@@ -1,0 +1,262 @@
+"""CLI entry point and command orchestration for scene script animation."""
+
+from __future__ import annotations
+
+import argparse
+import logging
+import os
+
+from google import genai
+import requests
+from pathlib import Path
+
+from animator.api import create_video_interaction, extract_video_bytes, wait_for_completion
+from animator.config import (
+    DEFAULT_ANIMATIONS_DIR,
+    DEFAULT_BLUEPRINT_DIR,
+    DEFAULT_DURATION_SECONDS,
+    DEFAULT_SCRIPTS_DIR,
+    DEFAULT_TIMEOUT_SECONDS,
+    DEFAULT_VIDEO_MODEL,
+    FULL_VIDEO_NAME,
+)
+from animator.media import combine_parts, extract_last_frame, frame_path, part_path, previous_frame
+from animator.prompt import build_direction, build_input_items
+from animator.script import (
+    latest_attempt_image,
+    parse_global_section,
+    parse_scene_characters,
+    parse_segments,
+)
+
+logger = logging.getLogger("animator")
+
+
+def run(args: argparse.Namespace) -> int:
+    """Execute the animation generation or composition pipeline."""
+    script_path = Path(args.scripts_dir) / f"{args.scene}.md"
+    if not script_path.is_file():
+        raise RuntimeError(
+            f"Scene script {script_path} not found. "
+            f"Generate it first with src/scene_script.py --name \"{args.scene}\" --prompt \"...\"."
+        )
+    script = script_path.read_text(encoding="utf-8")
+    logger.info("Loaded scene script: %s (%d chars)", script_path, len(script))
+
+    segments = parse_segments(script)
+    scene_dir = Path(args.output) if args.output else DEFAULT_ANIMATIONS_DIR / args.scene
+    scene_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.compose_only:
+        present = [segment for segment in segments if part_path(scene_dir, segment).exists()]
+        missing = [segment for segment in segments if not part_path(scene_dir, segment).exists()]
+        if missing:
+            logger.info(
+                "Missing part(s) %s — combining only the existing clips.",
+                ", ".join(str(segment.index) for segment in missing),
+            )
+        full_path = combine_parts(scene_dir, present)
+        if full_path:
+            print(f"Wrote full scene video: {full_path}")
+        return 0
+
+    characters = parse_scene_characters(script)
+    logger.info("Characters in scene: %s", ", ".join(characters))
+
+    logline = parse_global_section(script, r"Logline")
+    setting = parse_global_section(script, r"Setting[^\n]*")
+    if not setting:
+        logger.info("No '## Setting & Light' section found; segments will be prompted as-is.")
+
+    if args.parts is not None:
+        selected = [segment for segment in segments if segment.index == args.parts]
+        if not selected:
+            available = ", ".join(str(segment.index) for segment in segments)
+            raise RuntimeError(
+                f"--parts {args.parts} does not match any segment in {script_path}. "
+                f"Available segment indices: {available}."
+            )
+    else:
+        selected = segments
+
+    blueprint_dir = Path(args.blueprint_dir)
+    references = [
+        (character, latest_attempt_image(character, blueprint_dir))
+        for character in characters
+    ]
+    for character, image_path in references:
+        logger.info("Reference for %s: %s", character, image_path)
+
+    pending = [
+        segment
+        for segment in selected
+        if args.force or not part_path(scene_dir, segment).exists()
+    ]
+    skipped = [segment for segment in selected if segment not in pending]
+    for segment in skipped:
+        logger.info(
+            "Part %d already exists at %s; skipping (use --force to regenerate).",
+            segment.index,
+            part_path(scene_dir, segment),
+        )
+
+    if pending:
+        gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if not gemini_key:
+            raise RuntimeError("Set GEMINI_API_KEY or GOOGLE_API_KEY before running this command.")
+        client = genai.Client(api_key=gemini_key)
+
+        for segment in pending:
+            logger.info(
+                "=== Generating segment %d of %d (%s) ===",
+                segment.index,
+                len(segments) - 1,
+                segment.span or "whole script",
+            )
+            continuity_frame = previous_frame(scene_dir, segment)
+            direction = build_direction(
+                args.scene,
+                logline,
+                setting,
+                segment,
+                characters,
+                args.duration,
+                has_continuity=continuity_frame is not None,
+            )
+            input_items = build_input_items(direction, references, continuity_frame)
+            interaction = create_video_interaction(
+                client, args.video_model, input_items, args.duration
+            )
+            interaction = wait_for_completion(client, interaction, args.timeout)
+            video_bytes = extract_video_bytes(interaction)
+            destination = part_path(scene_dir, segment)
+            destination.write_bytes(video_bytes)
+            logger.info(
+                "Wrote segment %d clip: %s (%d bytes)",
+                segment.index,
+                destination,
+                len(video_bytes),
+            )
+            extract_last_frame(destination, frame_path(scene_dir, segment.index))
+    else:
+        logger.info("Nothing to generate — all selected parts already exist.")
+
+    missing = [segment for segment in segments if not part_path(scene_dir, segment).exists()]
+    if missing:
+        logger.info(
+            "Scene is incomplete: missing part(s) %s. Run again (optionally with "
+            "--parts) to generate them, then the parts will be combined into %s.",
+            ", ".join(str(segment.index) for segment in missing),
+            scene_dir / FULL_VIDEO_NAME,
+        )
+    else:
+        full_path = combine_parts(scene_dir, segments)
+        if full_path:
+            print(f"Wrote full scene video: {full_path}")
+    return 0
+
+
+def main() -> None:
+    """Parse CLI arguments and run animator pipeline."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+        datefmt="%H:%M:%S",
+    )
+    parser = argparse.ArgumentParser(
+        description=(
+            "Generate 10-second 720p 24fps animated clips for a scene script "
+            "using Google Gemini Omni Flash, with the scene's final character "
+            "blueprints as reference images. Each script segment becomes "
+            "out/animations/<scene>/part-<N>.mp4; the existing parts are then "
+            "combined with 0.2s crossfade transitions into "
+            "out/animations/<scene>/full.mp4."
+        ),
+        epilog=(
+            "examples:\n"
+            "  %(prog)s --scene frisby_visits_mr_ages\n"
+            "      Generate every missing segment clip, then combine all parts\n"
+            "      into full.mp4.\n"
+            "\n"
+            "  %(prog)s --scene frisby_visits_mr_ages --parts 2\n"
+            "      Generate only segment 2 (the third 10-second part). If\n"
+            "      part-1.jpg exists it is used as the mandatory opening frame.\n"
+            "\n"
+            "  %(prog)s --scene frisby_visits_mr_ages --parts 1 --force\n"
+            "      Regenerate segment 1 even though part-1.mp4 already exists\n"
+            "      (new paid API call; without --force existing parts are skipped).\n"
+            "\n"
+            "  %(prog)s --scene frisby_visits_mr_ages --compose-only\n"
+            "      No generation and no API key needed: combine the existing\n"
+            "      part-*.mp4 clips into full.mp4 with crossfade transitions.\n"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument(
+        "--scene",
+        required=True,
+        help="Scene name; reads out/scripts/<scene>.md (e.g. frisby_meets_greatowl).",
+    )
+    parser.add_argument(
+        "--parts",
+        type=int,
+        default=None,
+        metavar="N",
+        help=(
+            "Generate only the segment with this index (from 0). E.g. --parts 2 "
+            "generates only the 3rd segment. Default: generate every missing segment."
+        ),
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Regenerate parts even if they already exist (full.mp4 is always rebuilt).",
+    )
+    parser.add_argument(
+        "--compose-only",
+        action="store_true",
+        help=(
+            "Skip all generation: only combine the existing part-*.mp4 clips "
+            "into full.mp4 with crossfade transitions (no API key needed)."
+        ),
+    )
+    parser.add_argument(
+        "--video-model",
+        default=DEFAULT_VIDEO_MODEL,
+        help=f"Gemini Omni Flash video model (default: {DEFAULT_VIDEO_MODEL}).",
+    )
+    parser.add_argument(
+        "--duration",
+        type=int,
+        default=DEFAULT_DURATION_SECONDS,
+        help=f"Clip length in seconds per segment (default: {DEFAULT_DURATION_SECONDS}).",
+    )
+    parser.add_argument(
+        "--scripts-dir",
+        default=str(DEFAULT_SCRIPTS_DIR),
+        help=f"Directory of scene scripts (default: {DEFAULT_SCRIPTS_DIR}).",
+    )
+    parser.add_argument(
+        "--blueprint-dir",
+        default=str(DEFAULT_BLUEPRINT_DIR),
+        help=f"Directory of character/scene blueprint outputs (default: {DEFAULT_BLUEPRINT_DIR}).",
+    )
+    parser.add_argument(
+        "--output",
+        default=None,
+        help="Output directory for clips (default: out/animations/<scene>/).",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=DEFAULT_TIMEOUT_SECONDS,
+        help=f"Maximum seconds to wait for each video generation (default: {DEFAULT_TIMEOUT_SECONDS}).",
+    )
+    args = parser.parse_args()
+
+    try:
+        raise SystemExit(run(args))
+    except requests.exceptions.RequestException as error:
+        parser.error(f"Network error during API call: {error}")
+    except (RuntimeError, ValueError) as error:
+        parser.error(str(error))

@@ -3,10 +3,10 @@
 
 Uses Gemini 3.6 Flash to turn a one-line scene description into a
 production-ready scene script covering character locations, camera location,
-camera movement, scene animations, sounds, and music — all held to the Don
-Bluth direction and lighting rules in ``readme.md``. The scene is structured
-as three clearly marked 10-second segments (``## Segment 0 (0:00-0:10)`` ...)
-so ``src/animator.py`` can generate each segment as its own clip.
+camera movement, scene animations, sounds, and music — all held to the direction
+and lighting rules in ``movie.yml``. The scene is structured as three clearly
+marked 10-second segments (``## Segment 0 (0:00-0:10)`` ...) so ``animator``
+can generate each segment as its own clip.
 
 The result is written to ``out/scripts/<name>.md``.
 
@@ -26,7 +26,7 @@ from pathlib import Path
 from google import genai
 from google.genai import types
 
-from blueprint_generator.characters import list_character_names
+from movie_config import get_movie_info, list_character_names
 
 logger = logging.getLogger("scene_script")
 
@@ -35,19 +35,15 @@ DEFAULT_SCRIPTS_DIR = Path("out") / "scripts"
 
 
 def build_system_instruction() -> str:
+    movie_info = get_movie_info()
     roster = ", ".join(list_character_names())
-    return f"""You are a world-class animation director and production designer specializing in Don Bluth's iconic 1980s dark fantasy feature animation (The Secret of NIMH, 1982). You are designing a scene for a short film adaptation of The Rats of NIMH.
+    rules = "\n".join(f"- {rule}" for rule in movie_info.hard_direction_rules)
+    return f"""You are a world-class animation director and production designer specializing in {movie_info.style}. You are designing a scene for {movie_info.adaptation}.
 
 Expand the user's short scene description into a detailed, production-ready scene design document tailored for exactly 30 seconds of screen time, structured as THREE 10-second segments. The document must cover character locations, camera location, camera movement, scene animations, sounds, and music.
 
 HARD DIRECTION RULES (from the project style bible — every choice must obey them):
-- Camera height stays at rodent eye-level (2-12 inches above ground) unless a shot is deliberately a predator POV. Environments dominate ~70% of frame volume; characters occupy the lower third.
-- Every shot orbits a single identifiable practical light source (candle, lantern, amulet glow, moonlight shaft). 60-70% of the frame sits in deep shadow.
-- Warm key light (amber/gold, 2000K-3200K) against cool ambient shadow (teal/indigo/slate purple, 7000K-10000K). 360-degree rim lighting separates character silhouettes from dark backgrounds.
-- Soft-focus dark foreground elements (roots, vines, cobwebs, cracked glass) obscure 20-30% of frame borders for a "peeping into a secret world" feel.
-- Animation mechanics: animating on twos (12fps) for dialogue/moderate motion, on ones (24fps) for action climaxes; deep anticipation crouches before major actions; heavy recoil on landing; drag and follow-through on ears, whiskers, tails, and capes; held emotional poses with micro-movements (trembling fingers, double-blinks, chest breathing, whisker twitches).
-- Tone: cozy danger, reverence and awe, vulnerability at small scale, storybook gothic.
-- Sound and music must match the register: hushed, tender, mournful; sparse orchestration with music-box/celesta colors for sanctuary, low strings and choir for awe, percussive dread for danger.
+{rules}
 
 CHARACTER ROSTER (use only these characters, spelled exactly as listed):
 {roster}
@@ -172,11 +168,12 @@ def main() -> None:
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
         datefmt="%H:%M:%S",
     )
+    movie_info = get_movie_info()
     parser = argparse.ArgumentParser(
         description=(
-            "Expand a short scene description into a detailed 30-second Don "
-            "Bluth scene design document (three 10-second segments) written "
-            "to out/scripts/<name>.md."
+            f"Expand a short scene description for {movie_info.title} into a "
+            "detailed 30-second scene design document (three 10-second segments) "
+            "written to out/scripts/<name>.md."
         )
     )
     parser.add_argument(

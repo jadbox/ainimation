@@ -5,4 +5,5 @@ Summary: Art pipeline for generating Don Bluth style character blueprints, scene
 Requires-Python: >=3.11
 Requires-Dist: google-genai>=1.0.0
 Requires-Dist: Pillow>=10.0.0
+Requires-Dist: PyYAML>=6.0
 Requires-Dist: requests>=2.28.0

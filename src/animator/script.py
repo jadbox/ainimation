@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 
 from blueprint_generator import slug
-from blueprint_generator.characters import CHARACTERS
+from blueprint_generator.utils.characters import CHARACTERS
 
 from animator.models import SceneSegment
 

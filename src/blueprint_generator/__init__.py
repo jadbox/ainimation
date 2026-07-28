@@ -1,4 +1,4 @@
-"""Character and scene-background blueprint generation pipeline for the Rats of NIMH project."""
+"""Character and scene-background blueprint generation pipeline."""
 
 from __future__ import annotations
 

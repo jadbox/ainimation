@@ -8,6 +8,7 @@ from typing import Any
 
 from animator.config import CONTINUITY_MESSAGE
 from animator.models import SceneSegment
+from movie_config import get_movie_info
 
 
 def build_direction(
@@ -20,6 +21,7 @@ def build_direction(
     has_continuity: bool = False,
 ) -> str:
     """Build the textual direction prompt sent to Google Gemini Omni Flash."""
+    movie_info = get_movie_info()
     span_note = f" (story time {segment.span})" if segment.span else ""
     setting_block = (
         f"=== SHARED SETTING & LIGHT (constant across the whole scene) ===\n{setting}\n\n"
@@ -40,19 +42,13 @@ def build_direction(
             "Begin from the exact starting pose/composition stated in the Shot "
             "Steps and end on a clean held final pose."
         )
-    return f"""Animate one continuous {duration}-second, 720p, 24fps, 16:9 hand-painted 2D cel
-animation clip in the style of a 1982 Don Bluth feature (The Secret of NIMH):
-hand-inked tapered lines, 2-tone cel shading, painterly gouache backgrounds,
-warm amber key light against deep teal/indigo shadow, 360-degree rim lighting,
-heavy vignette, soft-focus dark foreground occlusion on 20-30% of the frame
-borders, film grain.
+    return f"""Animate one continuous {duration}-second, 720p, 24fps, 16:9 {movie_info.style_summary}
 
 Scene: "{scene_name}" — {logline or 'see script below.'}
 
 Characters appearing (reference images attached, in order): {", ".join(characters)}.
 Match each character's design EXACTLY to its reference image — same fur colors,
-garment, eyes, and proportions. Keep the camera at rodent eye-level
-(2-12 inches high) around a single dominant practical light source.
+garment, eyes, and proportions. {movie_info.camera_rules}
 {opening_instruction}
 
 {setting_block}=== SCENE SCRIPT{span_note} ===

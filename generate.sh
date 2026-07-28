@@ -27,7 +27,7 @@ err_no_character() {
 if [ "$#" -gt 0 ] && [[ "$1" != -* ]]; then
     CHARACTER="$1"
     shift
-    exec "$PYTHON" -m blueprint_generator.generate --character "$CHARACTER" "$@"
+    exec "$PYTHON" -m blueprint_generator.blueprint --character "$CHARACTER" "$@"
 fi
 
 # Scan for a bare --character with no following value (either it is the last
@@ -43,4 +43,4 @@ if [ "$prev" = "--character" ]; then
     err_no_character
 fi
 
-exec "$PYTHON" -m blueprint_generator.generate "$@"
+exec "$PYTHON" -m blueprint_generator.blueprint "$@"

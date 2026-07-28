@@ -315,11 +315,13 @@ Gemini Omni Flash (`gemini-omni-flash-preview`). It:
    that already exist are skipped unless `--force` is passed. For visual
    continuity, each clip's last frame is extracted to `part-<N>.jpg`
    (requires `ffmpeg`), and when generating segment `N` the previous segment's
-   frame (`part-<N-1>.jpg`) is sent as an additional reference image with an
-   instruction to continue the video from that exact frame.
+   frame (`part-<N-1>.jpg`) is sent as an additional reference image with a
+   mandatory-opening-frame instruction: the generated video's first frame must
+   reproduce that reference exactly before the action continues.
 4. When every segment is present in the output folder at the end of a run,
    concatenates them in order into `out/animations/<scene>/full.mp4`
-   (requires `ffmpeg` on `PATH`).
+   (requires `ffmpeg` on `PATH`; `full.mp4` is always overwritten so it
+   reflects the current part clips).
 
 ```bash
 uv run python src/animator.py --scene frisby_meets_greatowl            # all missing parts

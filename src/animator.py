@@ -67,10 +67,14 @@ SEGMENT_HEADER_RE = re.compile(
 FULL_VIDEO_NAME = "full.mp4"
 
 CONTINUITY_MESSAGE = (
-    "Reference image: the final frame of the previous shot. Continue the video "
-    "from this exact frame — match its composition, lighting, color, and "
-    "character pose precisely, using it as your opening frame, then carry the "
-    "action forward seamlessly from it."
+    "MANDATORY OPENING FRAME: the attached reference image is the final frame "
+    "of the previous shot, and it IS frame 0 of your output. The very first "
+    "frame of the generated video must be a pixel-faithful reproduction of this "
+    "exact image — identical composition, character pose and expression, "
+    "lighting, color palette, and background. Do NOT reinterpret, re-frame, "
+    "re-light, re-angle, zoom, or redesign it in any way. All motion must begin "
+    "from this exact state and carry the action forward seamlessly from it. "
+    "This requirement overrides any conflicting framing described elsewhere."
 )
 
 
@@ -194,6 +198,7 @@ def build_direction(
     segment: SceneSegment,
     characters: list[str],
     duration: int,
+    has_continuity: bool = False,
 ) -> str:
     span_note = f" (story time {segment.span})" if segment.span else ""
     setting_block = (
@@ -201,6 +206,17 @@ def build_direction(
         if setting
         else ""
     )
+    if has_continuity:
+        opening_instruction = (
+            "The final attached reference image is the mandatory opening frame "
+            "of this video: reproduce it exactly as frame 0 (see the MANDATORY "
+            "OPENING FRAME instruction below), then end on a clean held final pose."
+        )
+    else:
+        opening_instruction = (
+            "Begin from the exact starting pose/composition stated in the Shot "
+            "Steps and end on a clean held final pose."
+        )
     return f"""Animate one continuous {duration}-second, 720p, 24fps, 16:9 hand-painted 2D cel
 animation clip in the style of a 1982 Don Bluth feature (The Secret of NIMH):
 hand-inked tapered lines, 2-tone cel shading, painterly gouache backgrounds,
@@ -213,9 +229,8 @@ Scene: "{scene_name}" — {logline or 'see script below.'}
 Characters appearing (reference images attached, in order): {", ".join(characters)}.
 Match each character's design EXACTLY to its reference image — same fur colors,
 garment, eyes, and proportions. Keep the camera at rodent eye-level
-(2-12 inches high) around a single dominant practical light source. Begin from
-the exact starting pose/composition stated in the Shot Steps and end on a
-clean held final pose.
+(2-12 inches high) around a single dominant practical light source.
+{opening_instruction}
 
 {setting_block}=== SCENE SCRIPT{span_note} ===
 {segment.body}"""
@@ -386,15 +401,13 @@ def previous_frame(scene_dir: Path, segment: SceneSegment) -> Path | None:
     return None
 
 
-def combine_parts(scene_dir: Path, segments: list[SceneSegment], force: bool) -> Path | None:
+def combine_parts(scene_dir: Path, segments: list[SceneSegment]) -> Path | None:
     """Concatenate all part clips in order into full.mp4 with ffmpeg.
 
-    Returns the combined file path, or None when combining was skipped.
+    full.mp4 is always (re)written so it reflects the current part clips.
+    Returns the combined file path, or None when ffmpeg is unavailable.
     """
     full_path = scene_dir / FULL_VIDEO_NAME
-    if full_path.exists() and not force:
-        logger.info("%s already exists; skipping combination (use --force to rebuild).", full_path)
-        return full_path
     if shutil.which("ffmpeg") is None:
         logger.warning(
             "All scene parts are present, but ffmpeg is not installed — skipping "
@@ -489,10 +502,11 @@ def run(args: argparse.Namespace) -> int:
         for segment in pending:
             logger.info("=== Generating segment %d of %d (%s) ===",
                         segment.index, len(segments) - 1, segment.span or "whole script")
+            continuity_frame = previous_frame(scene_dir, segment)
             direction = build_direction(
                 args.scene, logline, setting, segment, characters, args.duration,
+                has_continuity=continuity_frame is not None,
             )
-            continuity_frame = previous_frame(scene_dir, segment)
             input_items = build_input_items(direction, references, continuity_frame)
             interaction = create_video_interaction(client, args.video_model, input_items, args.duration)
             interaction = wait_for_completion(client, interaction, args.timeout)
@@ -514,7 +528,7 @@ def run(args: argparse.Namespace) -> int:
             scene_dir / FULL_VIDEO_NAME,
         )
     else:
-        full_path = combine_parts(scene_dir, segments, args.force)
+        full_path = combine_parts(scene_dir, segments)
         if full_path:
             print(f"Wrote full scene video: {full_path}")
     return 0
@@ -553,7 +567,7 @@ def main() -> None:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Regenerate parts (and the combined video) even if they already exist.",
+        help="Regenerate parts even if they already exist (full.mp4 is always rebuilt).",
     )
     parser.add_argument(
         "--video-model",

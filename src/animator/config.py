@@ -7,6 +7,9 @@ from pathlib import Path
 ASPECT = "landscape"
 """Static configuration for aspect ratio orientation. Options: 'landscape' or 'portrait'."""
 
+RESOLUTION = "480p"
+"""Static configuration for video resolution. Options: e.g. '720p', '480p', '360p', '1080p'."""
+
 ASPECT_RATIO_MAP = {
     "landscape": "16:9",
     "portrait": "9:16",
@@ -24,6 +27,7 @@ def get_aspect_ratio(aspect: str = ASPECT) -> str:
 
 DEFAULT_VIDEO_MODEL = "gemini-omni-flash-preview"
 DEFAULT_DURATION_SECONDS = 10
+DEFAULT_RESOLUTION = RESOLUTION
 DEFAULT_ASPECT_RATIO = get_aspect_ratio(ASPECT)
 DEFAULT_SCRIPTS_DIR = Path("out") / "scripts"
 DEFAULT_BLUEPRINT_DIR = Path("out") / "blueprint"

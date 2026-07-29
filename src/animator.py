@@ -41,11 +41,13 @@ from animator.config import (
     DEFAULT_ASPECT_RATIO,
     DEFAULT_BLUEPRINT_DIR,
     DEFAULT_DURATION_SECONDS,
+    DEFAULT_RESOLUTION,
     DEFAULT_SCRIPTS_DIR,
     DEFAULT_TIMEOUT_SECONDS,
     DEFAULT_VIDEO_MODEL,
     FULL_VIDEO_NAME,
     POLL_INTERVAL_SECONDS,
+    RESOLUTION,
     TRANSITION_SECONDS,
     get_aspect_ratio,
 )
@@ -58,6 +60,7 @@ from animator.media import (
     frame_path,
     part_path,
     previous_frame,
+    prompt_path,
 )
 from animator.models import SceneSegment
 from animator.prompt import build_direction, build_input_items
@@ -77,11 +80,13 @@ __all__ = [
     "DEFAULT_ASPECT_RATIO",
     "DEFAULT_BLUEPRINT_DIR",
     "DEFAULT_DURATION_SECONDS",
+    "DEFAULT_RESOLUTION",
     "DEFAULT_SCRIPTS_DIR",
     "DEFAULT_TIMEOUT_SECONDS",
     "DEFAULT_VIDEO_MODEL",
     "FULL_VIDEO_NAME",
     "POLL_INTERVAL_SECONDS",
+    "RESOLUTION",
     "SceneSegment",
     "TRANSITION_SECONDS",
     "build_crossfade_filter",
@@ -103,6 +108,7 @@ __all__ = [
     "parse_segments",
     "part_path",
     "previous_frame",
+    "prompt_path",
     "run",
     "wait_for_completion",
 ]

@@ -14,10 +14,10 @@ This document contains the artistic, narrative, character, lighting, and animati
 
 ## 2. Character Design & Specifications
 
-### Main Characters in *Mrs. Frisby and the Rats of NIMH*
-* **Mrs. Frisby**: A widowed field mouse and the story's determined protagonist, seeking a way to save her sick son Timothy.
-* **Timothy Frisby**: Mrs. Frisby's young son, whose pneumonia prevents the family from leaving their home before plowing season.
-* **Mr. Ages**: An elderly, reclusive mouse physician and herbalist who treats Timothy and directs Mrs. Frisby to the rats.
+### Main Characters in *Mrs Frisby and the Rats of NIMH*
+* **Mrs Frisby**: A widowed field mouse and the story's determined protagonist, seeking a way to save her sick son Timothy.
+* **Timothy NameFrisby**: Mrs. Frisby's young son, whose pneumonia prevents the family from leaving their home before plowing season.
+* **Mr Ages**: An elderly, reclusive mouse physician and herbalist who treats Timothy and directs Mrs. Frisby to the rats.
 * **Nicodemus**: The wise, aged leader of the rats of NIMH and keeper of their history and plans.
 * **Justin**: The capable, compassionate captain of the rats' guard who helps Mrs. Frisby.
 * **Jenner**: An ambitious rat who opposes Nicodemus's leadership and the plan to leave the farm.

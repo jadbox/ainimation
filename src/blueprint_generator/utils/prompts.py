@@ -15,36 +15,44 @@ from movie_config import get_movie_info
 def build_initial_prompt(character: CharacterSpec) -> str:
     """Build the initial image generation prompt for a character style guide."""
     movie_info = get_movie_info()
-    return f"""Create a polished {character.name} character style guide for a hand-painted
+    display_name = character.display_name()
+    return f"""Create a polished {display_name} character style guide for a hand-painted
 {movie_info.style}. Deliver one cohesive 16:9 reference
 image with a large three-quarter hero pose plus smaller front, profile, and back
 turnaround views, detail callouts for key features, and a clear silhouette read.
 
-{character.name} is {character.identity}: {character.appearance}. Give the
-character {character.garment}. Keep the animal anatomy visible beneath it.
+{display_name} is {character.identity}: {character.appearance}. Give the
+character {character.garment}. Keep true animal anatomy visible beneath garments.
+Feature oversized glossy eyes with stacked white catchlight highlights and tufted
+spiky fur/feather silhouettes breaking outer contours.
 
-Use hand-inked tapered dark-brown linework, two-tone cel shading, dense gouache
-and watercolor texture on paper, and deliberately irregular fur/feather
-silhouettes. Stage the hero pose at {character.staging}. The pose should feel
+Rendering style: hand-inked tapered dark-brown linework (no black vector lines),
+two-tone cel shading, dense gouache and watercolor paper texture. Lighting: strong
+warm amber/gold key light against deep teal/indigo shadow with continuous 360-degree
+cool-gold rim lighting. Frame from a low rodent eye-level (2-12 inches high) with
+soft-focus dark foreground elements framing 20-30% of the borders.
+
+Stage the hero pose at {character.staging}. The pose should feel
 {character.pose_mood}. Avoid {character.avoid}."""
 
 
 def build_review_system_instruction(character: CharacterSpec) -> str:
     """Build the reviewer LLM system instruction for a character style guide."""
     movie_info = get_movie_info()
+    display_name = character.display_name()
     return f"""You are a world-class visual development director and production designer specializing in {movie_info.style}.
 
-Your job is to critically review the supplied {character.name} character reference sheet image against the requested prompt, analyze any previous review iterations you gave on earlier images, and decide whether the current image meets feature-film production standards.
+Your job is to critically review the supplied {display_name} character reference sheet image against the requested prompt, analyze any previous review iterations you gave on earlier images, and decide whether the current image meets feature-film production standards.
 
 When past review iterations are provided:
 - Treat them as clearly labeled historical feedback from previous rounds in this review process.
 - Critique the results of your past instructions: evaluate whether the image generator successfully implemented your prior feedback/revised prompt, or if it introduced new flaws.
 - Refine and improve your review process based on how effectively previous prompt changes moved the artwork toward the target aesthetic.
 
-Apply strict aesthetic & technical visual criteria for {character.name}:
-1. Character Identity & Anatomy: {character.identity}. Must read as a real {character.species} first and a person second. Required features: {character.appearance}. Garment: {character.garment}. Must retain true animal anatomy under garments.
+Apply strict aesthetic & technical visual criteria for {display_name}:
+1. Character Identity & Anatomy: {character.identity}. Must read as a real {character.species} first and a person second. Required features: {character.appearance}. Garment: {character.garment}. Must retain true animal anatomy under garments, oversized glossy eyes with stacked white highlights, and tufted spiky fur/feather silhouettes breaking contours.
 2. Linework & Rendering: Expressive hand-inked tapered lines (dark brown, not black/vector), rich 2-tone cel shading, dense gouache/watercolor textured paint effect. Reject clean vector art, 3D CGI, smooth plastic gradients, or digital glow filters.
-3. Staging & Lighting: Low perspective. Strong single practical light source producing rich amber/gold highlights contrasted with deep teal/indigo shadows and continuous cool-gold rim lighting. Dark, soft-focus foreground elements framing 20-30% of edges. Target staging: {character.staging}.
+3. Staging & Lighting: Low rodent eye-level perspective (2-12 inches high). Strong single practical light source producing rich amber/gold highlights contrasted with deep teal/indigo shadows and continuous 360-degree cool-gold rim lighting. Dark, soft-focus foreground elements framing 20-30% of edges. Target staging: {character.staging}.
 4. Sheet Organization & Quality: Clear 16:9 reference sheet with a prominent three-quarter hero pose plus turnaround views (front, profile, back) and detail callouts. Zero anatomy glitches, zero extra limbs, zero text/logos/watermarks/labels.
 5. Character Style Befitting the Narrative (HARD GATE): The design itself must make the viewer FEEL this character's role in the story at first glance; it must read as {character.pose_mood}. Apply character-design DNA: grotesque-yet-appealing shapes, asymmetry and age/wear etched into the silhouette, tufted spiky fur or feathers breaking every contour, and oversized glossy eyes that carry the entire emotional performance. Ask yourself: "Could this exact design only exist in {movie_info.title}, and does it trigger the precise emotional reaction the narrative demands (awe, fear, tenderness, menace)?" A competent, cute, symmetrical, or generic rendering that could be dropped into any modern cartoon or children's book FAILS this criterion even when every technical box above is checked.
 

@@ -23,6 +23,11 @@ def frame_path(scene_dir: Path, segment_index: int) -> Path:
     return scene_dir / f"part-{segment_index}.jpg"
 
 
+def prompt_path(scene_dir: Path, segment_index: int) -> Path:
+    """Return the prompt markdown file path for a given segment index."""
+    return scene_dir / f"part-{segment_index}-prompt.md"
+
+
 def extract_last_frame(video_path: Path, destination: Path) -> bool:
     """Extract the last frame of a clip to a JPEG next to it (requires ffmpeg)."""
     if shutil.which("ffmpeg") is None:

@@ -16,12 +16,13 @@ from animator.config import (
     DEFAULT_ANIMATIONS_DIR,
     DEFAULT_BLUEPRINT_DIR,
     DEFAULT_DURATION_SECONDS,
+    DEFAULT_RESOLUTION,
     DEFAULT_SCRIPTS_DIR,
     DEFAULT_TIMEOUT_SECONDS,
     DEFAULT_VIDEO_MODEL,
     FULL_VIDEO_NAME,
 )
-from animator.media import combine_parts, extract_last_frame, frame_path, part_path, previous_frame
+from animator.media import combine_parts, extract_last_frame, frame_path, part_path, previous_frame, prompt_path
 from animator.prompt import build_direction, build_input_items
 from animator.script import (
     parse_global_section,
@@ -237,6 +238,10 @@ def run(args: argparse.Namespace) -> int:
                 has_continuity=continuity_frame is not None,
                 has_background_reference=background_plate is not None,
             )
+            prompt_file = prompt_path(scene_dir, segment.index)
+            prompt_file.write_text(direction, encoding="utf-8")
+            logger.info("Saved prompt for segment %d: %s", segment.index, prompt_file)
+
             input_items = build_input_items(
                 direction, references, continuity_frame, background_plate
             )
@@ -281,7 +286,7 @@ def main() -> None:
     )
     parser = argparse.ArgumentParser(
         description=(
-            "Generate 10-second 720p 24fps animated clips for a scene script "
+            f"Generate 10-second {DEFAULT_RESOLUTION} 24fps animated clips for a scene script "
             "using Google Gemini Omni Flash, with the scene's final character "
             "blueprints as reference images. Each script segment becomes "
             "out/animations/<scene>/part-<N>.mp4; the existing parts are then "

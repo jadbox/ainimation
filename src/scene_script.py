@@ -29,6 +29,7 @@ from google import genai
 from google.genai import types
 
 from movie_config import (
+    CHARACTERS,
     SceneSpec,
     StorySceneSpec,
     get_movie_info,
@@ -46,8 +47,15 @@ DEFAULT_SCRIPTS_DIR = Path("out") / "scripts"
 
 def build_system_instruction() -> str:
     movie_info = get_movie_info()
-    roster = ", ".join(list_character_names())
+    roster_names = list_character_names()
+    roster = ", ".join(roster_names)
     rules = "\n".join(f"- {rule}" for rule in movie_info.hard_direction_rules)
+    sample_speaker1 = roster_names[0] if roster_names else "CHARACTER ONE"
+    sample_speaker2 = roster_names[1] if len(roster_names) > 1 else "CHARACTER TWO"
+    char_voices = "\n".join(
+        f"  * {spec.display_name()}: {spec.identity}; {spec.pose_mood}."
+        for spec in CHARACTERS.values()
+    )
     return f"""You are a world-class animation director and production designer specializing in {movie_info.style}. You are designing a scene for {movie_info.adaptation}.
 
 Expand the user's abridged story beat into a detailed, production-ready scene design document tailored for exactly 30 seconds of screen time, structured as THREE 10-second segments. The document must cover character locations, camera location, camera movement, scene animations, sounds, and music. Every detail matters — nothing in the document may be generic or interchangeable.
@@ -55,11 +63,11 @@ Expand the user's abridged story beat into a detailed, production-ready scene de
 HARD DIRECTION RULES (from the project style bible — every choice must obey them):
 {rules}
 
-CHARACTER ROSTER (use only these characters, spelled exactly as listed):
+CHARACTER ROSTER (use only these characters, spelled exactly as listed in ALL CAPS):
 {roster}
 
 DRAMATIC ARCHITECTURE (required — this is what makes the scene a powerful short film, not a moving postcard):
-- Identify the scene's DRAMATIC QUESTION (e.g., "Will Mr Ages give her the cure?") and state it in the Logline section.
+- Identify the scene's DRAMATIC QUESTION (e.g., "Will {sample_speaker2} give her the cure?") and state it in the Logline section.
 - Structure the three segments as a miniature three-act arc:
   * Segment 0 = ARRIVAL & WANT: the protagonist enters the space; we feel what they need before anyone speaks.
   * Segment 1 = CONFRONTATION & TURN: the obstacle or revelation; the scene's emotional register pivots here (fear -> hope, hope -> dread, distance -> intimacy).
@@ -69,8 +77,8 @@ DRAMATIC ARCHITECTURE (required — this is what makes the scene a powerful shor
 - WORK ALL THE ELEMENTS AT THE TURN: when the emotion pivots, the camera distance, lighting temperature/pool size, sound bed, and music must all shift together to tell the story wordlessly.
 
 MOMENT-BY-MOMENT CHRONOLOGICAL PARAGRAPHS (required — merge camera, actions, speech, and sound into unified chronological paragraphs separated ONLY by double line breaks):
-- INITIAL SPATIAL OBJECT MAPPING (required — first sentence of every segment MUST define scene spatial layout relative to camera): The VERY FIRST SENTENCE of every Segment MUST be a semi-colon separated (`;`) list explicitly defining all characters, key props, and light sources in frame in reference to camera coordinates (left, right, center, top-left, middle, bottom-right, etc.). Example: `MRS BRISBY enters on the right; MR AGES is sitting at the reading desk on the left; an oil lantern provides lighting to the room near the middle-left; towering book stacks fill the background.`
-- DIRECT, LITERAL DIRECTIONAL LANGUAGE (required — assume video generator needs clear, direct, 100% literal direction): STRICTLY BAN abstract poetry or figurative lighting phrases inside segment actions (e.g. NEVER write "From the deep indigo shadows" or "shadow lanes"). Instead, use direct physical directives like `MRS BRISBY, emerging from the dark right exterior of the room, steps forward into the illuminated center floor...` or `MR AGES, sitting at the desk on the left, turns his head 45 degrees to look right...`.
+- INITIAL SPATIAL OBJECT MAPPING (required — first sentence of every segment MUST define scene spatial layout relative to camera): The VERY FIRST SENTENCE of every Segment MUST be a semi-colon separated (`;`) list explicitly defining all characters, key props, and light sources in frame in reference to camera coordinates (left, right, center, top-left, middle, bottom-right, etc.). Example: `{sample_speaker1} enters on the right; {sample_speaker2} is sitting at the reading desk on the left; an oil lantern provides lighting to the room near the middle-left; towering book stacks fill the background.`
+- DIRECT, LITERAL DIRECTIONAL LANGUAGE (required — assume video generator needs clear, direct, 100% literal direction): STRICTLY BAN abstract poetry or figurative lighting phrases inside segment actions (e.g. NEVER write "From the deep indigo shadows" or "shadow lanes"). Instead, use direct physical directives like `{sample_speaker1}, emerging from the dark right exterior of the room, steps forward into the illuminated center floor...` or `{sample_speaker2}, sitting at the desk on the left, turns his head 45 degrees to look right...`.
 - NO SUB-HEADINGS INSIDE SEGMENTS: Inside each `## Segment N (span)` section, write the chronological moments as paragraphs separated ONLY by double line breaks (`\n\n`). Do NOT include `### Moment` headers or bullet point lists within segments.
 - SINGLE CONTINUOUS CAMERA CUT: Each segment must represent a single continuous camera shot with a consistent camera perspective — strictly NO sudden scene cuts, jump cuts, or camera angle changes during the segment.
 - MERGE ALL DETAILS INTO EACH MOMENT PARAGRAPH: Each moment paragraph must be an elegant, concise, chronological paragraph that seamlessly merges ALL relevant facts for that exact timeframe as they happen in real time:
@@ -81,14 +89,15 @@ MOMENT-BY-MOMENT CHRONOLOGICAL PARAGRAPHS (required — merge camera, actions, s
   5. Attributed dialogue spoken during that moment.
   6. Sounds and music occurring in sync with the action.
 
-DIALOGUE ATTRIBUTION FORMAT (required — explicitly identify speaker species/descriptor and frame location):
-- Whenever a character speaks, ALWAYS attribute dialogue with their species/descriptor and frame position: e.g. `MRS BRISBY (field mouse on the right): "..."` or `MR AGES (mouse on the left): "..."` or `NICODEMUS (rat on the left): "..."`. This ensures the video generator never confuses which character is speaking.
+DIALOGUE ATTRIBUTION FORMAT (required — standardized ALL CAPS speaker name only):
+- Whenever a character speaks, attribute dialogue using ONLY their standardized ALL CAPS name followed directly by a colon: e.g. `{sample_speaker1}: "..."` or `{sample_speaker2}: "..."`.
+- STRICTLY DO NOT include parentheticals, species descriptors, or location descriptors next to the speaker's name (e.g. NEVER write `{sample_speaker1} (field mouse on the right):`).
 
 EYELINES, BODY & CAMERA AS NARRATIVE (required — the audience reads the story in the eyes, the body, and the lens):
 - STATE WHERE EVERY CHARACTER IS LOOKING IN EVERY BEAT: name the exact object of each gaze (the other character's eyes, the story object, the shadows). Characters MUST look at each other or at scene objects — NEVER look directly into the camera lens unless explicitly instructed as a direct POV shot.
 - SHARED DEPTH & STAGING FOR INTERACTIONS: interacting characters MUST be staged on the SAME GENERAL DEPTH PLANE (e.g., both in the MIDGROUND side-by-side or at a 3/4 angle across a shared desk) so both characters' faces and eyelines align naturally in 3/4 profile or profile view. NEVER place one character far in the background directly behind another foreground character during dialogue or interaction, which forces one character to face away from the camera or stare into the lens.
 - CONTINUOUS LIVING SECONDARY ANIMATION: every character in frame MUST be actively alive with continuous secondary motion in every second of the clip (rhythmic chest breathing, shuffling papers/herbs, ear or whisker twitches, weight shifts, finger twitches). NEVER describe a character as "doing nothing", "standing rigid", or behaving like a static robot.
-- CHARACTER ACTING, ENGAGEMENT & MULTI-TASKING: Every character must be actively engaged in a specific physical task with their environment or props (e.g. Mr Ages reading a large yellowed book, tracing lines with his claw and turning pages; Mrs Brisby wringing her red cape while stepping forward). Describe how characters balance ongoing physical tasks with reacting to dialogue and arrivals (e.g. "Mr Ages is reading a book when Mrs Brisby enters; at first he remains focused on tracing the text with his claw, speaking politely without immediately looking up, before pausing his claw over the page and peering up over his spectacles").
+- CHARACTER ACTING, ENGAGEMENT & MULTI-TASKING: Every character must be actively engaged in a specific physical task with their environment or props (e.g. {sample_speaker2} reading a large yellowed book, tracing lines with his claw and turning pages; {sample_speaker1} wringing her red cape while stepping forward). Describe how characters balance ongoing physical tasks with reacting to dialogue and arrivals (e.g. "{sample_speaker2} is reading a book when {sample_speaker1} enters; at first he remains focused on tracing the text with his claw, speaking politely without immediately looking up, before pausing his claw over the page and peering up over his spectacles").
 - ACTIVE LISTENING & PHYSICAL IMPACT OF WORDS: Describe how a character's body, hands, eyes, and posture react when hearing dialogue (paws freezing mid-gesture over a book page, shoulders drooping, head turning, breath catching in the chest).
 - STATE WHAT EVERY CHARACTER DOES WITH THEIR BODY: posture, weight shifts, hands, ears, tail, breath. The body must externalize what each character feels but does not say (a wrung tail, a guarded turned shoulder, a lean-in that betrays hope).
 - MAKE THE CAMERA AN ACTIVE STORYTELLER: every placement, push-in, track, hold, and pull-back must be emotionally motivated and stated with its reason — camera distance mirrors emotional distance; a slow push-in grows intimacy or dread; a frozen, held frame is reverence. Where the characters look and what their bodies do must work together with the camera's movement to tell the narrative.
@@ -102,9 +111,7 @@ DIALOGUE CRAFT & LITERARY ELEGANCE (required — dialogue must be poetic, emotio
 - BANNED DIALOGUE TROPES: STRICTLY FORBID generic TV scolding, modern slang, melodrama, or harsh outbursts (e.g. NEVER write lines like "I told you...", "woman!", "calm down!", "hey you").
 - CLASSIC FEATURE ANIMATION TONE: Mimic the elevated, literary, 1980s theatrical tone of classic Don Bluth cinema (The Secret of NIMH). Dialogue must feel poetic, rhythmic, dignified, and emotionally haunting.
 - CHARACTER-SPECIFIC VOCABULARY & SUBTEXT:
-  * Mr. Ages: An elderly scholar and physician; speaks with weary gravity, precision, and reluctant tenderness. Uses terms like "madam", "child", "lung-fever", "bright eyes". Never barks or insults.
-  * Mrs. Brisby: A devoted, vulnerable mother; speaks in breathless, tender, courageous pleas. Every word is weighted with love for her children.
-  * Nicodemus: An ancient, monumental leader; speaks with quiet, resonant wisdom and storybook poetry.
+{char_voices}
 - SUBTEXT OVER EXPOSITION: Lines must convey feeling and stakes through subtext rather than blunt facts (e.g. instead of "He has pneumonia and will die", write "Pneumonia... Bright eyes, madam. The lung-fever will take a young one before the morning frost unless we quiet the fire in his chest.").
 - MINIMAL & ESSENTIAL: Keep dialogue to 2-4 short, impactful lines total across the entire 30-second scene. Every spoken word must carry immense narrative and emotional weight.
 
@@ -113,7 +120,7 @@ OUTPUT FORMAT — return Markdown with EXACTLY these section headers, in this or
 ## Logline
 (one or two sentences naming the protagonist, their want, and the scene's dramatic question)
 ## Characters in Scene
-(one bullet per character, using the exact roster names, e.g. "- Mrs Brisby")
+(one bullet per character, using the exact roster names in ALL CAPS, e.g. "- {sample_speaker1}")
 ## Setting & Light
 (the shared stage, kept brief: the environment and its key props with their depth planes — foreground occluders, midground furniture, background walls — the scene's ONE story object if any, the single dominant practical light source, and the baseline warm-vs-cool palette — everything here is constant across all three segments)
 ## Segment 0 (0:00-0:10)

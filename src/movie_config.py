@@ -3,12 +3,19 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
 import yaml
 
 DEFAULT_MOVIE_FILE = Path("movie.yml")
+
+
+def standardize_name(name: str) -> str:
+    """Standardize a character name to ALL CAPS with no punctuation marks."""
+    clean = re.sub(r"[^\w\s]", "", name)
+    return " ".join(clean.split()).upper()
 
 
 @dataclass(frozen=True)
@@ -37,7 +44,7 @@ class CharacterSpec:
     avoid: str
 
     def display_name(self) -> str:
-        return self.name
+        return standardize_name(self.name)
 
 
 @dataclass(frozen=True)

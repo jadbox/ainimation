@@ -94,34 +94,31 @@ Generates character style guide sheets (`--character`) or scene background plate
 
 ### B. Scene Script Generator (`scene-script`)
 
-Expands an abridged story scene from the `story:` section of `movie.yml` into a detailed 30-second scene design document split into three self-contained 10-second segments.
+Expands an abridged story scene from the `story:` section of `movie.yml` into detailed segment design files written per scene segment (e.g., `out/scripts/frisby_visits_mr_ages_part0.md`).
 
 * **CLI Commands**:
   ```bash
   # List the story scenes available for --name
   uv run scene-script
 
-  # Expand a story scene into a full scene design document
+  # Expand a story scene into segment prompt documents
   uv run scene-script --name frisby_visits_mr_ages
   ```
 
 * **Key Options**:
-  * `--name NAME`: Story scene name from the `story:` section of `movie.yml` (written to `out/scripts/<name>.md`). Omit to list all available story scenes.
+  * `--name NAME`: Story scene name from the `story:` section of `movie.yml` (written to `out/scripts/<name>_part0.md`, etc.). Omit to list all available story scenes.
   * `--model MODEL`: Gemini text model ID (default: `gemini-3.6-flash`).
-  * `--output PATH`: Custom output file path.
-  * `--force`: Overwrite existing script if it already exists.
+  * `--output PATH`: Custom output file or directory base path.
+  * `--force`: Overwrite existing scripts if they already exist.
 
-* **Output Document Structure** (`out/scripts/<name>.md`):
-  * `## Logline`: Protagonist, want, and dramatic question.
-  * `## Characters in Scene`: Character roster list matching `movie.yml`.
-  * `## Setting & Light`: Shared environment, story object, primary light source, and color palette.
-  * `## Segment 0 (0:00-0:10)`, `## Segment 1 (0:10-0:20)`, `## Segment 2 (0:20-0:30)`: Fully self-contained shooting plans with blocking, camera, animation, dialogue, sound/music, and step-by-step shot timing.
+* **Output Document Structure** (`out/scripts/<name>_part<N>.md`):
+  * Pre-formatted segment video prompts containing style summary, camera rules, depth & staging mandates, characters, logline, shared setting & light, and the segment's moment-by-moment shooting plan.
 
 ---
 
 ### C. Animator (`animator` / `src/animator.py`)
 
-Generates animated 720p 24fps video clips for each segment in a scene script using Google Gemini Omni Flash (`gemini-omni-flash-preview`), maintaining frame-0 visual continuity between segments, and combining them into a full video with crossfade transitions.
+Generates animated 720p 24fps video clips for each segment prompt in `out/scripts/<scene>_part<N>.md` using Google Gemini Omni Flash (`gemini-omni-flash-preview`), maintaining frame-0 visual continuity between segments, and combining them into a full video with crossfade transitions.
 
 * **CLI Commands**:
   ```bash
@@ -139,7 +136,7 @@ Generates animated 720p 24fps video clips for each segment in a scene script usi
   ```
 
 * **Key Options**:
-  * `--scene NAME`: Scene script name (reads `out/scripts/<scene>.md`).
+  * `--scene NAME`: Scene script name (reads `out/scripts/<scene>_part<N>.md`).
   * `--parts N`: Generate only segment index `N` (0-indexed). Default: generate all missing segments.
   * `--force`: Regenerate parts even if clip already exists.
   * `--compose-only`: Skip API calls and combine existing `part-*.mp4` clips into `full.mp4`.
@@ -151,12 +148,13 @@ Generates animated 720p 24fps video clips for each segment in a scene script usi
   * `--output DIR`: Custom output folder (default: `out/animations/<scene>/`).
 
 * **Workflow & Continuity Mechanics**:
-  1. Reads `out/scripts/<scene>.md` and extracts characters from `## Characters in Scene`.
+  1. Reads `out/scripts/<scene>_part<N>.md` for each segment and extracts characters from the prompt.
   2. Loads latest blueprint images (`attempt-*.jpg`) from `out/blueprint/<character-slug>/` as character reference inputs. Missing blueprints are generated automatically via `generate-blueprint` (the exact command is echoed as `CREATING BLUEPRINT: ...`).
   3. For the first segment (index 0), attaches the scene location's background plate (`out/blueprint/<scene-slug>/attempt-*.jpg`, auto-generated if missing) as an environment reference so the set layout and depth layering stay anchored. The script name is mapped to a scene location via the `story:` section of `movie.yml`.
   4. For segment `N > 0`, extracts the last frame of segment `N-1` (`part-<N-1>.jpg`) via `ffmpeg` and sends it as a mandatory opening frame reference for exact visual/background continuity (no background plate is attached to these segments).
-  5. Generates `part-<N>.mp4` for each segment.
-  6. Combines all parts into `out/animations/<scene>/full.mp4` with a 0.2s crossfade transition using `ffmpeg`.
+  5. Tacks reference image tags (<IMAGE_REF_N>) and continuity/opening frame instructions onto the segment prompt, saving the final tagged prompt to `out/animations/<scene>/part-<N>-prompt.md`.
+  6. Generates `part-<N>.mp4` for each segment.
+  7. Combines all parts into `out/animations/<scene>/full.mp4` with a 0.2s crossfade transition using `ffmpeg`.
 
 * **Module Layout**:
   * `src/animator.py`: Executable CLI launcher script.
@@ -170,7 +168,7 @@ Generates animated 720p 24fps video clips for each segment in a scene script usi
 [ movie.yml / movie.md ]
           │
           ▼
-[ scene-script ] ──► Generates 30s Scene Document (out/scripts/<scene>.md)
+[ scene-script ] ──► Generates Segment Prompts (out/scripts/<scene>_part<N>.md)
           │
           ▼
 [ generate-blueprint ] ──► Generates Character & Background Blueprints (out/blueprint/...)

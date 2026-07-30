@@ -23,9 +23,10 @@ from animator.config import (
     FULL_VIDEO_NAME,
 )
 from animator.media import combine_parts, extract_last_frame, frame_path, part_path, previous_frame, prompt_path
-from animator.prompt import build_direction, build_input_items
+from animator.models import SceneSegment
+from animator.prompt import add_reference_tags, build_input_items
 from animator.script import (
-    parse_global_section,
+    find_scene_part_scripts,
     parse_scene_characters,
     parse_segments,
 )
@@ -129,16 +130,31 @@ def ensure_background_plate(
 
 def run(args: argparse.Namespace) -> int:
     """Execute the animation generation or composition pipeline."""
-    script_path = Path(args.scripts_dir) / f"{args.scene}.md"
-    if not script_path.is_file():
-        raise RuntimeError(
-            f"Scene script {script_path} not found. "
-            f"Generate it first with: uv run scene-script --name \"{args.scene}\""
-        )
-    script = script_path.read_text(encoding="utf-8")
-    logger.info("Loaded scene script: %s (%d chars)", script_path, len(script))
+    scripts_dir = Path(args.scripts_dir)
+    part_scripts = find_scene_part_scripts(scripts_dir, args.scene)
 
-    segments = parse_segments(script)
+    if not part_scripts:
+        # Check for legacy single-file script
+        legacy_path = scripts_dir / f"{args.scene}.md"
+        if legacy_path.is_file():
+            script = legacy_path.read_text(encoding="utf-8")
+            segments = parse_segments(script)
+            logger.info("Loaded legacy scene script: %s", legacy_path)
+        else:
+            expected_file = scripts_dir / f"{args.scene}_part0.md"
+            raise RuntimeError(
+                f"Scene script {expected_file} not found. "
+                f"Generate it first with: uv run scene-script --name \"{args.scene}\""
+            )
+    else:
+        segments = [
+            SceneSegment(index=idx, span="", body=path.read_text(encoding="utf-8"))
+            for idx, path in part_scripts
+        ]
+        logger.info(
+            "Loaded %d scene segment script(s) for %r", len(segments), args.scene
+        )
+
     scene_dir = Path(args.output) if args.output else DEFAULT_ANIMATIONS_DIR / args.scene
     scene_dir.mkdir(parents=True, exist_ok=True)
 
@@ -155,20 +171,15 @@ def run(args: argparse.Namespace) -> int:
             print(f"Wrote full scene video: {full_path}")
         return 0
 
-    characters = parse_scene_characters(script)
+    characters = parse_scene_characters(segments[0].body)
     logger.info("Characters in scene: %s", ", ".join(characters))
-
-    logline = parse_global_section(script, r"Logline")
-    setting = parse_global_section(script, r"Setting[^\n]*")
-    if not setting:
-        logger.info("No '## Setting & Light' section found; segments will be prompted as-is.")
 
     if args.parts is not None:
         selected = [segment for segment in segments if segment.index == args.parts]
         if not selected:
             available = ", ".join(str(segment.index) for segment in segments)
             raise RuntimeError(
-                f"--parts {args.parts} does not match any segment in {script_path}. "
+                f"--parts {args.parts} does not match any segment for {args.scene}. "
                 f"Available segment indices: {available}."
             )
     else:
@@ -214,27 +225,23 @@ def run(args: argparse.Namespace) -> int:
 
         for segment in pending:
             logger.info(
-                "=== Generating segment %d of %d (%s) ===",
+                "=== Generating segment %d of %d ===",
                 segment.index,
                 len(segments) - 1,
-                segment.span or "whole script",
             )
             continuity_frame = previous_frame(scene_dir, segment)
             background_plate = None
             if scene_slug and segment.index == segments[0].index and continuity_frame is None:
-                background_plate = ensure_background_plate(scene_slug, blueprint_dir, script)
+                background_plate = ensure_background_plate(scene_slug, blueprint_dir, segment.body)
                 logger.info(
                     "Background plate reference for segment %d: %s",
                     segment.index,
                     background_plate,
                 )
-            direction = build_direction(
-                args.scene,
-                logline,
-                setting,
-                segment,
-                characters,
-                args.duration,
+
+            direction = add_reference_tags(
+                base_prompt=segment.body,
+                characters=characters,
                 has_continuity=continuity_frame is not None,
                 has_background_reference=background_plate is not None,
             )

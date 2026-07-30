@@ -42,6 +42,80 @@ def tag_character_mentions(text: str, characters: list[str]) -> str:
     return "".join(parts)
 
 
+def add_reference_tags(
+    base_prompt: str,
+    characters: list[str],
+    has_continuity: bool = False,
+    has_background_reference: bool = False,
+) -> str:
+    """Add reference image tags (<IMAGE_REF_N>, opening instructions, prefixes) to base_prompt."""
+    bg_idx = len(characters) if has_background_reference else None
+    cont_idx = (
+        len(characters) + (1 if has_background_reference else 0)
+        if has_continuity
+        else None
+    )
+
+    prefix_declarations: list[str] = []
+    if has_background_reference and bg_idx is not None:
+        prefix_declarations.append(f"[# Background scene use references <IMAGE_REF_{bg_idx}>]")
+    if has_continuity and cont_idx is not None:
+        prefix_declarations.append(f"[# Sources <FIRST_FRAME>IMAGE_REF_{cont_idx}]")
+
+    prefix_block = "\n".join(prefix_declarations) + "\n\n" if prefix_declarations else ""
+
+    text = base_prompt
+
+    # 1. Tag character header line
+    for i, char in enumerate(characters):
+        clean_name = standardize_name(char)
+        if not clean_name:
+            continue
+        tag = f"<IMAGE_REF_{i}>"
+        pattern = rf"\b{re.escape(clean_name)}\b(?!\s*<IMAGE_REF_\d+>)"
+        text = re.sub(pattern, f"{clean_name} {tag}", text, count=1, flags=re.IGNORECASE)
+
+    # 2. Update reference image statement line
+    if len(characters) > 1:
+        ref_range_str = f"(<IMAGE_REF_0> through <IMAGE_REF_{len(characters) - 1}>)"
+    elif len(characters) == 1:
+        ref_range_str = "(<IMAGE_REF_0>)"
+    else:
+        ref_range_str = ""
+
+    bg_ref_line = (
+        f"\n- Environment reference <IMAGE_REF_{bg_idx}> sets the background production set."
+        if has_background_reference and bg_idx is not None
+        else ""
+    )
+
+    old_ref_stmt = "Match character designs EXACTLY to visual reference images. Do NOT use character references as initial frames."
+    new_ref_stmt = f"Match character designs EXACTLY to visual reference images {ref_range_str}. Do NOT use character references as initial frames.{bg_ref_line}"
+    if old_ref_stmt in text:
+        text = text.replace(old_ref_stmt, new_ref_stmt, 1)
+
+    # 3. Add opening / background instructions
+    instructions: list[str] = []
+    if not has_continuity:
+        instructions.append("Begin from starting pose/composition in script and end on a clean held final pose.")
+    if has_background_reference and bg_idx is not None:
+        instructions.append(
+            f"Background Set: Reference image <IMAGE_REF_{bg_idx}> is the exact set for this video (environment, set pieces, layout, lighting, depth layering)."
+        )
+
+    if instructions:
+        inst_block = "\n\n".join(instructions)
+        if "Depth & Staging (mandatory):" in text:
+            text = text.replace("Depth & Staging (mandatory):", f"{inst_block}\n\nDepth & Staging (mandatory):", 1)
+        else:
+            text = text + "\n\n" + inst_block
+
+    # 4. Tag character name mentions across non-quoted narrative text
+    text = tag_character_mentions(text, characters)
+
+    return prefix_block + text
+
+
 def build_direction(
     scene_name: str,
     logline: str,
@@ -54,90 +128,22 @@ def build_direction(
     resolution: str = DEFAULT_RESOLUTION,
 ) -> str:
     """Build the textual direction prompt sent to Google Gemini Omni Flash."""
-    movie_info = get_movie_info()
-    aspect_ratio = get_aspect_ratio()
-    span_note = f" (story time {segment.span})" if segment.span else ""
+    from scene_script import format_segment_base_prompt
 
-    char_tags_list = []
-    for i, char in enumerate(characters):
-        name_str = standardize_name(char)
-        try:
-            spec = get_character(char)
-            voice_tag = f" <VOICE>{spec.voice}</VOICE>" if spec.voice else ""
-        except ValueError:
-            voice_tag = ""
-        char_tags_list.append(f"{name_str} <IMAGE_REF_{i}>{voice_tag}")
-    char_header_str = ", ".join(char_tags_list)
-
-    tagged_logline = tag_character_mentions(logline, characters)
-    tagged_setting = tag_character_mentions(setting, characters)
-    tagged_segment_body = tag_character_mentions(segment.body, characters)
-
-    prefix_declarations: list[str] = []
-    if has_background_reference:
-        bg_idx = len(characters)
-        prefix_declarations.append(f"[# Background scene use references <IMAGE_REF_{bg_idx}>]")
-    if has_continuity:
-        cont_idx = len(characters) + (1 if has_background_reference else 0)
-        prefix_declarations.append(f"[# Sources <FIRST_FRAME>IMAGE_REF_{cont_idx}]")
-
-    prefix_block = "\n".join(prefix_declarations) + "\n\n" if prefix_declarations else ""
-
-    setting_block = (
-        f"=== SHARED SETTING & LIGHT (constant across the whole scene) ===\n{tagged_setting}\n\n"
-        if tagged_setting
-        else ""
+    base_prompt = format_segment_base_prompt(
+        scene_name=scene_name,
+        logline=logline,
+        setting=setting,
+        characters=characters,
+        span=segment.span,
+        segment_body=segment.body,
     )
-
-    cont_idx = len(characters) + (1 if has_background_reference else 0)
-    bg_idx = len(characters)
-
-    char_ref_range = f"<IMAGE_REF_0> through <IMAGE_REF_{len(characters)-1}>" if len(characters) > 1 else "<IMAGE_REF_0>"
-    bg_ref_line = f"\n- Environment reference <IMAGE_REF_{bg_idx}> sets the background production set." if has_background_reference else ""
-
-    opening_instruction = (
-        ""
-        if has_continuity
-        else "Begin from starting pose/composition in script and end on a clean held final pose."
+    return add_reference_tags(
+        base_prompt=base_prompt,
+        characters=characters,
+        has_continuity=has_continuity,
+        has_background_reference=has_background_reference,
     )
-
-    if has_background_reference:
-        environment_instruction = (
-            f"Background Set: Reference image <IMAGE_REF_{bg_idx}> is the exact set for this video (environment, set pieces, layout, lighting, depth layering)."
-        )
-    else:
-        environment_instruction = ""
-
-    opening_block = f"\n\n{opening_instruction}" if opening_instruction else ""
-    env_block = f"\n\n{environment_instruction}" if environment_instruction else ""
-
-    return f"""{prefix_block}In a single unbroken scene, in a single continuous shot with no scene cuts. Style: {movie_info.style_summary}
-
-Scene: "{scene_name}" — {tagged_logline or 'see script below.'}
-
-Characters appearing: {char_header_str}.
-Match character designs EXACTLY to visual reference images ({char_ref_range}). Do NOT use character references as initial frames.{bg_ref_line}
-{movie_info.camera_rules}{opening_block}{env_block}
-
-Depth & Staging (mandatory): Characters stay on ground planes (feet on floor, never standing on furniture/props unless explicitly climbing). 
-Midground set pieces MUST occlude characters passing behind them. Interacting characters share the same depth plane in 3/4 or profile view.
-
-Single continuous camera shot (mandatory): One single continuous shot from a consistent camera perspective. 
-STRICTLY NO sudden scene cuts, jump cuts, shot transitions, or camera angle changes. Camera moves smoothly in continuous motion.
-
-Eyeline & camera rules (mandatory): Characters MUST look at each other or at scene objects as directed in script — NEVER look directly into camera lens. Maintain 3/4 or profile eyelines.
-
-Dialogue & speaker mandates (mandatory):
-- ONLY the character explicitly declared as speaker in a dialogue line moves their mouth and lips to speak.
-- All non-speaking characters MUST keep their mouths firmly CLOSED, remaining silent while reacting with active body language.
-
-Continuous character motion & physical locomotion (mandatory):
-- Every character in frame MUST be actively alive with continuous secondary movement (rhythmic breathing, weight shifts, ear/whisker twitches). NO character may freeze or stand rigid.
-- STRICTLY NO teleporting, sudden position pops, fading in/out of character locations, or creating duplicate/ghost character copies in frame.
-- ALWAYS use proper, continuous physical locomotion and movement (stepping, walking, turning, pivoting, climbing) whenever a character or item changes location or facing orientation in the script.
-
-{setting_block}=== SCENE SCRIPT{span_note} ===
-{tagged_segment_body}"""
 
 
 def build_input_items(
@@ -182,4 +188,5 @@ def build_input_items(
             }
         )
     return items
+
 

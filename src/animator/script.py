@@ -8,6 +8,7 @@ from pathlib import Path
 
 from blueprint_generator import slug
 from blueprint_generator.utils.characters import CHARACTERS
+from movie_config import standardize_name
 
 from animator.models import SceneSegment
 
@@ -24,44 +25,53 @@ def normalize_name(name: str) -> str:
     return re.sub(r"[^a-z0-9]", "", name.lower())
 
 
-def parse_scene_characters(script: str) -> list[str]:
-    """Extract roster character names from the '## Characters in Scene' section."""
-    match = re.search(r"^##\s*Characters in Scene\s*$", script, flags=re.MULTILINE | re.IGNORECASE)
-    if not match:
-        raise RuntimeError(
-            "Scene script has no '## Characters in Scene' section. "
-            "Regenerate it with src/scene_script.py."
-        )
-    section_lines: list[str] = []
-    for line in script[match.end():].splitlines():
-        if line.strip().startswith("##"):
-            break
-        section_lines.append(line)
+def find_scene_part_scripts(scripts_dir: Path, scene_name: str) -> list[tuple[int, Path]]:
+    """Find all matching part script files for scene_name in scripts_dir.
 
+    Looks for files named ``<scene_name>_part<N>.md``.
+    Returns a list of ``(index, path)`` sorted by index.
+    """
+    pattern = re.compile(rf"^{re.escape(scene_name)}_part(\d+)\.md$", re.IGNORECASE)
+    found: list[tuple[int, Path]] = []
+    if not scripts_dir.exists():
+        return found
+    for path in scripts_dir.iterdir():
+        if path.is_file():
+            match = pattern.match(path.name)
+            if match:
+                idx = int(match.group(1))
+                found.append((idx, path))
+    found.sort(key=lambda item: item[0])
+    return found
+
+
+def parse_scene_characters(script_text: str) -> list[str]:
+    """Extract roster character names from prompt or script text."""
     roster = {normalize_name(spec.name): spec.name for spec in CHARACTERS.values()}
     found: list[str] = []
-    for line in section_lines:
-        bullet = re.match(r"^\s*(?:[-*+]|\d+[.)])\s*(.+?)\s*$", line)
-        if not bullet:
-            continue
-        cleaned = re.sub(r"<VOICE>.*?</VOICE>", "", bullet.group(1), flags=re.IGNORECASE)
-        candidate = normalize_name(cleaned)
-        if candidate in roster and roster[candidate] not in found:
-            found.append(roster[candidate])
+
+    match = re.search(r"Characters appearing:\s*([^.\n]+)", script_text, flags=re.IGNORECASE)
+    if match:
+        line = match.group(1)
+        cleaned = re.sub(r"<VOICE>.*?</VOICE>", "", line, flags=re.IGNORECASE)
+        for spec in CHARACTERS.values():
+            if normalize_name(spec.name) in normalize_name(cleaned):
+                if spec.name not in found:
+                    found.append(spec.name)
+
     if not found:
-        raise RuntimeError(
-            "No roster characters found in the '## Characters in Scene' section. "
-            f"Available characters: {', '.join(spec.name for spec in CHARACTERS.values())}."
-        )
+        # Fallback to searching entire text
+        norm_text = normalize_name(script_text)
+        for spec in CHARACTERS.values():
+            if normalize_name(spec.name) in norm_text:
+                if spec.name not in found:
+                    found.append(spec.name)
+
     return found
 
 
 def parse_global_section(script: str, header_pattern: str) -> str:
-    """Extract the body of a scene-wide ``##`` section (e.g. Logline, Setting).
-
-    ``header_pattern`` is a case-insensitive regex matched against the header
-    text. Returns an empty string when the section is absent.
-    """
+    """Extract the body of a scene-wide ``##`` section (e.g. Logline, Setting)."""
     match = re.search(
         rf"^##\s+{header_pattern}\s*$", script, flags=re.MULTILINE | re.IGNORECASE
     )
@@ -75,11 +85,7 @@ def parse_global_section(script: str, header_pattern: str) -> str:
 
 
 def parse_segments(script: str) -> list[SceneSegment]:
-    """Split a scene script into its marked 10-second segments.
-
-    Scripts without ``## Segment N (...)`` headers are treated as a single
-    segment (index 0) covering the whole script.
-    """
+    """Split a scene script into its marked 10-second segments."""
     matches = list(SEGMENT_HEADER_RE.finditer(script))
     if not matches:
         logger.info("No segment headers found; treating the whole script as one segment.")
@@ -98,16 +104,6 @@ def parse_segments(script: str) -> list[SceneSegment]:
         )
 
     segments.sort(key=lambda segment: segment.index)
-    indices = [segment.index for segment in segments]
-    if indices != list(range(indices[0], indices[0] + len(indices))):
-        raise RuntimeError(
-            f"Segment indices in the scene script are not contiguous: {indices}."
-        )
-    logger.info(
-        "Parsed %d scene segment(s): %s",
-        len(segments),
-        ", ".join(f"Segment {s.index} ({s.span or 'whole script'})" for s in segments),
-    )
     return segments
 
 
@@ -121,3 +117,4 @@ def latest_attempt_image(character_name: str, blueprint_dir: Path) -> Path:
             f"Run `uv run generate-character --character \"{character_name}\"` first."
         )
     return attempts[-1]
+

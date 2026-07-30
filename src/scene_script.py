@@ -1,16 +1,15 @@
 #!/usr/bin/env python3
-"""Expand an abridged story scene from ``movie.yml`` into a detailed 30-second scene design document.
+"""Expand an abridged story scene from ``movie.yml`` into detailed segment design files.
 
 Uses Gemini 3.6 Flash to turn the ``story:`` section's abridged scene beats
 (scene reference, characters, key emotions, important actions/talking points,
-and character eyelines/expressions) into a production-ready scene script
+and character eyelines/expressions) into production-ready segment prompts
 covering character locations, camera location, camera movement, scene
 animations, sounds, and music — all held to the direction and lighting rules in
-``movie.yml``. The scene is structured as three clearly marked 10-second
-segments (``## Segment 0 (0:00-0:10)`` ...) so ``animator`` can generate each
-segment as its own clip.
+``movie.yml``.
 
-The result is written to ``out/scripts/<name>.md``.
+The scene is exported as one prompt file per segment:
+``out/scripts/<name>_part0.md``, ``out/scripts/<name>_part1.md``, etc.
 
 Usage:
     python src/scene_script.py                      # list available story scenes
@@ -32,11 +31,13 @@ from movie_config import (
     CHARACTERS,
     SceneSpec,
     StorySceneSpec,
+    get_character,
     get_movie_info,
     get_scene,
     get_story_scene,
     list_character_names,
     list_story_scenes,
+    standardize_name,
 )
 
 logger = logging.getLogger("scene_script")
@@ -180,6 +181,129 @@ def slugify_name(name: str) -> str:
     return slug
 
 
+def parse_section(document: str, header_pattern: str) -> str:
+    """Extract body text from a section heading matching header_pattern."""
+    match = re.search(
+        rf"^##\s+{header_pattern}\s*$", document, flags=re.MULTILINE | re.IGNORECASE
+    )
+    if not match:
+        return ""
+    body = document[match.end():]
+    next_heading = re.search(r"^##\s", body, flags=re.MULTILINE)
+    if next_heading:
+        body = body[: next_heading.start()]
+    return body.strip()
+
+
+def parse_characters_in_scene(document: str) -> list[str]:
+    """Extract roster character names from '## Characters in Scene'."""
+    match = re.search(r"^##\s*Characters in Scene\s*$", document, flags=re.MULTILINE | re.IGNORECASE)
+    if not match:
+        return []
+    section_lines: list[str] = []
+    for line in document[match.end():].splitlines():
+        if line.strip().startswith("##"):
+            break
+        section_lines.append(line)
+
+    roster = {standardize_name(spec.name): spec.name for spec in CHARACTERS.values()}
+    found: list[str] = []
+    for line in section_lines:
+        bullet = re.match(r"^\s*(?:[-*+]|\d+[.)])\s*(.+?)\s*$", line)
+        if not bullet:
+            continue
+        cleaned = re.sub(r"<VOICE>.*?</VOICE>", "", bullet.group(1), flags=re.IGNORECASE)
+        candidate = standardize_name(cleaned)
+        if candidate in roster and roster[candidate] not in found:
+            found.append(roster[candidate])
+    return found
+
+
+def parse_segments_from_document(document: str) -> list[tuple[int, str, str]]:
+    """Extract (index, span, body) tuples for each segment in document."""
+    header_re = re.compile(
+        r"^##\s+Segment\s+(\d+)\s*\(([^)]*)\)\s*$",
+        flags=re.MULTILINE | re.IGNORECASE,
+    )
+    matches = list(header_re.finditer(document))
+    if not matches:
+        return [(0, "0:00-0:30", document.strip())]
+
+    segments: list[tuple[int, str, str]] = []
+    for position, match in enumerate(matches):
+        idx = int(match.group(1))
+        span = match.group(2).strip()
+        start = match.end()
+        end = matches[position + 1].start() if position + 1 < len(matches) else len(document)
+        body = document[start:end]
+        next_heading = re.search(r"^##\s", body, flags=re.MULTILINE)
+        if next_heading:
+            body = body[: next_heading.start()]
+        segments.append((idx, span, body.strip()))
+
+    segments.sort(key=lambda s: s[0])
+    return segments
+
+
+def format_segment_base_prompt(
+    scene_name: str,
+    logline: str,
+    setting: str,
+    characters: list[str],
+    span: str,
+    segment_body: str,
+) -> str:
+    """Build the base prompt document for a single scene segment."""
+    movie_info = get_movie_info()
+
+    char_items: list[str] = []
+    for char in characters:
+        name_str = standardize_name(char)
+        try:
+            spec = get_character(char)
+            voice_tag = f" <VOICE>{spec.voice}</VOICE>" if spec.voice else ""
+        except ValueError:
+            voice_tag = ""
+        char_items.append(f"{name_str}{voice_tag}")
+    char_header_str = ", ".join(char_items)
+
+    span_note = f" (story time {span})" if span else ""
+
+    setting_block = (
+        f"=== SHARED SETTING & LIGHT (constant across the whole scene) ===\n{setting}\n\n"
+        if setting
+        else ""
+    )
+
+    return f"""In a single unbroken scene, in a single continuous shot with no scene cuts. Style: {movie_info.style_summary}
+
+Scene: "{scene_name}" — {logline or 'see script below.'}
+
+Characters appearing: {char_header_str}.
+Match character designs EXACTLY to visual reference images. Do NOT use character references as initial frames.
+{movie_info.camera_rules}
+
+Depth & Staging (mandatory): Characters stay on ground planes (feet on floor, never standing on furniture/props unless explicitly climbing). 
+Midground set pieces MUST occlude characters passing behind them. Interacting characters share the same depth plane in 3/4 or profile view.
+
+Single continuous camera shot (mandatory): One single continuous shot from a consistent camera perspective. 
+STRICTLY NO sudden scene cuts, jump cuts, shot transitions, or camera angle changes. Camera moves smoothly in continuous motion.
+
+Eyeline & camera rules (mandatory): Characters MUST look at each other or at scene objects as directed in script — NEVER look directly into camera lens. Maintain 3/4 or profile eyelines.
+
+Dialogue & speaker mandates (mandatory):
+- ONLY the character explicitly declared as speaker in a dialogue line moves their mouth and lips to speak.
+- All non-speaking characters MUST keep their mouths firmly CLOSED, remaining silent while reacting with active body language.
+
+Continuous character motion & physical locomotion (mandatory):
+- Every character in frame MUST be actively alive with continuous secondary movement (rhythmic breathing, weight shifts, ear/whisker twitches). NO character may freeze or stand rigid.
+- STRICTLY NO teleporting, sudden position pops, fading in/out of character locations, or creating duplicate/ghost character copies in frame.
+- ALWAYS use proper, continuous physical locomotion and movement (stepping, walking, turning, pivoting, climbing) whenever a character or item changes location or facing orientation in the script.
+
+{setting_block}=== SCENE SCRIPT{span_note} ===
+{segment_body}"""
+
+
 def require_api_key() -> str:
     key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
     if not key:
@@ -191,10 +315,22 @@ def run(args: argparse.Namespace) -> int:
     story = get_story_scene(args.name)
     scene = get_scene(story.scene)
     scene_name = slugify_name(story.name)
-    output = Path(args.output) if args.output else DEFAULT_SCRIPTS_DIR / f"{scene_name}.md"
-    if output.exists() and not args.force:
+
+    if args.output:
+        out_path = Path(args.output)
+        if out_path.suffix == ".md":
+            base_path = out_path.with_suffix("")
+        else:
+            base_path = out_path / scene_name
+    else:
+        base_path = DEFAULT_SCRIPTS_DIR / scene_name
+
+    base_path.parent.mkdir(parents=True, exist_ok=True)
+
+    part0_file = Path(f"{base_path}_part0.md")
+    if part0_file.exists() and not args.force:
         raise RuntimeError(
-            f"{output} already exists. Pass --force to overwrite it."
+            f"{part0_file} already exists. Pass --force to overwrite scene scripts."
         )
 
     client = genai.Client(api_key=require_api_key())
@@ -212,19 +348,32 @@ def run(args: argparse.Namespace) -> int:
     document = (response.text or "").strip()
     if not document:
         raise RuntimeError("Gemini returned an empty scene document.")
-    if not re.search(r"^##\s*Segment\s+0\s*\(", document, flags=re.MULTILINE | re.IGNORECASE):
-        logger.warning(
-            "The generated document has no '## Segment 0 (...)' header; "
-            "src/animator.py will treat it as a single segment."
-        )
+
+    logline = parse_section(document, r"Logline")
+    setting = parse_section(document, r"Setting[^\n]*")
+    characters = parse_characters_in_scene(document) or story.characters
+    segments = parse_segments_from_document(document)
 
     header = (
         f"<!-- Generated by scene_script.py (model: {args.model}) from story scene: "
         f"{story.name!r} (movie.yml story section) -->\n\n"
     )
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(header + document + "\n", encoding="utf-8")
-    print(f"Wrote scene script: {output}")
+
+    written_files: list[Path] = []
+    for idx, span, body in segments:
+        part_file = Path(f"{base_path}_part{idx}.md")
+        content = format_segment_base_prompt(
+            scene_name=scene_name,
+            logline=logline,
+            setting=setting,
+            characters=characters,
+            span=span,
+            segment_body=body,
+        )
+        part_file.write_text(header + content + "\n", encoding="utf-8")
+        written_files.append(part_file)
+        print(f"Wrote scene segment script: {part_file}")
+
     return 0
 
 
@@ -238,8 +387,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
             f"Expand an abridged story scene from movie.yml for {movie_info.title} "
-            "into a detailed 30-second scene design document (three 10-second "
-            "segments) written to out/scripts/<name>.md. Run without --name to "
+            "into detailed segment design files written to "
+            "out/scripts/<name>_part0.md, etc. Run without --name to "
             "list the available story scenes."
         )
     )
@@ -247,8 +396,8 @@ def main() -> None:
         "--name",
         default=None,
         help=(
-            "Story scene name from the movie.yml `story:` section; the script is "
-            "written to out/scripts/<name>.md (e.g. frisby_visits_mr_ages). "
+            "Story scene name from the movie.yml `story:` section; segment scripts "
+            "are written to out/scripts/<name>_part0.md, etc. (e.g. frisby_visits_mr_ages). "
             "Omit to list all available story scenes."
         ),
     )
@@ -260,12 +409,12 @@ def main() -> None:
     parser.add_argument(
         "--output",
         default=None,
-        help="Output file path (default: out/scripts/<name>.md).",
+        help="Output base path or directory (default: out/scripts/<name>).",
     )
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Overwrite an existing scene script.",
+        help="Overwrite existing scene scripts.",
     )
     args = parser.parse_args()
 

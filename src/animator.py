@@ -1,32 +1,23 @@
 #!/usr/bin/env python3
 """Animate a scene script into 720p clips with Gemini Omni Flash.
 
-Reads the scene design document at ``out/scripts/<scene>.md`` (produced by
-``src/scene_script.py``), collects the final character blueprint images for
-just the characters appearing in the scene (the last ``attempt-*.jpg`` in each
-character's ``out/blueprint/<character-slug>/`` folder), and sends the script
-plus reference images to Google Gemini Omni Flash.
+Reads the scene segment prompt files at ``out/scripts/<scene>_part<N>.md``
+(produced by ``src/scene_script.py``), collects the final character blueprint
+images for the characters appearing in the scene, and sends the prompt plus
+reference images to Google Gemini Omni Flash.
 
-The scene script is split into clearly marked 10-second segments
-(``## Segment 0 (0:00-0:10)`` ...). Each segment is self-contained (its own
-blocking, camera, animation, dialogue, and sound/music sub-sections); the
-video prompt for a part contains ONLY the shared ``## Setting & Light``
-section plus that one segment, so the model is never confused by other
-segments. Each segment is generated as its own 10-second, 720p, 24fps clip and
-saved to ``out/animations/<scene>/part-<N>.mp4``. Use ``--parts N`` to generate
-only one segment; without it, every missing segment is generated. When all
-segments are present in the output folder at the end of a run, they are
-concatenated (in order) into ``out/animations/<scene>/full.mp4``.
+Each segment prompt file is mostly complete and self-contained; ``animator`` adds
+the necessary image reference tags (<IMAGE_REF_N>), opening/continuity frame
+instructions, and prefix headers, saving the final tagged prompt to
+``out/animations/<scene>/part-<N>-prompt.md``.
+
+Each segment is generated as its own 10-second clip saved to
+``out/animations/<scene>/part-<N>.mp4``. When all segments are present, they are
+concatenated with crossfade transitions into ``out/animations/<scene>/full.mp4``.
 
 Usage:
     python src/animator.py --scene frisby_meets_greatowl            # all missing parts
     python src/animator.py --scene frisby_meets_greatowl --parts 2  # only the 3rd segment
-
-Continuity: after each part clip is written, its last frame is extracted to
-``part-<N>.jpg`` (requires ffmpeg). When generating segment N, if
-``part-<N-1>.jpg`` exists it is sent as an extra reference image with an
-instruction to continue the video from that exact frame, so consecutive
-segments match in look, composition, and pose.
 """
 
 from __future__ import annotations
@@ -63,8 +54,9 @@ from animator.media import (
     prompt_path,
 )
 from animator.models import SceneSegment
-from animator.prompt import build_direction, build_input_items
+from animator.prompt import add_reference_tags, build_direction, build_input_items
 from animator.script import (
+    find_scene_part_scripts,
     latest_attempt_image,
     normalize_name,
     parse_global_section,
@@ -89,6 +81,7 @@ __all__ = [
     "RESOLUTION",
     "SceneSegment",
     "TRANSITION_SECONDS",
+    "add_reference_tags",
     "build_crossfade_filter",
     "build_direction",
     "build_input_items",
@@ -98,6 +91,7 @@ __all__ = [
     "create_video_interaction",
     "extract_last_frame",
     "extract_video_bytes",
+    "find_scene_part_scripts",
     "frame_path",
     "get_aspect_ratio",
     "latest_attempt_image",

@@ -53,7 +53,8 @@ def build_system_instruction() -> str:
     sample_speaker1 = roster_names[0] if roster_names else "CHARACTER ONE"
     sample_speaker2 = roster_names[1] if len(roster_names) > 1 else "CHARACTER TWO"
     char_voices = "\n".join(
-        f"  * {spec.display_name()}: {spec.identity}; {spec.pose_mood}."
+        f"  * {spec.display_name()}: {spec.identity}; {spec.appearance}."
+        + (f" <VOICE>{spec.voice}</VOICE>" if spec.voice else "")
         for spec in CHARACTERS.values()
     )
     return f"""You are a world-class animation director and production designer specializing in {movie_info.style}. You are designing a scene for {movie_info.adaptation}.
@@ -97,6 +98,7 @@ EYELINES, BODY & CAMERA AS NARRATIVE (required — the audience reads the story 
 - STATE WHERE EVERY CHARACTER IS LOOKING IN EVERY BEAT: name the exact object of each gaze (the other character's eyes, the story object, the shadows). Characters MUST look at each other or at scene objects — NEVER look directly into the camera lens unless explicitly instructed as a direct POV shot.
 - SHARED DEPTH & STAGING FOR INTERACTIONS: interacting characters MUST be staged on the SAME GENERAL DEPTH PLANE (e.g., both in the MIDGROUND side-by-side or at a 3/4 angle across a shared desk) so both characters' faces and eyelines align naturally in 3/4 profile or profile view. NEVER place one character far in the background directly behind another foreground character during dialogue or interaction, which forces one character to face away from the camera or stare into the lens.
 - CONTINUOUS LIVING SECONDARY ANIMATION: every character in frame MUST be actively alive with continuous secondary motion in every second of the clip (rhythmic chest breathing, shuffling papers/herbs, ear or whisker twitches, weight shifts, finger twitches). NEVER describe a character as "doing nothing", "standing rigid", or behaving like a static robot.
+- PHYSICAL LOCOMOTION & NO TELEPORTING: Describe every change of position, location, or facing direction as explicit, continuous physical locomotion (e.g., stepping forward, walking, turning 45 degrees, pivoting). NEVER write action where characters abruptly appear in new spots or face new directions without describing the physical motion to get there, and NEVER create duplicate or ghost character copies.
 - CHARACTER ACTING, ENGAGEMENT & MULTI-TASKING: Every character must be actively engaged in a specific physical task with their environment or props (e.g. {sample_speaker2} reading a large yellowed book, tracing lines with his claw and turning pages; {sample_speaker1} wringing her red cape while stepping forward). Describe how characters balance ongoing physical tasks with reacting to dialogue and arrivals (e.g. "{sample_speaker2} is reading a book when {sample_speaker1} enters; at first he remains focused on tracing the text with his claw, speaking politely without immediately looking up, before pausing his claw over the page and peering up over his spectacles").
 - ACTIVE LISTENING & PHYSICAL IMPACT OF WORDS: Describe how a character's body, hands, eyes, and posture react when hearing dialogue (paws freezing mid-gesture over a book page, shoulders drooping, head turning, breath catching in the chest).
 - STATE WHAT EVERY CHARACTER DOES WITH THEIR BODY: posture, weight shifts, hands, ears, tail, breath. The body must externalize what each character feels but does not say (a wrung tail, a guarded turned shoulder, a lean-in that betrays hope).
@@ -120,7 +122,7 @@ OUTPUT FORMAT — return Markdown with EXACTLY these section headers, in this or
 ## Logline
 (one or two sentences naming the protagonist, their want, and the scene's dramatic question)
 ## Characters in Scene
-(one bullet per character, using the exact roster names in ALL CAPS, e.g. "- {sample_speaker1}")
+(one bullet per character, using the exact roster names in ALL CAPS with voice directives in <VOICE> tags, e.g. "- {sample_speaker1} <VOICE>voice description...</VOICE>")
 ## Setting & Light
 (the shared stage, kept brief: the environment and its key props with their depth planes — foreground occluders, midground furniture, background walls — the scene's ONE story object if any, the single dominant practical light source, and the baseline warm-vs-cool palette — everything here is constant across all three segments)
 ## Segment 0 (0:00-0:10)

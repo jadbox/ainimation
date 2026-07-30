@@ -22,7 +22,7 @@ All movie-specific information, character rosters, scene definitions, and hard d
 * **`movie.yml`**: Machine-readable configuration located at the project root. Contains:
   * **Movie metadata**: Title, adaptation description, style description, style summary, and camera rules.
   * **Hard direction rules**: List of strict visual/lighting/animation mandates passed into system instructions.
-  * **Characters**: List of characters (`name`, `species`, `identity`, `appearance`, `garment`, `staging`, `pose_mood`, `avoid`).
+  * **Characters**: List of characters (`name`, `species`, `identity`, `appearance`, `voice`, `avoid`).
   * **Scenes**: List of scene locations (`name`, `slug`, `logline`, `backgrounds`).
   * **Story**: Abridged story beats (`name`, `title`, `scene`, `characters`, `emotions`, `actions`, `looks`) that `scene-script` expands into full scene design documents. `scene` references a scene location slug; `characters` reference roster names; `looks` records where the characters are looking and their facial expressions.
 * **`movie.md`**: Human-readable style bible containing comprehensive artistic guidelines, color scripting, animation mechanics, optical FX passes, and camera director checklists. Refer to [`movie.md`](./movie.md) for full style documentation.

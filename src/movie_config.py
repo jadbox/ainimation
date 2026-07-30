@@ -38,10 +38,8 @@ class CharacterSpec:
     species: str
     identity: str
     appearance: str
-    garment: str
-    staging: str
-    pose_mood: str
-    avoid: str
+    voice: str = ""
+    avoid: str = ""
 
     def display_name(self) -> str:
         return standardize_name(self.name)
@@ -121,9 +119,7 @@ def load_movie_config(
             species=char_raw.get("species", ""),
             identity=char_raw.get("identity", ""),
             appearance=char_raw.get("appearance", ""),
-            garment=char_raw.get("garment", ""),
-            staging=char_raw.get("staging", ""),
-            pose_mood=char_raw.get("pose_mood", ""),
+            voice=char_raw.get("voice", ""),
             avoid=char_raw.get("avoid", ""),
         )
         characters[spec.name.lower()] = spec
@@ -178,6 +174,10 @@ def get_character(name: str) -> CharacterSpec:
     key = name.strip().lower()
     if key in CHARACTERS:
         return CHARACTERS[key]
+    clean = standardize_name(name).lower()
+    for spec in CHARACTERS.values():
+        if standardize_name(spec.name).lower() == clean:
+            return spec
     available = ", ".join(list_character_names())
     raise ValueError(f"No character named {name!r}. Available characters: {available}.")
 

@@ -88,10 +88,8 @@ class TestPromptTagging(unittest.TestCase):
             name="Mrs Brisby",
             species="field mouse",
             identity="a widowed field mouse",
-            appearance="dusty mauve-brown fur, blue-violet eyes",
-            garment="red hooded cape",
-            staging="mouse eye level",
-            pose_mood="anxious but determined",
+            appearance="dusty mauve-brown fur, blue-violet eyes; wearing red hooded cape; anxious but determined posture",
+            voice="soft, medium-high pitch",
             avoid="clean vector lines",
         )
         prompt = build_initial_prompt(spec)

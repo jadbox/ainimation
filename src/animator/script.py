@@ -44,7 +44,8 @@ def parse_scene_characters(script: str) -> list[str]:
         bullet = re.match(r"^\s*(?:[-*+]|\d+[.)])\s*(.+?)\s*$", line)
         if not bullet:
             continue
-        candidate = normalize_name(bullet.group(1))
+        cleaned = re.sub(r"<VOICE>.*?</VOICE>", "", bullet.group(1), flags=re.IGNORECASE)
+        candidate = normalize_name(cleaned)
         if candidate in roster and roster[candidate] not in found:
             found.append(roster[candidate])
     if not found:

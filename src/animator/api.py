@@ -34,7 +34,10 @@ def create_video_interaction(
             model=model,
             input=input_items,
             response_modalities=["video"],
-            generation_config={"video_config": {"task": "reference_to_video"}},
+            generation_config={
+                "video_config": {"task": "reference_to_video"},
+                "temperature": 0.7,
+            },
             response_format={
                 "type": "video",
                 "aspect_ratio": get_aspect_ratio(),
@@ -49,7 +52,11 @@ def create_video_interaction(
             type(error).__name__,
             error,
         )
-        interaction = client.interactions.create(model=model, input=input_items)
+        interaction = client.interactions.create(
+            model=model,
+            input=input_items,
+            generation_config={"temperature": 0.7},
+        )
     logger.info(
         "Video request accepted in %.1fs (interaction id: %s, status: %s)",
         time.monotonic() - t0,

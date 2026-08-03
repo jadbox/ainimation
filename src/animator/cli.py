@@ -269,8 +269,19 @@ def run(args: argparse.Namespace) -> int:
     else:
         logger.info("Nothing to generate — all selected parts already exist.")
 
+    present = [segment for segment in segments if part_path(scene_dir, segment).exists()]
     missing = [segment for segment in segments if not part_path(scene_dir, segment).exists()]
-    if missing:
+    if len(present) >= 2:
+        if missing:
+            logger.info(
+                "Scene is incomplete: missing part(s) %s. Combining existing %d parts anyway.",
+                ", ".join(str(segment.index) for segment in missing),
+                len(present),
+            )
+        full_path = combine_parts(scene_dir, present)
+        if full_path:
+            print(f"Wrote full scene video: {full_path}")
+    elif missing:
         logger.info(
             "Scene is incomplete: missing part(s) %s. Run again (optionally with "
             "--parts) to generate them, then the parts will be combined into %s.",

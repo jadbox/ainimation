@@ -1,4 +1,4 @@
-"""Animate scene scripts into 720p clips with Gemini Omni Flash."""
+"""Animate scene scripts into 720p clips via a pluggable video provider."""
 
 from __future__ import annotations
 

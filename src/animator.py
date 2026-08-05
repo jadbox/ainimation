@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Animate a scene script into 720p clips with Gemini Omni Flash.
+"""Animate a scene script into clips via a pluggable video provider.
 
 Reads the scene segment prompt files at ``out/scripts/<scene>_part<N>.md``
 (produced by ``src/scene_script.py``), collects the final character blueprint
 images for the characters appearing in the scene, and sends the prompt plus
-reference images to Google Gemini Omni Flash.
+reference images to a configured video provider (Google Gemini Omni Flash by
+default, or OpenRouter's async videos API e.g. ``minimax/hailuo-3``).
 
 Each segment prompt file is mostly complete and self-contained; ``animator`` adds
 the necessary image reference tags (<IMAGE_REF_N>), opening/continuity frame
@@ -22,7 +23,7 @@ Usage:
 
 from __future__ import annotations
 
-from animator.api import create_video_interaction, extract_video_bytes, wait_for_completion
+from animator.api import GeminiVideoProvider, extract_video_bytes
 from animator.cli import main, run
 from animator.config import (
     ASPECT,
@@ -32,14 +33,18 @@ from animator.config import (
     DEFAULT_ASPECT_RATIO,
     DEFAULT_BLUEPRINT_DIR,
     DEFAULT_DURATION_SECONDS,
+    DEFAULT_OPENROUTER_RESOLUTION,
+    DEFAULT_OPENROUTER_VIDEO_MODEL,
     DEFAULT_RESOLUTION,
     DEFAULT_SCRIPTS_DIR,
     DEFAULT_TIMEOUT_SECONDS,
     DEFAULT_VIDEO_MODEL,
+    DEFAULT_VIDEO_PROVIDER,
     FULL_VIDEO_NAME,
     POLL_INTERVAL_SECONDS,
     RESOLUTION,
     TRANSITION_SECONDS,
+    VIDEO_PROVIDERS,
     get_aspect_ratio,
 )
 from animator.media import (
@@ -54,7 +59,14 @@ from animator.media import (
     prompt_path,
 )
 from animator.models import SceneSegment
-from animator.prompt import add_reference_tags, build_direction, build_input_items
+from animator.prompt import add_reference_tags, build_direction, build_video_request
+from animator.provider import (
+    OpenRouterVideoProvider,
+    ReferenceImage,
+    VideoProvider,
+    VideoRequest,
+    create_video_provider,
+)
 from animator.script import (
     find_scene_part_scripts,
     latest_attempt_image,
@@ -72,23 +84,32 @@ __all__ = [
     "DEFAULT_ASPECT_RATIO",
     "DEFAULT_BLUEPRINT_DIR",
     "DEFAULT_DURATION_SECONDS",
+    "DEFAULT_OPENROUTER_RESOLUTION",
+    "DEFAULT_OPENROUTER_VIDEO_MODEL",
     "DEFAULT_RESOLUTION",
     "DEFAULT_SCRIPTS_DIR",
     "DEFAULT_TIMEOUT_SECONDS",
     "DEFAULT_VIDEO_MODEL",
+    "DEFAULT_VIDEO_PROVIDER",
     "FULL_VIDEO_NAME",
+    "GeminiVideoProvider",
+    "OpenRouterVideoProvider",
     "POLL_INTERVAL_SECONDS",
     "RESOLUTION",
+    "ReferenceImage",
     "SceneSegment",
     "TRANSITION_SECONDS",
+    "VIDEO_PROVIDERS",
+    "VideoProvider",
+    "VideoRequest",
     "add_reference_tags",
     "build_crossfade_filter",
     "build_direction",
-    "build_input_items",
+    "build_video_request",
     "clip_duration",
     "combine_parts",
     "concat_copy",
-    "create_video_interaction",
+    "create_video_provider",
     "extract_last_frame",
     "extract_video_bytes",
     "find_scene_part_scripts",
@@ -104,7 +125,6 @@ __all__ = [
     "previous_frame",
     "prompt_path",
     "run",
-    "wait_for_completion",
 ]
 
 if __name__ == "__main__":

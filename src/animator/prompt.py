@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
-import base64
 import re
 from pathlib import Path
-from typing import Any
 
-from animator.config import CONTINUITY_MESSAGE, DEFAULT_RESOLUTION, get_aspect_ratio
+from animator.config import (
+    DEFAULT_ASPECT_RATIO,
+    DEFAULT_DURATION_SECONDS,
+    DEFAULT_RESOLUTION,
+)
 from animator.models import SceneSegment
-from movie_config import get_character, get_movie_info, standardize_name
+from animator.provider import ReferenceImage, VideoRequest
+from movie_config import standardize_name
 
 
 def tag_character_mentions(text: str, characters: list[str]) -> str:
@@ -146,47 +149,58 @@ def build_direction(
     )
 
 
-def build_input_items(
+def build_video_request(
     direction: str,
     references: list[tuple[str, Path]],
     continuity_frame: Path | None = None,
     background_plate: Path | None = None,
-) -> list[dict[str, Any]]:
-    """Assemble text and encoded image payloads for Gemini video generation."""
-    items: list[dict[str, Any]] = [{"type": "text", "text": direction}]
-    for i, (character_name, image_path) in enumerate(references):
-        items.append({"type": "text", "text": f"Character reference image <IMAGE_REF_{i}>: {standardize_name(character_name)}"})
-        items.append(
-            {
-                "type": "image",
-                "data": base64.b64encode(image_path.read_bytes()).decode("utf-8"),
-                "mime_type": "image/jpeg",
-            }
+    duration: int = DEFAULT_DURATION_SECONDS,
+    resolution: str = DEFAULT_RESOLUTION,
+    aspect_ratio: str = DEFAULT_ASPECT_RATIO,
+    temperature: float | None = None,
+) -> VideoRequest:
+    """Assemble a backend-agnostic :class:`VideoRequest` from the pipeline inputs.
+
+    ``direction`` is the fully tagged prompt text; ``references`` are the
+    character blueprint image paths; ``continuity_frame`` and ``background_plate``
+    are optional reference/opening-frame image paths. Images are read and encoded
+    up front so each :class:`VideoProvider` can serialise them for its own API.
+    """
+    character_references = tuple(
+        ReferenceImage(
+            label=standardize_name(name),
+            data=image_path.read_bytes(),
+            mime_type="image/jpeg",
         )
-    if background_plate is not None:
-        bg_idx = len(references)
-        items.append(
-            {
-                "type": "text",
-                "text": f"Environment reference image <IMAGE_REF_{bg_idx}>: production background plate for this scene's set.",
-            }
+        for name, image_path in references
+    )
+    background_reference = (
+        ReferenceImage(
+            label="background",
+            data=background_plate.read_bytes(),
+            mime_type="image/jpeg",
         )
-        items.append(
-            {
-                "type": "image",
-                "data": base64.b64encode(background_plate.read_bytes()).decode("utf-8"),
-                "mime_type": "image/jpeg",
-            }
+        if background_plate is not None
+        else None
+    )
+    first_frame = (
+        ReferenceImage(
+            label="continuity",
+            data=continuity_frame.read_bytes(),
+            mime_type="image/jpeg",
         )
-    if continuity_frame is not None:
-        items.append({"type": "text", "text": f"Mandatory opening frame <FIRST_FRAME>: {CONTINUITY_MESSAGE}"})
-        items.append(
-            {
-                "type": "image",
-                "data": base64.b64encode(continuity_frame.read_bytes()).decode("utf-8"),
-                "mime_type": "image/jpeg",
-            }
-        )
-    return items
+        if continuity_frame is not None
+        else None
+    )
+    return VideoRequest(
+        prompt=direction,
+        character_references=character_references,
+        background_reference=background_reference,
+        continuity_frame=first_frame,
+        duration=duration,
+        resolution=resolution,
+        aspect_ratio=aspect_ratio,
+        temperature=temperature,
+    )
 
 

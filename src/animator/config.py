@@ -26,6 +26,28 @@ def get_aspect_ratio(aspect: str = ASPECT) -> str:
 
 
 DEFAULT_VIDEO_MODEL = "gemini-omni-flash-preview"
+"""Default video model for the Gemini provider."""
+
+DEFAULT_VIDEO_PROVIDER = "google"
+"""Default video generation provider (Google Gemini Omni Flash).
+Options: 'google' (or its 'gemini' alias), 'openrouter' or 'minimax'."""
+
+VIDEO_PROVIDERS = ("google", "openrouter", "minimax", "gemini")
+"""Valid video provider names usable with the ``--provider`` CLI flag.
+'gemini' is a backward-compatible alias for 'google'."""
+
+DEFAULT_OPENROUTER_VIDEO_MODEL = "minimax/hailuo-3"
+"""Default OpenRouter video model (MiniMax H3)."""
+
+DEFAULT_OPENROUTER_RESOLUTION = "768p"
+"""Output resolution requested for the OpenRouter video provider (MiniMax H3)."""
+
+DEFAULT_MINIMAX_VIDEO_MODEL = "MiniMax-H3"
+"""Default MiniMax video model (H3), used directly via the MiniMax API."""
+
+DEFAULT_MINIMAX_RESOLUTION = "768P"
+"""Output resolution requested for the MiniMax video provider (MiniMax H3)."""
+
 DEFAULT_DURATION_SECONDS = 10
 DEFAULT_RESOLUTION = RESOLUTION
 DEFAULT_ASPECT_RATIO = get_aspect_ratio(ASPECT)

@@ -4,27 +4,30 @@ from __future__ import annotations
 
 import argparse
 import logging
-import os
 import subprocess
 from pathlib import Path
 
-from google import genai
 import requests
 
-from animator.api import create_video_interaction, extract_video_bytes, wait_for_completion
 from animator.config import (
     DEFAULT_ANIMATIONS_DIR,
     DEFAULT_BLUEPRINT_DIR,
     DEFAULT_DURATION_SECONDS,
+    DEFAULT_MINIMAX_VIDEO_MODEL,
+    DEFAULT_OPENROUTER_VIDEO_MODEL,
     DEFAULT_RESOLUTION,
     DEFAULT_SCRIPTS_DIR,
     DEFAULT_TIMEOUT_SECONDS,
     DEFAULT_VIDEO_MODEL,
+    DEFAULT_VIDEO_PROVIDER,
     FULL_VIDEO_NAME,
+    VIDEO_PROVIDERS,
+    get_aspect_ratio,
 )
 from animator.media import combine_parts, extract_last_frame, frame_path, part_path, previous_frame, prompt_path
 from animator.models import SceneSegment
-from animator.prompt import add_reference_tags, build_input_items
+from animator.prompt import add_reference_tags, build_video_request
+from animator.provider import create_video_provider
 from animator.script import (
     find_scene_part_scripts,
     parse_scene_characters,
@@ -201,10 +204,11 @@ def run(args: argparse.Namespace) -> int:
         )
 
     if pending:
-        gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-        if not gemini_key:
-            raise RuntimeError("Set GEMINI_API_KEY or GOOGLE_API_KEY before running this command.")
-        client = genai.Client(api_key=gemini_key)
+        provider_obj = create_video_provider(
+            getattr(args, "provider", DEFAULT_VIDEO_PROVIDER),
+            model=args.video_model,
+        )
+        logger.info("Using video provider: %s", provider_obj.name)
 
         references = [
             (character, ensure_character_reference(character, blueprint_dir))
@@ -249,14 +253,16 @@ def run(args: argparse.Namespace) -> int:
             prompt_file.write_text(direction, encoding="utf-8")
             logger.info("Saved prompt for segment %d: %s", segment.index, prompt_file)
 
-            input_items = build_input_items(
-                direction, references, continuity_frame, background_plate
+            request = build_video_request(
+                direction,
+                references,
+                continuity_frame,
+                background_plate,
+                duration=args.duration,
+                resolution=DEFAULT_RESOLUTION,
+                aspect_ratio=get_aspect_ratio(),
             )
-            interaction = create_video_interaction(
-                client, args.video_model, input_items, args.duration
-            )
-            interaction = wait_for_completion(client, interaction, args.timeout)
-            video_bytes = extract_video_bytes(interaction)
+            video_bytes = provider_obj.generate(request, args.timeout)
             destination = part_path(scene_dir, segment)
             destination.write_bytes(video_bytes)
             logger.info(
@@ -305,8 +311,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
             f"Generate 10-second {DEFAULT_RESOLUTION} 24fps animated clips for a scene script "
-            "using Google Gemini Omni Flash, with the scene's final character "
-            "blueprints as reference images. Each script segment becomes "
+            "using a configurable video provider (default: Google Gemini Omni Flash; "
+            "alternative: OpenRouter minimax/hailuo-3 at 768p), with the scene's final "
+            "character blueprints as reference images. Each script segment becomes "
             "out/animations/<scene>/part-<N>.mp4; the existing parts are then "
             "combined with 0.2s crossfade transitions into "
             "out/animations/<scene>/full.mp4."
@@ -361,8 +368,28 @@ def main() -> None:
     )
     parser.add_argument(
         "--video-model",
-        default=DEFAULT_VIDEO_MODEL,
-        help=f"Gemini Omni Flash video model (default: {DEFAULT_VIDEO_MODEL}).",
+        default=None,
+        help=(
+            "Video generation model ID (override; when omitted each provider "
+            "uses its own default: google -> %s, openrouter -> %s, minimax -> %s)."
+            % (
+                DEFAULT_VIDEO_MODEL,
+                DEFAULT_OPENROUTER_VIDEO_MODEL,
+                DEFAULT_MINIMAX_VIDEO_MODEL,
+            )
+        ),
+    )
+    parser.add_argument(
+        "--provider",
+        choices=list(VIDEO_PROVIDERS),
+        default=DEFAULT_VIDEO_PROVIDER,
+        help=(
+            "Video generation provider (default: %(default)s, Google Gemini "
+            "Omni Flash). 'google' (alias 'gemini') uses the Gemini API. "
+            "'openrouter' uses the async OpenRouter videos API with the "
+            "OpenRouter API key. 'minimax' uses the MiniMax API directly "
+            "(MiniMax H3, 768P default) with the MINIMAX_API_KEY."
+        ),
     )
     parser.add_argument(
         "--duration",

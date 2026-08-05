@@ -11,7 +11,7 @@ This project automates the multi-stage visual development and animation generati
 1. **Character Blueprint Sheets**: Generates cohesive 16:9 character style guides (hero poses, turnarounds, detail callouts) with automated multi-turn vision LLM review loops.
 2. **Scene Background Plates**: Generates clean, character-free 16:9 production background plates for cel compositing.
 3. **30-Second Scene Scripts**: Expands abridged story beats from the `story:` section of `movie.yml` into structured 30-second scene design documents divided into three 10-second segments.
-4. **Animated Clips (Gemini Omni Flash)**: Generates 720p 24fps video clips per segment with last-frame continuity locking, then concatenates them into full scene videos with seamless crossfade transitions.
+4. **Animated Clips (Pluggable Video Provider)**: Generates 720p 24fps video clips per segment with last-frame continuity locking (Google Gemini Omni Flash by default, OpenRouter MiniMax H3 at 768p, or the MiniMax API directly with MiniMax H3 at 768P), then concatenates them into full scene videos with seamless crossfade transitions.
 
 ---
 
@@ -44,9 +44,13 @@ To adapt this pipeline for a new movie or art style, edit `movie.yml` (and `movi
      export GEMINI_API_KEY="your-gemini-api-key"
      # or export GOOGLE_API_KEY="..."
      ```
-   * OpenRouter API Key (optional, for OpenRouter review models like Kimi K3):
+   * OpenRouter API Key (required when using `--provider openrouter` for video, or for OpenRouter review models like Kimi K3):
      ```bash
      export OPENROUTER_API_KEY="your-openrouter-api-key"
+     ```
+   * MiniMax API Key (required when using `--provider minimax` for video):
+     ```bash
+     export MINIMAX_API_KEY="your-minimax-api-key"
      ```
 
 3. **External Dependencies**:
@@ -118,12 +122,18 @@ Expands an abridged story scene from the `story:` section of `movie.yml` into de
 
 ### C. Animator (`animator` / `src/animator.py`)
 
-Generates animated 720p 24fps video clips for each segment prompt in `out/scripts/<scene>_part<N>.md` using Google Gemini Omni Flash (`gemini-omni-flash-preview`), maintaining frame-0 visual continuity between segments, and combining them into a full video with crossfade transitions.
+Generates animated 720p 24fps video clips for each segment prompt in `out/scripts/<scene>_part<N>.md` using a pluggable video provider — Google Gemini Omni Flash (`gemini-omni-flash-preview`) by default, or OpenRouter's async videos API with MiniMax H3 (`minimax/hailuo-3`) at 768p — maintaining frame-0 visual continuity between segments, and combining them into a full video with crossfade transitions.
 
 * **CLI Commands**:
   ```bash
-  # Generate all missing segment clips and combine into full.mp4
+  # Generate all missing segment clips and combine into full.mp4 (Gemini)
   uv run animator --scene frisby_meets_greatowl
+
+  # Generate using the OpenRouter provider (MiniMax H3 at 768p)
+  uv run animator --scene frisby_meets_greatowl --provider openrouter
+
+  # Generate using the MiniMax API directly (MiniMax H3 at 768P)
+  uv run animator --scene frisby_meets_greatowl --provider minimax
 
   # Generate only segment 2 (0:20-0:30)
   uv run animator --scene frisby_meets_greatowl --parts 2
@@ -140,7 +150,8 @@ Generates animated 720p 24fps video clips for each segment prompt in `out/script
   * `--parts N`: Generate only segment index `N` (0-indexed). Default: generate all missing segments.
   * `--force`: Regenerate parts even if clip already exists.
   * `--compose-only`: Skip API calls and combine existing `part-*.mp4` clips into `full.mp4`.
-  * `--video-model MODEL`: Video generation model ID (default: `gemini-omni-flash-preview`).
+  * `--provider NAME`: Video generation provider (`google`, `openrouter` or `minimax`; `gemini` is an alias for `google`). Default: `google` (Gemini Omni Flash). The `openrouter` provider uses `OPENROUTER_API_KEY` and defaults to `minimax/hailuo-3` at `768p`. The `minimax` provider uses `MINIMAX_API_KEY` and defaults to `MiniMax-H3` at `768P`.
+  * `--video-model MODEL`: Video generation model ID (default: `gemini-omni-flash-preview` for `google`; OpenRouter e.g. `minimax/hailuo-3`; MiniMax e.g. `MiniMax-H3`).
   * `--duration SECONDS`: Duration per segment (default: 10).
   * `--timeout SECONDS`: Polling timeout per video request (default: 600).
   * `--scripts-dir DIR`: Directory containing scene scripts (default: `out/scripts`).
@@ -158,7 +169,7 @@ Generates animated 720p 24fps video clips for each segment prompt in `out/script
 
 * **Module Layout**:
   * `src/animator.py`: Executable CLI launcher script.
-  * `src/animator/`: Package containing submodules for config (`config.py`), models (`models.py`), script parsing (`script.py`), prompt building (`prompt.py`), Gemini API client (`api.py`), video media & ffmpeg processing (`media.py`), and CLI orchestration (`cli.py`).
+  * `src/animator/`: Package containing submodules for config (`config.py`), provider abstraction (`provider.py`), Gemini API client (`api.py`), script parsing (`script.py`), prompt building (`prompt.py`), video media & ffmpeg processing (`media.py`), and CLI orchestration (`cli.py`).
 
 ---
 
@@ -174,7 +185,7 @@ Generates animated 720p 24fps video clips for each segment prompt in `out/script
 [ generate-blueprint ] ──► Generates Character & Background Blueprints (out/blueprint/...)
           │
           ▼
-[ animator ] ──► Segment Video Generation (Gemini Omni Flash)
+[ animator ] ──► Segment Video Generation (Pluggable Provider: Gemini / OpenRouter)
           │
           ├──► Segment 0 (0:00-0:10) ──► out/animations/<scene>/part-0.mp4
           │                                     │ (Extracts last frame part-0.jpg)

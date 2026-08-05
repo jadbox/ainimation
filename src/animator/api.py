@@ -1,18 +1,118 @@
-"""Gemini API interactions for video generation."""
+"""Gemini API provider for video generation.
+
+Implements the :class:`~animator.provider.VideoProvider` interface on top of
+Google's ``genai`` client. The low-level ``interactions`` helpers
+(:func:`create_video_interaction`, :func:`wait_for_completion`,
+:func:`extract_video_bytes`) are retained so the original Gemini behaviour is
+unchanged.
+"""
 
 from __future__ import annotations
 
 import base64
 import logging
+import os
 import time
 from typing import Any
 
 import requests
 from google import genai
 
-from animator.config import POLL_INTERVAL_SECONDS, get_aspect_ratio
+from animator.config import (
+    CONTINUITY_MESSAGE,
+    DEFAULT_VIDEO_MODEL,
+    POLL_INTERVAL_SECONDS,
+    get_aspect_ratio,
+)
+from animator.provider import VideoProvider, VideoRequest
 
 logger = logging.getLogger("animator.api")
+
+
+def build_gemini_input_items(request: VideoRequest) -> list[dict[str, Any]]:
+    """Encode a :class:`VideoRequest` into Gemini's input item dicts."""
+    items: list[dict[str, Any]] = [{"type": "text", "text": request.prompt}]
+    for index, ref in enumerate(request.character_references):
+        items.append(
+            {
+                "type": "text",
+                "text": f"Character reference image <IMAGE_REF_{index}>: {ref.label}",
+            }
+        )
+        items.append(
+            {
+                "type": "image",
+                "data": base64.b64encode(ref.data).decode("utf-8"),
+                "mime_type": ref.mime_type,
+            }
+        )
+    if request.background_reference is not None:
+        bg_idx = len(request.character_references)
+        items.append(
+            {
+                "type": "text",
+                "text": (
+                    f"Environment reference image <IMAGE_REF_{bg_idx}>: production "
+                    "background plate for this scene's set."
+                ),
+            }
+        )
+        items.append(
+            {
+                "type": "image",
+                "data": base64.b64encode(request.background_reference.data).decode("utf-8"),
+                "mime_type": request.background_reference.mime_type,
+            }
+        )
+    if request.continuity_frame is not None:
+        items.append(
+            {
+                "type": "text",
+                "text": f"Mandatory opening frame <FIRST_FRAME>: {CONTINUITY_MESSAGE}",
+            }
+        )
+        items.append(
+            {
+                "type": "image",
+                "data": base64.b64encode(request.continuity_frame.data).decode("utf-8"),
+                "mime_type": request.continuity_frame.mime_type,
+            }
+        )
+    return items
+
+
+class GeminiVideoProvider(VideoProvider):
+    """Video generation via Google Gemini Omni Flash (``interactions`` API)."""
+
+    name = "google"
+
+    def __init__(self, model: str | None = None, api_key: str | None = None) -> None:
+        self.model = model or DEFAULT_VIDEO_MODEL
+        key = (
+            api_key
+            or os.environ.get("GEMINI_API_KEY")
+            or os.environ.get("GOOGLE_API_KEY")
+        )
+        if not key:
+            raise RuntimeError(
+                "Set GEMINI_API_KEY or GOOGLE_API_KEY before using the Gemini "
+                "video provider."
+            )
+        self._client = genai.Client(api_key=key)
+
+    def generate(self, request: VideoRequest, timeout: int) -> bytes:
+        t0 = time.monotonic()
+        input_items = build_gemini_input_items(request)
+        interaction = create_video_interaction(
+            self._client, self.model, input_items, request.duration
+        )
+        interaction = wait_for_completion(self._client, interaction, timeout)
+        video = extract_video_bytes(interaction)
+        logger.info(
+            "Google Gemini Omni Flash video generation completed in %.1fs.",
+            time.monotonic() - t0,
+        )
+        return video
 
 
 def create_video_interaction(

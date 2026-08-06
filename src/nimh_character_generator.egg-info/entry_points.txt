@@ -1,6 +1,6 @@
 [console_scripts]
 animator = animator:main
-generate-blueprint = blueprint_generator.blueprint:main
-generate-character = blueprint_generator.blueprint:main
+generate-blueprint = blueprint:main
+generate-character = blueprint:main
 scene-script = scriptgen:main
 scriptgen = scriptgen:main

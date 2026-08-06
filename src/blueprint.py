@@ -1,4 +1,14 @@
-"""Generate, review, and refine style guide blueprints for characters and scene backgrounds."""
+#!/usr/bin/env python3
+"""Generate, review, and refine style guide blueprints for characters and scene backgrounds.
+
+Runs the generate/review loop for a character style guide (--character) or a
+scene's background plates (--scene), writing artifacts to
+``out/blueprint/<subject-slug>/``.
+
+Usage:
+    python src/blueprint.py --character "Mrs Brisby"
+    python src/blueprint.py --scene great-owl-hollow
+"""
 
 from __future__ import annotations
 

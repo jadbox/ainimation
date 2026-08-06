@@ -65,7 +65,7 @@ class TestPromptTagging(unittest.TestCase):
         self.assertIn("<IMAGE_REF_2>", direction_bg)  # background plate reference tag
         self.assertIn("MRS BRISBY <IMAGE_REF_0>", direction_bg)
         self.assertIn("MR AGES <IMAGE_REF_1>", direction_bg)
-        self.assertIn("Single continuous camera shot", direction_bg)
+        self.assertIn("One unbroken continuous shot", direction_bg)
 
         direction_cont = build_direction(
             scene_name="frisby_visits_mr_ages",

@@ -15,15 +15,15 @@ dependencies = [
 ]
 
 [project.scripts]
-generate-blueprint = "blueprint_generator.blueprint:main"
-generate-character = "blueprint_generator.blueprint:main"
+generate-blueprint = "blueprint:main"
+generate-character = "blueprint:main"
 scriptgen = "scriptgen:main"
 scene-script = "scriptgen:main"
 animator = "animator:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-py-modules = ["scriptgen", "animator"]
+py-modules = ["blueprint", "scriptgen", "animator"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

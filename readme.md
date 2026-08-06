@@ -60,6 +60,23 @@ To adapt this pipeline for a new movie or art style, edit `movie.yml` (and `movi
 
 ## 4. CLI Python Scripts & Tooling Usage
 
+### Example End-to-End Pipeline
+
+```bash
+# 1. Edit movie.md and movie.yml to set up the story, characters, and scenes
+
+# 2. Generate a character style guide or a scene's background plates
+uv run generate-blueprint --character "Mrs Brisby"       # character blueprint
+uv run generate-blueprint --scene mr-ages-barn-library   # scene background plates
+
+# 3. Generate the scene script for a story scene name from movie.yml
+uv run scene-script --name frisby_visits_mr_ages -v
+
+# 4. Generate video for just part 0 of the scene; full.mp4 is composed
+#    automatically as additional parts are made
+uv run python src/animator.py --scene frisby_visits_mr_ages --parts 0 --provider minimax
+```
+
 ### A. Blueprint Generator (`generate-blueprint` / `generate.sh`)
 
 Generates character style guide sheets (`--character`) or scene background plates (`--scene`) using an image generation model and an automated reviewer LLM loop.
@@ -91,8 +108,8 @@ Generates character style guide sheets (`--character`) or scene background plate
   * `attempt-01.jpg` ... `attempt-04.jpg`: Retained attempt candidates.
 
 * **Module Layout**:
-  * `src/blueprint_generator/blueprint.py`: CLI entrypoint & generator execution loop.
-  * `src/blueprint_generator/utils/`: Modular helpers for models, prompts, image processing, reviewer API routing, and dynamic YAML character/scene lookups.
+  * `src/blueprint.py`: Executable CLI launcher script.
+  * `src/blueprint_generator/`: Package containing the generator execution loop and modular helpers under `utils/` for models, prompts, image processing, reviewer API routing, and dynamic YAML character/scene lookups.
 
 ---
 

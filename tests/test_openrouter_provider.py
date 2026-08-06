@@ -30,7 +30,7 @@ class FakeResp:
 KEY = "test-key"
 
 
-def build_req():
+def build_req(closing=False):
     img = b"\xff\xd8fakejpeg"
     return VideoRequest(
         prompt="P",
@@ -38,6 +38,7 @@ def build_req():
         character_references=(ReferenceImage("MRS BRISBY", img),),
         background_reference=ReferenceImage("background", img),
         continuity_frame=ReferenceImage("continuity", img),
+        closing_frame=ReferenceImage("closing", img) if closing else None,
         resolution="768p",
         aspect_ratio="16:9",
     )
@@ -54,6 +55,14 @@ class TestOpenRouter(unittest.TestCase):
         self.assertEqual(len(payload["input_references"]), 2)
         self.assertTrue(payload["input_references"][0]["image_url"]["url"].startswith("data:image/jpeg;base64,"))
         self.assertEqual(payload["frame_images"][0]["frame_type"], "first_frame")
+
+    def test_payload_frame_images_with_closing(self):
+        p = OpenRouterVideoProvider(api_key=KEY, model="minimax/hailuo-3")
+        payload = p._build_payload(build_req(closing=True))
+        self.assertEqual(
+            [frame["frame_type"] for frame in payload["frame_images"]],
+            ["first_frame", "last_frame"],
+        )
 
     def test_generate_flow(self):
         p = OpenRouterVideoProvider(api_key=KEY, model="minimax/hailuo-3")

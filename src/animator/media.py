@@ -18,9 +18,14 @@ def part_path(scene_dir: Path, segment: SceneSegment) -> Path:
     return scene_dir / f"part-{segment.index}.mp4"
 
 
-def frame_path(scene_dir: Path, segment_index: int) -> Path:
-    """Return the frame image file path for a given segment index."""
-    return scene_dir / f"part-{segment_index}.jpg"
+def start_frame_path(scene_dir: Path, segment_index: int) -> Path:
+    """Return the first-frame image file path for a given segment index."""
+    return scene_dir / f"part-{segment_index}-start.jpg"
+
+
+def end_frame_path(scene_dir: Path, segment_index: int) -> Path:
+    """Return the last-frame image file path for a given segment index."""
+    return scene_dir / f"part-{segment_index}-end.jpg"
 
 
 def prompt_path(scene_dir: Path, segment_index: int) -> Path:
@@ -28,26 +33,26 @@ def prompt_path(scene_dir: Path, segment_index: int) -> Path:
     return scene_dir / f"part-{segment_index}-prompt.md"
 
 
-def extract_last_frame(video_path: Path, destination: Path) -> bool:
-    """Extract the last frame of a clip to a JPEG next to it (requires ffmpeg)."""
+def _extract_frame(video_path: Path, destination: Path, first: bool) -> bool:
+    """Extract the first (or last) frame of a clip to a JPEG (requires ffmpeg)."""
     if shutil.which("ffmpeg") is None:
-        logger.warning("ffmpeg not found; cannot extract the last frame of %s.", video_path)
+        logger.warning("ffmpeg not found; cannot extract a frame of %s.", video_path)
         return False
+    command = ["ffmpeg", "-y"]
+    if not first:
+        command += ["-sseof", "-0.1"]
+    command += [
+        "-i",
+        video_path.name,
+        "-frames:v",
+        "1",
+        "-q:v",
+        "2",
+        destination.name,
+    ]
     try:
         subprocess.run(
-            [
-                "ffmpeg",
-                "-y",
-                "-sseof",
-                "-0.1",
-                "-i",
-                video_path.name,
-                "-frames:v",
-                "1",
-                "-q:v",
-                "2",
-                destination.name,
-            ],
+            command,
             cwd=video_path.parent,
             check=True,
             capture_output=True,
@@ -55,27 +60,43 @@ def extract_last_frame(video_path: Path, destination: Path) -> bool:
         )
     except subprocess.CalledProcessError as error:
         logger.warning(
-            "ffmpeg failed to extract the last frame of %s:\n%s",
+            "ffmpeg failed to extract the %s frame of %s:\n%s",
+            "first" if first else "last",
             video_path,
             error.stderr,
         )
         return False
-    logger.info("Saved last frame: %s", destination)
+    logger.info("Saved %s frame: %s", "first" if first else "last", destination)
     return True
+
+
+def extract_first_frame(video_path: Path, destination: Path) -> bool:
+    """Extract the first frame of a clip to a JPEG next to it (requires ffmpeg)."""
+    return _extract_frame(video_path, destination, first=True)
+
+
+def extract_last_frame(video_path: Path, destination: Path) -> bool:
+    """Extract the last frame of a clip to a JPEG next to it (requires ffmpeg)."""
+    return _extract_frame(video_path, destination, first=False)
 
 
 def previous_frame(scene_dir: Path, segment: SceneSegment) -> Path | None:
     """Return the previous segment's last-frame image for continuity, if available.
 
-    Falls back to extracting it from the previous segment's existing clip.
+    Falls back to the legacy ``part-<N>.jpg`` naming, then to extracting the
+    frame from the previous segment's existing clip.
     """
     if segment.index == 0:
         return None
     previous_index = segment.index - 1
-    frame = frame_path(scene_dir, previous_index)
+    frame = end_frame_path(scene_dir, previous_index)
     if frame.exists():
         logger.info("Continuity: using previous segment's last frame %s", frame)
         return frame
+    legacy_frame = scene_dir / f"part-{previous_index}.jpg"
+    if legacy_frame.exists():
+        logger.info("Continuity: using legacy last-frame image %s", legacy_frame)
+        return legacy_frame
     previous_video = scene_dir / f"part-{previous_index}.mp4"
     if previous_video.exists():
         logger.info("Continuity: extracting last frame from existing %s ...", previous_video)
@@ -83,10 +104,37 @@ def previous_frame(scene_dir: Path, segment: SceneSegment) -> Path | None:
             return frame
         return None
     logger.info(
-        "Continuity: no part-%d.jpg or part-%d.mp4 found; generating segment %d "
-        "without a continuity reference.",
+        "Continuity: no part-%d-end.jpg or part-%d.mp4 found; generating segment %d "
+        "without an opening continuity reference.",
         previous_index,
         previous_index,
+        segment.index,
+    )
+    return None
+
+
+def next_frame(scene_dir: Path, segment: SceneSegment) -> Path | None:
+    """Return the next segment's first-frame image for closing continuity, if available.
+
+    Falls back to extracting it from the next segment's existing clip. Used when
+    regenerating a part so its final frame lines up with the following shot.
+    """
+    next_index = segment.index + 1
+    frame = start_frame_path(scene_dir, next_index)
+    if frame.exists():
+        logger.info("Continuity: using next segment's first frame %s", frame)
+        return frame
+    next_video = scene_dir / f"part-{next_index}.mp4"
+    if next_video.exists():
+        logger.info("Continuity: extracting first frame from existing %s ...", next_video)
+        if extract_first_frame(next_video, frame):
+            return frame
+        return None
+    logger.info(
+        "Continuity: no part-%d-start.jpg or part-%d.mp4 found; generating segment %d "
+        "without a closing continuity reference.",
+        next_index,
+        next_index,
         segment.index,
     )
     return None

@@ -76,3 +76,19 @@ CONTINUITY_MESSAGE = (
     "unchanged background, and carry the action forward seamlessly from it. "
     "This requirement overrides any conflicting framing described elsewhere."
 )
+
+CLOSING_MESSAGE = (
+    "MANDATORY CLOSING FRAME: the attached reference image is the opening frame "
+    "of the next shot, and it IS the final frame of your output. The very last "
+    "frame of the generated video must be a pixel-faithful reproduction of this "
+    "exact image. This applies to EVERYTHING in the frame — the characters "
+    "(design, pose, expression, scale) AND the entire background scene: the "
+    "exact same set, architecture, props, spatial layout, lighting, and color "
+    "palette. The environment is the identical physical space continuing across "
+    "shots and must be inherited from this reference — never redesigned, "
+    "repainted, relocated, re-dressed, or re-lit. Do NOT reinterpret, re-frame, "
+    "re-light, re-angle, zoom, or redesign any element. All motion must resolve "
+    "into this exact state, with the characters moving within the SAME "
+    "unchanged background, and hand off the action seamlessly to it. "
+    "This requirement overrides any conflicting framing described elsewhere."
+)

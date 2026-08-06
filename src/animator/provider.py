@@ -10,9 +10,10 @@ vendor API. Concrete providers wrap different backends:
 * :class:`MiniMaxVideoProvider` — the MiniMax API directly (``MiniMax-H3``).
 
 A :class:`VideoRequest` normalises the pipeline's inputs (prompt text, character
-and background reference images, an optional continuity opening frame, duration,
-resolution and aspect ratio) into a backend-agnostic summary. Each provider is
-responsible for encoding those inputs in whatever wire format its API expects.
+and background reference images, optional continuity opening/closing frames,
+duration, resolution and aspect ratio) into a backend-agnostic summary. Each
+provider is responsible for encoding those inputs in whatever wire format its
+API expects.
 """
 
 from __future__ import annotations
@@ -79,6 +80,9 @@ class VideoRequest:
     continuity_frame: ReferenceImage | None = None
     """Optional mandatory opening frame (last frame of the previous segment)."""
 
+    closing_frame: ReferenceImage | None = None
+    """Optional mandatory closing frame (first frame of the next segment)."""
+
     duration: int = DEFAULT_DURATION_SECONDS
     """Requested clip length in seconds."""
 
@@ -114,7 +118,8 @@ class OpenRouterVideoProvider(VideoProvider):
     Uses ``POST /api/v1/videos`` to submit a job, polls the returned polling URL
     until completion, then downloads the finished MP4. Character and background
     references are sent as ``input_references``; a continuity frame is sent as a
-    ``first_frame`` image for exact frame-0 continuity. MiniMax H3
+    ``first_frame`` image for exact frame-0 continuity and a closing frame as a
+    ``last_frame`` image for exact final-frame continuity. MiniMax H3
     (``minimax/hailuo-3``) is the default model at 768p.
     """
 
@@ -167,14 +172,25 @@ class OpenRouterVideoProvider(VideoProvider):
         if input_refs:
             payload["input_references"] = input_refs
 
+        frame_images: list[dict[str, Any]] = []
         if request.continuity_frame is not None:
-            payload["frame_images"] = [
+            frame_images.append(
                 {
                     "type": "image_url",
                     "image_url": {"url": request.continuity_frame.data_uri()},
                     "frame_type": "first_frame",
                 }
-            ]
+            )
+        if request.closing_frame is not None:
+            frame_images.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": request.closing_frame.data_uri()},
+                    "frame_type": "last_frame",
+                }
+            )
+        if frame_images:
+            payload["frame_images"] = frame_images
 
         payload.update(request.extra)
         return payload
@@ -267,13 +283,13 @@ class MiniMaxVideoProvider(VideoProvider):
 
     MiniMax distinguishes two mutually exclusive input modes:
     * **Reference mode** — character and background blueprints are sent as
-      ``reference_image`` entries (used for segment 0, where there is no
-      continuity frame).
-    * **First-frame mode** — a continuity frame is sent with ``role=first_frame``
-      so frame-0 is the exact last frame of the previous shot. Because MiniMax
+      ``reference_image`` entries (used when no continuity frames exist).
+    * **Frame mode** — a continuity frame is sent with ``role=first_frame``
+      and/or a closing frame with ``role=last_frame`` so frame 0 (and/or the
+      final frame) is the exact neighboring shot's frame. Because MiniMax
       forbids mixing ``reference_image`` with ``first_frame``/``last_frame``,
-      the character references are omitted here — the opening frame already
-      locks in the character designs and background.
+      the character references are omitted here — the locked frames already
+      pin down the character designs and background.
     """
 
     name = "minimax"
@@ -375,14 +391,23 @@ class MiniMaxVideoProvider(VideoProvider):
             {"type": "text", "text": request.prompt}
         ]
 
-        if request.continuity_frame is not None:
-            content.append(
-                {
-                    "type": "image_url",
-                    "image_url": {"url": request.continuity_frame.data_uri()},
-                    "role": "first_frame",
-                }
-            )
+        if request.continuity_frame is not None or request.closing_frame is not None:
+            if request.continuity_frame is not None:
+                content.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": request.continuity_frame.data_uri()},
+                        "role": "first_frame",
+                    }
+                )
+            if request.closing_frame is not None:
+                content.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": request.closing_frame.data_uri()},
+                        "role": "last_frame",
+                    }
+                )
         else:
             for ref in request.character_references:
                 content.append(
@@ -416,9 +441,12 @@ class MiniMaxVideoProvider(VideoProvider):
         headers = self._headers()
         payload = self._build_payload(request)
 
-        in_mode = (
-            "first-frame" if request.continuity_frame is not None else "reference"
-        )
+        modes: list[str] = []
+        if request.continuity_frame is not None:
+            modes.append("first-frame")
+        if request.closing_frame is not None:
+            modes.append("last-frame")
+        in_mode = "+".join(modes) if modes else "reference"
         logger.info(
             "Submitting MiniMax video request (model=%s, mode=%s, resolution=%s, "
             "duration=%ss, ratio=%s) ...",

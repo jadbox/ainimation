@@ -19,6 +19,7 @@ import requests
 from google import genai
 
 from animator.config import (
+    CLOSING_MESSAGE,
     CONTINUITY_MESSAGE,
     DEFAULT_VIDEO_MODEL,
     POLL_INTERVAL_SECONDS,
@@ -76,6 +77,20 @@ def build_gemini_input_items(request: VideoRequest) -> list[dict[str, Any]]:
                 "type": "image",
                 "data": base64.b64encode(request.continuity_frame.data).decode("utf-8"),
                 "mime_type": request.continuity_frame.mime_type,
+            }
+        )
+    if request.closing_frame is not None:
+        items.append(
+            {
+                "type": "text",
+                "text": f"Mandatory closing frame <LAST_FRAME>: {CLOSING_MESSAGE}",
+            }
+        )
+        items.append(
+            {
+                "type": "image",
+                "data": base64.b64encode(request.closing_frame.data).decode("utf-8"),
+                "mime_type": request.closing_frame.mime_type,
             }
         )
     return items

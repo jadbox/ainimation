@@ -30,7 +30,7 @@ class FakeResp:
 KEY = "test-key"
 
 
-def build_req(continuity=True):
+def build_req(continuity=True, closing=False):
     img = b"\xff\xd8fakejpeg"
     return VideoRequest(
         prompt="P",
@@ -38,6 +38,7 @@ def build_req(continuity=True):
         character_references=(ReferenceImage("MRS BRISBY", img),),
         background_reference=ReferenceImage("background", img),
         continuity_frame=ReferenceImage("continuity", img) if continuity else None,
+        closing_frame=ReferenceImage("closing", img) if closing else None,
         resolution="768P",
         aspect_ratio="16:9",
     )
@@ -65,6 +66,18 @@ class TestMiniMax(unittest.TestCase):
         for item in payload["content"]:
             if item["type"] == "image_url":
                 self.assertTrue(item["image_url"]["url"].startswith("data:image/jpeg;base64,"))
+
+    def test_payload_last_frame_only_mode(self):
+        p = MiniMaxVideoProvider(api_key=KEY)
+        payload = p._build_payload(build_req(continuity=False, closing=True))
+        roles = [c.get("role") for c in payload["content"] if c["type"] == "image_url"]
+        self.assertEqual(roles, ["last_frame"])
+
+    def test_payload_first_and_last_frame_mode(self):
+        p = MiniMaxVideoProvider(api_key=KEY)
+        payload = p._build_payload(build_req(continuity=True, closing=True))
+        roles = [c.get("role") for c in payload["content"] if c["type"] == "image_url"]
+        self.assertEqual(roles, ["first_frame", "last_frame"])
 
     def test_generate_flow(self):
         p = MiniMaxVideoProvider(api_key=KEY)

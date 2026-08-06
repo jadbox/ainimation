@@ -24,7 +24,17 @@ from animator.config import (
     VIDEO_PROVIDERS,
     get_aspect_ratio,
 )
-from animator.media import combine_parts, extract_last_frame, frame_path, part_path, previous_frame, prompt_path
+from animator.media import (
+    combine_parts,
+    end_frame_path,
+    extract_first_frame,
+    extract_last_frame,
+    next_frame,
+    part_path,
+    previous_frame,
+    prompt_path,
+    start_frame_path,
+)
 from animator.models import SceneSegment
 from animator.prompt import add_reference_tags, build_video_request
 from animator.provider import create_video_provider
@@ -235,8 +245,14 @@ def run(args: argparse.Namespace) -> int:
                 len(segments) - 1,
             )
             continuity_frame = previous_frame(scene_dir, segment)
+            closing_frame = next_frame(scene_dir, segment)
             background_plate = None
-            if scene_slug and segment.index == segments[0].index and continuity_frame is None:
+            if (
+                scene_slug
+                and segment.index == segments[0].index
+                and continuity_frame is None
+                and closing_frame is None
+            ):
                 background_plate = ensure_background_plate(scene_slug, blueprint_dir, segment.body)
                 logger.info(
                     "Background plate reference for segment %d: %s",
@@ -249,6 +265,7 @@ def run(args: argparse.Namespace) -> int:
                 characters=characters,
                 has_continuity=continuity_frame is not None,
                 has_background_reference=background_plate is not None,
+                has_closing_continuity=closing_frame is not None,
             )
             prompt_file = prompt_path(scene_dir, segment.index)
             prompt_file.write_text(direction, encoding="utf-8")
@@ -259,6 +276,7 @@ def run(args: argparse.Namespace) -> int:
                 references,
                 continuity_frame,
                 background_plate,
+                closing_frame=closing_frame,
                 duration=args.duration,
                 resolution=DEFAULT_RESOLUTION,
                 aspect_ratio=get_aspect_ratio(),
@@ -272,7 +290,8 @@ def run(args: argparse.Namespace) -> int:
                 destination,
                 len(video_bytes),
             )
-            extract_last_frame(destination, frame_path(scene_dir, segment.index))
+            extract_first_frame(destination, start_frame_path(scene_dir, segment.index))
+            extract_last_frame(destination, end_frame_path(scene_dir, segment.index))
     else:
         logger.info("Nothing to generate — all selected parts already exist.")
 
@@ -327,7 +346,9 @@ def main() -> None:
             "\n"
             "  %(prog)s --scene frisby_visits_mr_ages --parts 2\n"
             "      Generate only segment 2 (the third 10-second part). If\n"
-            "      part-1.jpg exists it is used as the mandatory opening frame.\n"
+            "      part-1-end.jpg exists it is used as the mandatory opening\n"
+            "      frame, and part-3-start.jpg (when present) as the mandatory\n"
+            "      closing frame.\n"
             "\n"
             "  %(prog)s --scene frisby_visits_mr_ages --parts 1 --force\n"
             "      Regenerate segment 1 even though part-1.mp4 already exists\n"

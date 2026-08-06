@@ -5,9 +5,10 @@ from __future__ import annotations
 import unittest
 from pathlib import Path
 
-from animator.media import prompt_path
+from animator.media import end_frame_path, prompt_path, start_frame_path
 from animator.models import SceneSegment
 from animator.prompt import (
+    add_reference_tags,
     build_direction,
     tag_character_mentions,
 )
@@ -82,6 +83,39 @@ class TestPromptTagging(unittest.TestCase):
     def test_prompt_path(self) -> None:
         p = prompt_path(Path("/tmp/out"), 2)
         self.assertEqual(p, Path("/tmp/out/part-2-prompt.md"))
+
+    def test_frame_paths(self) -> None:
+        self.assertEqual(
+            start_frame_path(Path("/tmp/out"), 0), Path("/tmp/out/part-0-start.jpg")
+        )
+        self.assertEqual(
+            end_frame_path(Path("/tmp/out"), 0), Path("/tmp/out/part-0-end.jpg")
+        )
+
+    def test_add_reference_tags_closing_continuity(self) -> None:
+        base = (
+            "Match character designs EXACTLY to visual reference images. "
+            "Do NOT use character references as initial frames.\n"
+            "MRS BRISBY hurries across the floor."
+        )
+        tagged = add_reference_tags(
+            base_prompt=base,
+            characters=["Mrs. Brisby"],
+            has_continuity=True,
+            has_closing_continuity=True,
+        )
+        self.assertIn("[# Sources <FIRST_FRAME>IMAGE_REF_1]", tagged)
+        self.assertIn("[# Sources <LAST_FRAME>IMAGE_REF_2]", tagged)
+
+    def test_add_reference_tags_closing_only_drops_held_pose(self) -> None:
+        tagged = add_reference_tags(
+            base_prompt="MRS BRISBY hurries across the floor.",
+            characters=["Mrs. Brisby"],
+            has_closing_continuity=True,
+        )
+        self.assertIn("[# Sources <LAST_FRAME>IMAGE_REF_1]", tagged)
+        self.assertIn("Begin from starting pose/composition in script.", tagged)
+        self.assertNotIn("clean held final pose", tagged)
 
     def test_build_initial_prompt(self) -> None:
         spec = CharacterSpec(

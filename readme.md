@@ -11,7 +11,7 @@ This project automates the multi-stage visual development and animation generati
 1. **Character Blueprint Sheets**: Generates cohesive 16:9 character style guides (hero poses, turnarounds, detail callouts) with automated multi-turn vision LLM review loops.
 2. **Scene Background Plates**: Generates clean, character-free 16:9 production background plates for cel compositing.
 3. **30-Second Scene Scripts**: Expands abridged story beats from the `story:` section of `movie.yml` into structured 30-second scene design documents divided into three 10-second segments.
-4. **Animated Clips (Pluggable Video Provider)**: Generates 720p 24fps video clips per segment with last-frame continuity locking (Google Gemini Omni Flash by default, OpenRouter MiniMax H3 at 768p, or the MiniMax API directly with MiniMax H3 at 768P), then concatenates them into full scene videos with seamless crossfade transitions.
+4. **Animated Clips (Pluggable Video Provider)**: Generates 720p 24fps video clips per segment with first/last-frame continuity locking (Google Gemini Omni Flash by default, OpenRouter MiniMax H3 at 768p, or the MiniMax API directly with MiniMax H3 at 768P), exports each clip's first and last frames as `part-<N>-start.jpg` / `part-<N>-end.jpg`, then concatenates the clips into full scene videos with seamless crossfade transitions.
 
 ---
 
@@ -184,10 +184,11 @@ Generates animated 720p 24fps video clips for each segment prompt in `out/script
   1. Reads `out/scripts/<scene>_part<N>.md` for each segment and extracts characters from the prompt.
   2. Loads latest blueprint images (`attempt-*.jpg`) from `out/blueprint/<character-slug>/` as character reference inputs. Missing blueprints are generated automatically via `generate-blueprint` (the exact command is echoed as `CREATING BLUEPRINT: ...`).
   3. For the first segment (index 0), attaches the scene location's background plate (`out/blueprint/<scene-slug>/attempt-*.jpg`, auto-generated if missing) as an environment reference so the set layout and depth layering stay anchored. The script name is mapped to a scene location via the `story:` section of `movie.yml`.
-  4. For segment `N > 0`, extracts the last frame of segment `N-1` (`part-<N-1>.jpg`) via `ffmpeg` and sends it as a mandatory opening frame reference for exact visual/background continuity (no background plate is attached to these segments).
-  5. Tacks reference image tags (<IMAGE_REF_N>) and continuity/opening frame instructions onto the segment prompt, saving the final tagged prompt to `out/animations/<scene>/part-<N>-prompt.md`.
-  6. Generates `part-<N>.mp4` for each segment.
-  7. Combines all parts into `out/animations/<scene>/full.mp4` with a 0.2s crossfade transition using `ffmpeg`.
+   4. For segment `N > 0`, locates the last frame of segment `N-1` (`part-<N-1>-end.jpg`, falling back to the legacy `part-<N-1>.jpg` or extracting it from `part-<N-1>.mp4` via `ffmpeg`) and sends it as a mandatory opening frame reference for exact visual/background continuity (no background plate is attached to these segments).
+   5. When regenerating a part (e.g. `--parts N --force`), also locates the first frame of segment `N+1` (`part-<N+1>-start.jpg`, or extracted from `part-<N+1>.mp4`) when it exists and sends it as a mandatory closing frame reference, so the regenerated clip's final frame lines up with the next shot.
+   6. Tacks reference image tags (<IMAGE_REF_N>) and continuity/opening/closing frame instructions onto the segment prompt, saving the final tagged prompt to `out/animations/<scene>/part-<N>-prompt.md`.
+   7. Generates `part-<N>.mp4` for each segment and exports its first and last frames as `part-<N>-start.jpg` and `part-<N>-end.jpg`.
+   8. Combines all parts into `out/animations/<scene>/full.mp4` with a 0.2s crossfade transition using `ffmpeg`.
 
 * **Module Layout**:
   * `src/animator.py`: Executable CLI launcher script.
@@ -210,12 +211,12 @@ Generates animated 720p 24fps video clips for each segment prompt in `out/script
 [ animator ] ──► Segment Video Generation (Pluggable Provider: Gemini / OpenRouter)
           │
           ├──► Segment 0 (0:00-0:10) ──► out/animations/<scene>/part-0.mp4
-          │                                     │ (Extracts last frame part-0.jpg)
-          ├──► Segment 1 (0:10-0:20) ◄──────────┘ (Frame-0 Continuity Reference)
+          │                                     │ (Exports part-0-start.jpg and part-0-end.jpg)
+          ├──► Segment 1 (0:10-0:20) ◄──────────┘ (part-0-end.jpg as opening-frame reference)
           │            │
           │            ▼ ──► out/animations/<scene>/part-1.mp4
-          │                     │ (Extracts last frame part-1.jpg)
-          ├──► Segment 2 (0:20-0:30) ◄──────────┘ (Frame-0 Continuity Reference)
+          │                     │ (Exports part-1-start.jpg and part-1-end.jpg)
+          ├──► Segment 2 (0:20-0:30) ◄──────────┘ (part-1-end.jpg as opening-frame reference)
           │            │
           │            ▼ ──► out/animations/<scene>/part-2.mp4
           │

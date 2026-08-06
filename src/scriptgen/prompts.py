@@ -1,49 +1,15 @@
-#!/usr/bin/env python3
-"""Expand an abridged story scene from ``movie.yml`` into detailed segment design files.
-
-Uses Gemini 3.6 Flash to turn the ``story:`` section's abridged scene beats
-(scene reference, characters, key emotions, important actions/talking points,
-and character eyelines/expressions) into production-ready segment prompts
-covering character locations, camera location, camera movement, scene
-animations, sounds, and music — all held to the direction and lighting rules in
-``movie.yml``.
-
-The scene is exported as one prompt file per segment:
-``out/scripts/<name>_part0.md``, ``out/scripts/<name>_part1.md``, etc.
-
-Usage:
-    python src/scene_script.py                      # list available story scenes
-    python src/scene_script.py --name "frisby_visits_mr_ages"
-"""
+"""Prompt builders that turn an abridged story beat into a scene design request."""
 
 from __future__ import annotations
-
-import argparse
-import logging
-import os
-import re
-from pathlib import Path
-
-from google import genai
-from google.genai import types
 
 from movie_config import (
     CHARACTERS,
     SceneSpec,
     StorySceneSpec,
-    get_character,
     get_movie_info,
-    get_scene,
-    get_story_scene,
     list_character_names,
-    list_story_scenes,
-    standardize_name,
 )
-
-logger = logging.getLogger("scene_script")
-
-DEFAULT_MODEL = "gemini-3.6-flash"
-DEFAULT_SCRIPTS_DIR = Path("out") / "scripts"
+from scriptgen.config import MAX_SCRIPT_CHARS, MAX_SCRIPT_PROMPT_CHARS, SEGMENT_SPANS
 
 
 def build_system_instruction() -> str:
@@ -118,12 +84,13 @@ DEPTH & OCCLUSION (required — generative video flattens space unless depth is 
 - State the exact ground plane each character stands on (the floor, a path, a ledge). Characters NEVER stand on top of furniture or props (tables, desks, jars, lanterns, books) unless the scene specifically calls for climbing; when in doubt, feet stay on the floor.
 - For every set piece sitting between the camera and a character, state the occlusion explicitly — what it hides and when.
 
-DIALOGUE CRAFT & LITERARY ELEGANCE (required — dialogue must be poetic, emotional, and deeply character-driven):
+DIALOGUE CRAFT & LITERARY ELEGANCE (required — dialogue must be simple, thoughtful, and deeply character-driven):
+- GROUNDED IN THE STORY BEAT (required): Every line must come directly from the beat's actions, talking points, and emotions — the request, the answer, or the warning happening NOW in this scene. STRICTLY NO invented backstory, past events, deaths, casualties, or implications beyond what the beat states (e.g. NEVER write lines like "The boy was always too stubborn to die quietly" or "I've seen it take three before the frost"). Simple and clear beats poetic invention: a line is good when it plainly moves this scene forward.
 - BANNED DIALOGUE TROPES: STRICTLY FORBID generic TV scolding, modern slang, melodrama, or harsh outbursts (e.g. NEVER write lines like "I told you...", "woman!", "calm down!", "hey you").
-- CLASSIC FEATURE ANIMATION TONE: Mimic the elevated, literary, 1980s theatrical tone of classic Don Bluth cinema (The Secret of NIMH). Dialogue must feel poetic, rhythmic, dignified, and emotionally haunting.
+- CLASSIC FEATURE ANIMATION TONE: Mimic the elevated, literary, 1980s theatrical tone of classic Don Bluth cinema (The Secret of NIMH). Dialogue must feel poetic, rhythmic, and dignified — but never at the cost of inventing story content.
 - CHARACTER-SPECIFIC VOCABULARY & SUBTEXT:
 {char_voices}
-- SUBTEXT OVER EXPOSITION: Lines must convey feeling and stakes through subtext rather than blunt facts (e.g. instead of "He has pneumonia and will die", write "Pneumonia... Bright eyes, madam. The lung-fever will take a young one before the morning frost unless we quiet the fire in his chest.").
+- SUBTEXT OVER EXPOSITION: Lines must convey feeling and stakes through subtext rather than blunt facts, using ONLY what the beat provides (e.g. instead of "Will you help my son or not?", write "His breath rattles like dry leaves, sir... I have no one else to ask.").
 - MINIMAL & ESSENTIAL: Keep dialogue to 2-4 short, impactful lines total across the entire 30-second scene. Every spoken word must carry immense narrative and emotional weight.
 
 OUTPUT FORMAT — return Markdown with EXACTLY these section headers, in this order:
@@ -145,13 +112,15 @@ OUTPUT FORMAT — return Markdown with EXACTLY these section headers, in this or
 
 SEGMENT RULES — the three Segment sections are the shooting plan and must:
 - Use the exact headers shown above (`## Segment 0 (0:00-0:10)`, etc.) so tooling can parse the 10-second boundaries.
+- MAXIMUM CONCISION (required): Write the most economical version possible — every sentence must earn its place, every detail must be filmable and non-redundant, and no moment may be repeated or padded. Keep each Segment section's body as short as it can be while still obeying all the rules above. HARD CHARACTER LIMIT: each Segment section body MUST stay at or under {MAX_SCRIPT_PROMPT_CHARS} characters — the final saved prompt file (fixed style/camera header + shared sections + segment body) cannot exceed {MAX_SCRIPT_CHARS} characters, and anything over is rejected and regenerated at your expense.
 - Be FULLY SELF-CONTAINED: every production detail lives inside a Segment's paragraphs. Tooling extracts each Segment individually (with only the Logline and Setting & Light attached) to prompt a video model, so a Segment must NEVER reference information defined in another Segment or in a section that no longer exists.
 - Chain into the three-act arc described above; each Segment must state in its opening paragraph the exact pose/composition it begins on (matching the previous Segment's final frame) so the generated clips can be concatenated seamlessly.
 
 Be specific and cinematic. Every visual choice must be filmable under the direction rules above, and every element must serve the story."""
 
 
-def build_user_prompt(story: StorySceneSpec, scene: SceneSpec) -> str:
+def build_scene_context(story: StorySceneSpec, scene: SceneSpec) -> str:
+    """Render the canonical story-beat context block used in every part prompt."""
     characters = ", ".join(story.characters)
     emotions = "\n".join(f"  - {item}" for item in story.emotions)
     actions = "\n".join(f"  - {item}" for item in story.actions)
@@ -172,274 +141,71 @@ def build_user_prompt(story: StorySceneSpec, scene: SceneSpec) -> str:
         f"Key emotions & feelings:\n{emotions}\n"
         f"Important actions & talking points:\n{actions}\n"
         f"Where the characters are looking & their facial expressions:\n{looks}\n\n"
-        "Expand this abridged story beat into the full 30-second scene design document now, "
-        "following the exact output format (including the three 10-second "
-        "Segment sections) and direction rules."
+        "These beats are the COMPLETE story of this scene: invent no events, "
+        "history, or implications beyond them."
     )
 
 
-def slugify_name(name: str) -> str:
-    """Validate/normalize a scene name into a filesystem-safe slug."""
-    slug = name.strip().lower().replace(" ", "-")
-    if not re.fullmatch(r"[a-z0-9][a-z0-9_-]*", slug):
-        raise ValueError(
-            f"Scene name {name!r} must start with a letter or digit and contain "
-            "only lowercase letters, digits, hyphens, and underscores."
-        )
-    return slug
-
-
-def parse_section(document: str, header_pattern: str) -> str:
-    """Extract body text from a section heading matching header_pattern."""
-    match = re.search(
-        rf"^##\s+{header_pattern}\s*$", document, flags=re.MULTILINE | re.IGNORECASE
+def build_part0_prompt(story: StorySceneSpec, scene: SceneSpec) -> str:
+    """Prompt for segment 0, which also establishes the shared scene sections."""
+    span = SEGMENT_SPANS[0]
+    return (
+        build_scene_context(story, scene)
+        + "\n\nExpand this abridged story beat into a production-ready scene design "
+        "and output ONLY this structure, in this order:\n"
+        "# <evocative scene title>\n"
+        "## Logline\n"
+        "## Characters in Scene\n"
+        "## Setting & Light\n"
+        f"## Segment 0 ({span})\n"
+        "<segment 0 chronological shooting plan body>\n\n"
+        f"Write Segment 0 ONLY. Segments 1 and 2 are generated separately and will "
+        f"reference this output, so keep the shared sections self-contained and "
+        "maximally concise. Obey every direction rule. HARD LIMIT: the Segment 0 "
+        f"body must stay at or under {MAX_SCRIPT_PROMPT_CHARS} characters."
     )
-    if not match:
-        return ""
-    body = document[match.end():]
-    next_heading = re.search(r"^##\s", body, flags=re.MULTILINE)
-    if next_heading:
-        body = body[: next_heading.start()]
-    return body.strip()
 
 
-def parse_characters_in_scene(document: str) -> list[str]:
-    """Extract roster character names from '## Characters in Scene'."""
-    match = re.search(r"^##\s*Characters in Scene\s*$", document, flags=re.MULTILINE | re.IGNORECASE)
-    if not match:
-        return []
-    section_lines: list[str] = []
-    for line in document[match.end():].splitlines():
-        if line.strip().startswith("##"):
-            break
-        section_lines.append(line)
-
-    roster = {standardize_name(spec.name): spec.name for spec in CHARACTERS.values()}
-    found: list[str] = []
-    for line in section_lines:
-        bullet = re.match(r"^\s*(?:[-*+]|\d+[.)])\s*(.+?)\s*$", line)
-        if not bullet:
-            continue
-        cleaned = re.sub(r"<VOICE>.*?</VOICE>", "", bullet.group(1), flags=re.IGNORECASE)
-        candidate = standardize_name(cleaned)
-        if candidate in roster and roster[candidate] not in found:
-            found.append(roster[candidate])
-    return found
-
-
-def parse_segments_from_document(document: str) -> list[tuple[int, str, str]]:
-    """Extract (index, span, body) tuples for each segment in document."""
-    header_re = re.compile(
-        r"^##\s+Segment\s+(\d+)\s*\(([^)]*)\)\s*$",
-        flags=re.MULTILINE | re.IGNORECASE,
-    )
-    matches = list(header_re.finditer(document))
-    if not matches:
-        return [(0, "0:00-0:30", document.strip())]
-
-    segments: list[tuple[int, str, str]] = []
-    for position, match in enumerate(matches):
-        idx = int(match.group(1))
-        span = match.group(2).strip()
-        start = match.end()
-        end = matches[position + 1].start() if position + 1 < len(matches) else len(document)
-        body = document[start:end]
-        next_heading = re.search(r"^##\s", body, flags=re.MULTILINE)
-        if next_heading:
-            body = body[: next_heading.start()]
-        segments.append((idx, span, body.strip()))
-
-    segments.sort(key=lambda s: s[0])
-    return segments
-
-
-def format_segment_base_prompt(
-    scene_name: str,
+def build_next_part_prompt(
+    story: StorySceneSpec,
+    scene: SceneSpec,
+    part_index: int,
+    prev_body: str,
     logline: str,
     setting: str,
     characters: list[str],
-    span: str,
-    segment_body: str,
 ) -> str:
-    """Build the base prompt document for a single scene segment."""
-    movie_info = get_movie_info()
-
-    char_items: list[str] = []
-    for char in characters:
-        name_str = standardize_name(char)
-        try:
-            spec = get_character(char)
-            voice_tag = f" <VOICE>{spec.voice}</VOICE>" if spec.voice else ""
-        except ValueError:
-            voice_tag = ""
-        char_items.append(f"{name_str}{voice_tag}")
-    char_header_str = ", ".join(char_items)
-
-    span_note = f" (story time {span})" if span else ""
-
-    setting_block = (
-        f"=== SHARED SETTING & LIGHT (constant across the whole scene) ===\n{setting}\n\n"
-        if setting
-        else ""
+    """Prompt for a later segment, chaining the previous segment as a reference."""
+    span = SEGMENT_SPANS.get(part_index, "")
+    shared = (
+        f"Logline: {logline}\n"
+        f"Characters in scene: {', '.join(characters)}\n"
+        f"Setting & Light: {setting}"
+    )
+    return (
+        build_scene_context(story, scene)
+        + "\n\nESTABLISHED SHARED CONTENT (already set for this scene; keep it "
+        "consistent, do not restate it):\n"
+        + shared
+        + "\n\n<REFERENCE> (the previous segment's content you already wrote — "
+        "continue seamlessly from its final frame; match pose, composition, "
+        "blocking, and lighting):\n"
+        f"{prev_body}\n</REFERENCE>\n\n"
+        f"Produce ONLY this section, writing segment {part_index}'s chronological "
+        f"shooting plan:\n"
+        f"## Segment {part_index} ({span})\n<segment body>\n\n"
+        "Do NOT restate the title, Logline, Characters, or Setting & Light. "
+        "Follow all direction rules and MAXIMUM CONCISION. HARD LIMIT: the "
+        f"segment body must stay at or under {MAX_SCRIPT_PROMPT_CHARS} characters."
     )
 
-    return f"""In a single unbroken scene, in a single continuous shot with no scene cuts. Style: {movie_info.style_summary}
 
-Scene: "{scene_name}" — {logline or 'see script below.'}
-
-Characters appearing: {char_header_str}.
-Match character designs EXACTLY to visual reference images. Do NOT use character references as initial frames.
-{movie_info.camera_rules}
-
-Depth & Staging (mandatory): Characters stay on ground planes (feet on floor, never standing on furniture/props unless explicitly climbing). 
-Midground set pieces MUST occlude characters passing behind them. Interacting characters share the same depth plane in 3/4 or profile view.
-
-Single continuous camera shot (mandatory): One single continuous shot from a consistent camera perspective. 
-STRICTLY NO sudden scene cuts, jump cuts, shot transitions, or camera angle changes. Camera moves smoothly in continuous motion.
-
-Eyeline & camera rules (mandatory): Characters MUST look at each other or at scene objects as directed in script — NEVER look directly into camera lens. Maintain 3/4 or profile eyelines.
-
-Dialogue & speaker mandates (mandatory):
-- ONLY the character explicitly declared as speaker in a dialogue line moves their mouth and lips to speak.
-- All non-speaking characters MUST keep their mouths firmly CLOSED, remaining silent while reacting with active body language.
-
-Continuous character motion & physical locomotion (mandatory):
-- Every character in frame MUST be actively alive with continuous secondary movement (rhythmic breathing, weight shifts, ear/whisker twitches). NO character may freeze or stand rigid.
-- STRICTLY NO teleporting, sudden position pops, fading in/out of character locations, or creating duplicate/ghost character copies in frame.
-- ALWAYS use proper, continuous physical locomotion and movement (stepping, walking, turning, pivoting, climbing) whenever a character or item changes location or facing orientation in the script.
-
-{setting_block}=== SCENE SCRIPT{span_note} ===
-{segment_body}"""
-
-
-def require_api_key() -> str:
-    key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-    if not key:
-        raise RuntimeError("Set GEMINI_API_KEY or GOOGLE_API_KEY before running this command.")
-    return key
-
-
-def run(args: argparse.Namespace) -> int:
-    story = get_story_scene(args.name)
-    scene = get_scene(story.scene)
-    scene_name = slugify_name(story.name)
-
-    if args.output:
-        out_path = Path(args.output)
-        if out_path.suffix == ".md":
-            base_path = out_path.with_suffix("")
-        else:
-            base_path = out_path / scene_name
-    else:
-        base_path = DEFAULT_SCRIPTS_DIR / scene_name
-
-    base_path.parent.mkdir(parents=True, exist_ok=True)
-
-    part0_file = Path(f"{base_path}_part0.md")
-    if part0_file.exists() and not args.force:
-        raise RuntimeError(
-            f"{part0_file} already exists. Pass --force to overwrite scene scripts."
-        )
-
-    client = genai.Client(api_key=require_api_key())
-
-    logger.info("=== Expanding story scene %r with model=%s ===", scene_name, args.model)
-    logger.info("Story beat: %s (location: %s)", story.title, scene.name)
-    response = client.models.generate_content(
-        model=args.model,
-        contents=build_user_prompt(story, scene),
-        config=types.GenerateContentConfig(
-            system_instruction=build_system_instruction(),
-            temperature=0.7,
-        ),
+def build_condense_prompt(previous_doc: str, current_chars: int, target_chars: int) -> str:
+    """Prompt to rewrite the previous document shorter while keeping its structure."""
+    reduce_by = current_chars - target_chars
+    return (
+        f"Your previous document is {current_chars} characters; the limit is "
+        f"{target_chars} characters. Rewrite it, cutting at least {reduce_by} "
+        "characters while keeping the same section structure and story beats. "
+        f"Return ONLY the rewritten document.\n\n{previous_doc}"
     )
-    document = (response.text or "").strip()
-    if not document:
-        raise RuntimeError("Gemini returned an empty scene document.")
-
-    logline = parse_section(document, r"Logline")
-    setting = parse_section(document, r"Setting[^\n]*")
-    characters = parse_characters_in_scene(document) or story.characters
-    segments = parse_segments_from_document(document)
-
-    header = (
-        f"<!-- Generated by scene_script.py (model: {args.model}) from story scene: "
-        f"{story.name!r} (movie.yml story section) -->\n\n"
-    )
-
-    written_files: list[Path] = []
-    for idx, span, body in segments:
-        part_file = Path(f"{base_path}_part{idx}.md")
-        content = format_segment_base_prompt(
-            scene_name=scene_name,
-            logline=logline,
-            setting=setting,
-            characters=characters,
-            span=span,
-            segment_body=body,
-        )
-        part_file.write_text(header + content + "\n", encoding="utf-8")
-        written_files.append(part_file)
-        print(f"Wrote scene segment script: {part_file}")
-
-    return 0
-
-
-def main() -> None:
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
-        datefmt="%H:%M:%S",
-    )
-    movie_info = get_movie_info()
-    parser = argparse.ArgumentParser(
-        description=(
-            f"Expand an abridged story scene from movie.yml for {movie_info.title} "
-            "into detailed segment design files written to "
-            "out/scripts/<name>_part0.md, etc. Run without --name to "
-            "list the available story scenes."
-        )
-    )
-    parser.add_argument(
-        "--name",
-        default=None,
-        help=(
-            "Story scene name from the movie.yml `story:` section; segment scripts "
-            "are written to out/scripts/<name>_part0.md, etc. (e.g. frisby_visits_mr_ages). "
-            "Omit to list all available story scenes."
-        ),
-    )
-    parser.add_argument(
-        "--model",
-        default=DEFAULT_MODEL,
-        help=f"Gemini text model (default: {DEFAULT_MODEL}).",
-    )
-    parser.add_argument(
-        "--output",
-        default=None,
-        help="Output base path or directory (default: out/scripts/<name>).",
-    )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Overwrite existing scene scripts.",
-    )
-    args = parser.parse_args()
-
-    if not args.name:
-        print("Available story scenes in movie.yml (pass one to --name):\n")
-        for spec in list_story_scenes():
-            print(f"  {spec.name}")
-            if spec.title:
-                print(f"      {spec.title}")
-            print(f"      scene: {spec.scene} | characters: {', '.join(spec.characters)}")
-        return
-
-    try:
-        raise SystemExit(run(args))
-    except (RuntimeError, ValueError) as error:
-        parser.error(str(error))
-
-
-if __name__ == "__main__":
-    main()

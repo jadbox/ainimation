@@ -19,6 +19,13 @@ SEGMENT_HEADER_RE = re.compile(
     flags=re.MULTILINE | re.IGNORECASE,
 )
 
+HTML_COMMENT_RE = re.compile(r"<!--.*?-->", flags=re.DOTALL)
+
+
+def strip_html_comments(script: str) -> str:
+    """Remove ``<!-- ... -->`` comment blocks (e.g. scriptgen's header) from script text."""
+    return HTML_COMMENT_RE.sub("", script).strip()
+
 
 def normalize_name(name: str) -> str:
     """Normalize a character name for fuzzy roster matching."""

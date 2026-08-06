@@ -67,7 +67,7 @@ class SceneSpec:
 
 @dataclass(frozen=True)
 class StorySceneSpec:
-    """An abridged story beat that ``scene_script`` expands into a full scene design."""
+    """An abridged story beat that ``scriptgen`` expands into a full scene design."""
 
     name: str
     title: str

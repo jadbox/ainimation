@@ -32,6 +32,7 @@ from animator.script import (
     find_scene_part_scripts,
     parse_scene_characters,
     parse_segments,
+    strip_html_comments,
 )
 from blueprint_generator import slug
 from movie_config import get_scene, get_story_scene
@@ -140,7 +141,7 @@ def run(args: argparse.Namespace) -> int:
         # Check for legacy single-file script
         legacy_path = scripts_dir / f"{args.scene}.md"
         if legacy_path.is_file():
-            script = legacy_path.read_text(encoding="utf-8")
+            script = strip_html_comments(legacy_path.read_text(encoding="utf-8"))
             segments = parse_segments(script)
             logger.info("Loaded legacy scene script: %s", legacy_path)
         else:
@@ -151,7 +152,7 @@ def run(args: argparse.Namespace) -> int:
             )
     else:
         segments = [
-            SceneSegment(index=idx, span="", body=path.read_text(encoding="utf-8"))
+            SceneSegment(index=idx, span="", body=strip_html_comments(path.read_text(encoding="utf-8")))
             for idx, path in part_scripts
         ]
         logger.info(

@@ -2,7 +2,7 @@
 """Animate a scene script into clips via a pluggable video provider.
 
 Reads the scene segment prompt files at ``out/scripts/<scene>_part<N>.md``
-(produced by ``src/scene_script.py``), collects the final character blueprint
+(produced by ``src/scriptgen.py``), collects the final character blueprint
 images for the characters appearing in the scene, and sends the prompt plus
 reference images to a configured video provider (Google Gemini Omni Flash by
 default, or OpenRouter's async videos API e.g. ``minimax/hailuo-3``).

@@ -24,7 +24,7 @@ All movie-specific information, character rosters, scene definitions, and hard d
   * **Hard direction rules**: List of strict visual/lighting/animation mandates passed into system instructions.
   * **Characters**: List of characters (`name`, `species`, `identity`, `appearance`, `voice`, `avoid`).
   * **Scenes**: List of scene locations (`name`, `slug`, `logline`, `backgrounds`).
-  * **Story**: Abridged story beats (`name`, `title`, `scene`, `characters`, `emotions`, `actions`, `looks`) that `scene-script` expands into full scene design documents. `scene` references a scene location slug; `characters` reference roster names; `looks` records where the characters are looking and their facial expressions.
+  * **Story**: Abridged story beats (`name`, `title`, `scene`, `characters`, `emotions`, `actions`, `looks`) that `scriptgen` expands into full scene design documents. `scene` references a scene location slug; `characters` reference roster names; `looks` records where the characters are looking and their facial expressions.
 * **`movie.md`**: Human-readable style bible containing comprehensive artistic guidelines, color scripting, animation mechanics, optical FX passes, and camera director checklists. Refer to [`movie.md`](./movie.md) for full style documentation.
 
 To adapt this pipeline for a new movie or art style, edit `movie.yml` (and `movie.md`). The Python code dynamically loads `movie.yml` via `src/movie_config.py` without requiring code changes.
@@ -96,24 +96,29 @@ Generates character style guide sheets (`--character`) or scene background plate
 
 ---
 
-### B. Scene Script Generator (`scene-script`)
+### B. Scene Script Generator (`scriptgen` / `scene-script`)
 
-Expands an abridged story scene from the `story:` section of `movie.yml` into detailed segment design files written per scene segment (e.g., `out/scripts/frisby_visits_mr_ages_part0.md`).
+Expands an abridged story scene from the `story:` section of `movie.yml` into detailed segment design files written per scene segment (e.g., `out/scripts/frisby_visits_mr_ages_part0.md`). Generation runs through OpenRouter's chat completions API.
 
 * **CLI Commands**:
   ```bash
   # List the story scenes available for --name
-  uv run scene-script
+  uv run scriptgen
 
-  # Expand a story scene into segment prompt documents
-  uv run scene-script --name frisby_visits_mr_ages
+  # Expand a story scene into segment prompt documents (writes part 0, 1, and 2)
+  uv run scriptgen --name frisby_visits_mr_ages
   ```
 
 * **Key Options**:
   * `--name NAME`: Story scene name from the `story:` section of `movie.yml` (written to `out/scripts/<name>_part0.md`, etc.). Omit to list all available story scenes.
-  * `--model MODEL`: Gemini text model ID (default: `gemini-3.6-flash`).
+  * `--model MODEL`: OpenRouter model slug used to expand the scene (default: `qwen/qwen3.8-max`). The shortcut `gemini` maps to `google/gemini-3.6-flash` on OpenRouter. Requires `OPENROUTER_API_KEY`.
+  * `-v` / `--verbose`: Stream the LLM output from OpenRouter (reasoning/thinking plus final content) as it is generated.
   * `--output PATH`: Custom output file or directory base path.
   * `--force`: Overwrite existing scripts if they already exist.
+
+* **Sequential Per-Part Generation**: the three 10-second segments are generated one at a time in order. Part 0 also establishes the shared sections (title, logline, characters, setting & light). Each later part is prompted with the previous segment's saved content embedded as a `<REFERENCE>` block so blocking, composition, and lighting continue seamlessly. Reasoning effort for the default model is set to `medium` to limit excessive "thinking" time.
+
+* **Length Validation & Retry**: each saved segment file (static template + segment body) must stay at or below 6000 characters. If any part is over the limit, `scriptgen` re-runs that part's prompt with a reduction instruction (embedding the previous generation and the exact number of characters to cut) up to 3 times before writing.
 
 * **Output Document Structure** (`out/scripts/<name>_part<N>.md`):
   * Pre-formatted segment video prompts containing style summary, camera rules, depth & staging mandates, characters, logline, shared setting & light, and the segment's moment-by-moment shooting plan.
@@ -179,7 +184,7 @@ Generates animated 720p 24fps video clips for each segment prompt in `out/script
 [ movie.yml / movie.md ]
           │
           ▼
-[ scene-script ] ──► Generates Segment Prompts (out/scripts/<scene>_part<N>.md)
+[ scriptgen ] ──► Generates Segment Prompts (out/scripts/<scene>_part<N>.md)
           │
           ▼
 [ generate-blueprint ] ──► Generates Character & Background Blueprints (out/blueprint/...)

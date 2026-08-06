@@ -131,7 +131,7 @@ def build_direction(
     resolution: str = DEFAULT_RESOLUTION,
 ) -> str:
     """Build the textual direction prompt sent to Google Gemini Omni Flash."""
-    from scene_script import format_segment_base_prompt
+    from scriptgen.format import format_segment_base_prompt
 
     base_prompt = format_segment_base_prompt(
         scene_name=scene_name,

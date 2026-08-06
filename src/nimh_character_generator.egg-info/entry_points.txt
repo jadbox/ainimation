@@ -2,4 +2,5 @@
 animator = animator:main
 generate-blueprint = blueprint_generator.blueprint:main
 generate-character = blueprint_generator.blueprint:main
-scene-script = scene_script:main
+scene-script = scriptgen:main
+scriptgen = scriptgen:main

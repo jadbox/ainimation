@@ -112,6 +112,50 @@ class TestMiniMax(unittest.TestCase):
             prov = create_video_provider("minimax")
         self.assertIsInstance(prov, MiniMaxVideoProvider)
 
+    def test_cancel_sends_delete(self):
+        p = MiniMaxVideoProvider(api_key=KEY)
+        ok = FakeResp({"task_id": "jobX", "action": "cancelled", "status": "cancelled"})
+        with mock.patch("animator.provider.requests.delete", return_value=ok) as md:
+            p.cancel("jobX", reason="test")
+        url = md.call_args[0][0]
+        self.assertEqual(
+            url, "https://api.minimax.io/v2/video_generation/jobX"
+        )
+        self.assertEqual(md.call_args[1]["headers"]["Authorization"], "Bearer test-key")
+
+    def test_cancel_ignores_http_error(self):
+        p = MiniMaxVideoProvider(api_key=KEY)
+        err = FakeResp({"error": "nope"}, status=400)
+        with mock.patch("animator.provider.requests.delete", return_value=err):
+            p.cancel("jobY", reason="test")  # should not raise
+
+    def test_cancel_active_tasks_on_signal(self):
+        p = MiniMaxVideoProvider(api_key=KEY)
+        p._active_tasks.update({"job1", "job2"})
+        ok = FakeResp({"task_id": "job1", "action": "cancelled", "status": "cancelled"})
+        with mock.patch("animator.provider.requests.delete", return_value=ok) as md:
+            p._cancel_active_tasks()
+        ids = {c.args[0].rsplit("/", 1)[-1] for c in md.call_args_list}
+        self.assertEqual(ids, {"job1", "job2"})
+        self.assertEqual(len(md.call_args_list), 2)
+        self.assertEqual(p._active_tasks, set())
+
+    def test_generate_registers_active_task_then_clears(self):
+        p = MiniMaxVideoProvider(api_key=KEY)
+        submit = FakeResp({"task_id": "job-clear"})
+        succeeded = FakeResp(
+            {"task": {"status": "succeeded", "content": {"url": "https://cdn/x.mp4"}}}
+        )
+        dl = FakeResp({})
+        dl.content = b"MP4BYTES"
+        with mock.patch("animator.provider.requests.post", return_value=submit), \
+             mock.patch("animator.provider.requests.get", side_effect=[succeeded, dl]), \
+             mock.patch("animator.provider.time.sleep"), \
+             mock.patch("animator.provider.time.monotonic", side_effect=seq()):
+            out = p.generate(build_req(), timeout=600)
+        self.assertEqual(out, b"MP4BYTES")
+        self.assertEqual(p._active_tasks, set())
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

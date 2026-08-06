@@ -45,11 +45,43 @@ def generate_image(client: genai.Client, model: str, prompt: str) -> bytes:
     return data
 
 
+TARGET_WIDTH = 1280
+TARGET_HEIGHT = 720
+"""True 16:9 output dimensions for processed JPEGs."""
+
+
+def crop_to_16_9(image: Image.Image) -> Image.Image:
+    """Center-crop ``image`` to a true 16:9 aspect ratio.
+
+    PIL's ``thumbnail`` preserves the source aspect ratio, so a model that
+    returns a non-16:9 composition would otherwise slip through as e.g.
+    1280x714, which breaks background/animation anchoring. Cropping to exactly
+    16:9 keeps generated blueprints on-canon.
+    """
+    width, height = image.size
+    target_ratio = TARGET_WIDTH / TARGET_HEIGHT
+    source_ratio = width / height
+    if abs(source_ratio - target_ratio) < 1e-6:
+        return image
+    if source_ratio > target_ratio:
+        new_width = int(round(height * target_ratio))
+        left = (width - new_width) // 2
+        box = (left, 0, left + new_width, height)
+    else:
+        new_height = int(round(width / target_ratio))
+        top = (height - new_height) // 2
+        box = (0, top, width, top + new_height)
+    return image.crop(box)
+
+
 def to_jpeg(image_data: bytes) -> bytes:
-    """Convert image bytes to high quality JPEG format resized to 1280x720 maximum."""
+    """Convert image bytes to a true 16:9 high quality JPEG resized to 1280x720."""
     with Image.open(io.BytesIO(image_data)) as image:
         converted = image.convert("RGB")
-        converted.thumbnail((1280, 720), Image.Resampling.LANCZOS)
+        converted = crop_to_16_9(converted)
+        converted = converted.resize(
+            (TARGET_WIDTH, TARGET_HEIGHT), Image.Resampling.LANCZOS
+        )
         buf = io.BytesIO()
         converted.save(buf, format="JPEG", quality=95, optimize=True)
         return buf.getvalue()

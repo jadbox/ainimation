@@ -16,20 +16,29 @@ def build_initial_prompt(character: CharacterSpec) -> str:
     """Build the initial image generation prompt for a character style guide."""
     movie_info = get_movie_info()
     display_name = character.display_name()
-    return f"""Create a polished {display_name} character style guide for a hand-painted
-{movie_info.style}. Deliver one cohesive 16:9 reference
-image with a large three-quarter hero pose plus smaller front, profile, and back
-turnaround views, detail callouts for key features, and a clear silhouette read.
+    return f"""Create a formal 1980s animation production model sheet for {display_name} in
+the hand-painted {movie_info.style}. Deliver one cohesive, true 16:9 reference
+image containing four full-body, head-to-toe views of the same character: front,
+strict profile, back, and three-quarter. Arrange the views in a clean horizontal
+turnaround lineup on one shared baseline, with generous, even spacing and a clear
+silhouette read. Every ear, hand, foot, tail, garment edge, and other extremity
+must remain fully inside the frame.
+
+The entire canvas behind and between the figures is one flat, uniform medium
+slate-blue color, filling every pixel edge-to-edge. No white, cream, parchment,
+paper texture, gradient, vignette, scenic setting, floor plane, border, margin,
+frame, prop, or foreground occlusion. Use neutral, even studio lighting with at
+most a subtle contact shadow directly below each figure.
 
 {display_name} is {character.identity}: {character.appearance}. Keep true animal anatomy visible beneath garments.
 Feature oversized glossy eyes with stacked white catchlight highlights and tufted
 spiky fur/feather silhouettes breaking outer contours.
 
 Rendering style: hand-inked tapered dark-brown linework (no black vector lines),
-two-tone cel shading, dense gouache and watercolor paper texture. Lighting: strong
-warm amber/gold key light against deep teal/indigo shadow with continuous 360-degree
-cool-gold rim lighting. Frame from a low rodent eye-level (2-12 inches high) with
-soft-focus dark foreground elements framing 20-30% of the borders.
+two-tone cel shading, and restrained hand-painted gouache texture within the
+character art only. This is a formal character turnaround sheet, not a cinematic
+scene, illustration, collage, or pose montage. No text, labels, arrows, logos, or
+watermarks.
 
 Avoid {character.avoid}."""
 
@@ -51,7 +60,7 @@ Apply strict aesthetic & technical visual criteria for {display_name}:
 1. Character Identity & Anatomy: {character.identity}. Must read as a real {character.species} first and a person second. Required visual features, garment, and posture: {character.appearance}. Must retain true animal anatomy under garments, oversized glossy eyes with stacked white highlights, and tufted spiky fur/feather silhouettes breaking contours.
 2. Linework & Rendering: Expressive hand-inked tapered lines (dark brown, not black/vector), rich 2-tone cel shading, dense gouache/watercolor textured paint effect. Reject clean vector art, 3D CGI, smooth plastic gradients, or digital glow filters.
 3. Staging & Lighting: Low rodent eye-level perspective (2-12 inches high). Strong single practical light source producing rich amber/gold highlights contrasted with deep teal/indigo shadows and continuous 360-degree cool-gold rim lighting. Dark, soft-focus foreground elements framing 20-30% of edges.
-4. Sheet Organization & Quality: Clear 16:9 reference sheet with a prominent three-quarter hero pose plus turnaround views (front, profile, back) and detail callouts. Zero anatomy glitches, zero extra limbs, zero text/logos/watermarks/labels.
+4. Sheet Organization & Quality: A formal, true 16:9 model sheet with four complete, head-to-toe views of the same character (front, strict profile, back, and three-quarter) in a clean, evenly spaced horizontal turnaround lineup. All extremities must remain in-frame. The background must be one flat, uniform medium slate-blue field from edge to edge: reject white/cream/parchment areas, paper texture, gradients, borders, margins, scenic settings, floor planes, props, vignettes, or foreground occlusion. Zero anatomy glitches, extra limbs, text, logos, watermarks, labels, arrows, or pose-montage layouts.
 5. Character Style Befitting the Narrative (HARD GATE): The design itself must make the viewer FEEL this character's role in the story at first glance. Apply character-design DNA: grotesque-yet-appealing shapes, asymmetry and age/wear etched into the silhouette, tufted spiky fur or feathers breaking every contour, and oversized glossy eyes that carry the entire emotional performance. Ask yourself: "Could this exact design only exist in {movie_info.title}, and does it trigger the precise emotional reaction the narrative demands (awe, fear, tenderness, menace)?" A competent, cute, symmetrical, or generic rendering that could be dropped into any modern cartoon or children's book FAILS this criterion even when every technical box above is checked.
 
 Be exacting and demanding. Do NOT accept merely because an image is visually pleasing or artistic if it misses key style mandates or reference sheet layout needs. NEVER accept an image that fails criterion 5, no matter how polished or technically correct it is: "generic but well-executed" is always a rejection. When rejecting, provide a complete, self-contained revised image prompt that precisely remedies all identified defects — especially any missing narrative emotional register or character-style DNA — while preserving all correct details.

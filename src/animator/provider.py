@@ -17,9 +17,11 @@ responsible for encoding those inputs in whatever wire format its API expects.
 
 from __future__ import annotations
 
+import atexit
 import base64
 import logging
 import os
+import signal
 import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -279,6 +281,7 @@ class MiniMaxVideoProvider(VideoProvider):
     BASE_URL = "https://api.minimax.io"
     CREATE_URL = f"{BASE_URL}/v2/video_generation"
     QUERY_URL = f"{BASE_URL}/v2/query/video_generation"
+    DELETE_URL = f"{BASE_URL}/v2/video_generation"
     TERMINAL_FAILED = {"failed", "cancelled"}
 
     def __init__(
@@ -294,12 +297,78 @@ class MiniMaxVideoProvider(VideoProvider):
             raise RuntimeError(
                 "Set MINIMAX_API_KEY before using the MiniMax video provider."
             )
+        self._active_tasks: set[str] = set()
+        self._shutdown_registered = False
+        self._original_handlers: dict[int, Any] = {}
 
     def _headers(self) -> dict[str, str]:
         return {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+
+    def _register_shutdown_handlers(self) -> None:
+        """Install one-time signal/atexit handlers that cancel queued jobs on exit."""
+        if self._shutdown_registered:
+            return
+        self._shutdown_registered = True
+        for signum in (signal.SIGINT, signal.SIGTERM, signal.SIGABRT):
+            try:
+                self._original_handlers[signum] = signal.getsignal(signum)
+            except (ValueError, OSError):
+                continue
+            signal.signal(signum, self._handle_shutdown)
+        atexit.register(self._cancel_active_tasks)
+
+    def _handle_shutdown(self, signum: int, frame: Any) -> None:
+        logger.warning(
+            "Received signal %s while MiniMax jobs may be in queue; cancelling "
+            "in-flight task(s)...",
+            signum,
+        )
+        self._cancel_active_tasks()
+        original = self._original_handlers.get(signum, signal.SIG_DFL)
+        signal.signal(signum, original)
+        raise KeyboardInterrupt
+
+    def cancel(self, task_id: str, reason: str = "program exited") -> None:
+        """Cancel a queued MiniMax task (or delete its record if already finished).
+
+        Hits ``DELETE /v2/video_generation/{task_id}``. MiniMax only cancels
+        tasks whose status is ``queued``; jobs already running or finished are
+        left alone. Errors are logged and swallowed so a best-effort cancel
+        never masks the original failure.
+        """
+        url = f"{self.DELETE_URL}/{task_id}"
+        try:
+            response = requests.delete(url, headers=self._headers(), timeout=120)
+        except requests.RequestException as error:
+            logger.warning(
+                "Failed to cancel MiniMax task %s (%s): %s", task_id, reason, error
+            )
+            return
+        if response.status_code != 200:
+            logger.warning(
+                "MiniMax cancel request for task %s (%s) returned %s: %s",
+                task_id,
+                reason,
+                response.status_code,
+                response.text[:300],
+            )
+            return
+        data = response.json()
+        logger.info(
+            "MiniMax task %s %s (%s)",
+            task_id,
+            data.get("action") or data.get("status") or "cancelled",
+            reason,
+        )
+
+    def _cancel_active_tasks(self) -> None:
+        """Cancel every MiniMax task currently tracked as active by this provider."""
+        while self._active_tasks:
+            task_id = self._active_tasks.pop()
+            self.cancel(task_id, reason="program exit")
 
     def _build_payload(self, request: VideoRequest) -> dict[str, Any]:
         content: list[dict[str, Any]] = [
@@ -343,6 +412,7 @@ class MiniMaxVideoProvider(VideoProvider):
         return payload
 
     def generate(self, request: VideoRequest, timeout: int) -> bytes:
+        self._register_shutdown_handlers()
         headers = self._headers()
         payload = self._build_payload(request)
 
@@ -378,10 +448,14 @@ class MiniMaxVideoProvider(VideoProvider):
         if not task_id:
             raise RuntimeError(f"MiniMax returned a video task without a task id: {data}")
 
-        content_url = self._poll(task_id, headers, timeout)
-        if not content_url:
-            raise RuntimeError("MiniMax returned no downloadable video URL.")
-        content = self._download(content_url, timeout)
+        self._active_tasks.add(task_id)
+        try:
+            content_url = self._poll(task_id, headers, timeout)
+            if not content_url:
+                raise RuntimeError("MiniMax returned no downloadable video URL.")
+            content = self._download(content_url, timeout)
+        finally:
+            self._active_tasks.discard(task_id)
         logger.info("Downloaded %d bytes of generated video.", len(content))
         logger.info(
             "MiniMax video generation completed in %.1fs.",

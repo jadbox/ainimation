@@ -6,8 +6,7 @@ A local Astro + Tailwind UI over the animation pipeline tools (`scriptgen`, `gen
 
 - Multi-film support: each film lives in `../films/<slug>/` (its own `movie.yml` and `out/` assets). The app routes by film (`/<film>`, `/<film>/scene/...`) and `/` redirects to the default film. When more than one film exists, a film switcher appears in the header; the header title always reflects the selected film's `movie.yml` title.
 - Scene table driven by the `story:` section of the film's `movie.yml`, with live script status from `films/<film>/out/scripts/`.
-- **Create scripts** button runs `uv run scriptgen --film <film> --name <scene>` on the server and streams the output into a terminal panel.
-- **View scripts** page renders all three 10-second segment scripts (`<scene>_part0..2.md`) with a sticky index.
+- **View scripts** page renders all three 10-second segment scripts (`<scene>_part0..2.md`) with a sticky index. Script generation lives on this page: **Generate scripts** (when no scripts exist) or **Regenerate scripts** (when they do), both with a number-of-parts selector, streaming output into a terminal panel.
 - **Configure animate** opens a per-part generation page with scripts, character/background references, per-part copy commands, and available cross-scene frame overrides.
 
 ## Running

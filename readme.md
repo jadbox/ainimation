@@ -11,7 +11,7 @@ This project automates the multi-stage visual development and animation generati
 1. **Character Blueprint Sheets**: Generates cohesive 16:9 character style guides (hero poses, turnarounds, detail callouts) with automated multi-turn vision LLM review loops.
 2. **Scene Background Plates**: Generates clean, character-free 16:9 production background plates for cel compositing.
 3. **30-Second Scene Scripts**: Expands abridged story beats from the `story:` section of `movie.yml` into structured 30-second scene design documents divided into three 10-second segments.
-4. **Animated Clips (Pluggable Video Provider)**: Generates 720p 24fps video clips per segment with first/last-frame continuity locking (Google Gemini Omni Flash by default, OpenRouter MiniMax H3 at 768p, or the MiniMax API directly with MiniMax H3 at 768P), exports each clip's first and last frames as `part-<N>-start.jpg` / `part-<N>-end.jpg`, then concatenates the clips into full scene videos with seamless crossfade transitions.
+4. **Animated Clips (Pluggable Video Provider)**: Generates 720p 24fps video clips per segment with first/last-frame continuity locking (MiniMax H3 via the MiniMax API directly at 768P by default, Google Gemini Omni Flash, or OpenRouter MiniMax H3 at 768p), exports each clip's first and last frames as `part-<N>-start.jpg` / `part-<N>-end.jpg`, then concatenates the clips into full scene videos with seamless crossfade transitions.
 5. **Film Assembly**: The web console can merge available scene `full.mp4` files in story order into `films/<film>/out/animations/film.mpeg` and export a midpoint `film-thumb.jpg`.
 5. **Web Console**: A local browser UI over the pipeline (scene tables, script generation, blueprint viewing, animator command copy) — see section 4.D.
 
@@ -154,11 +154,11 @@ Expands an abridged story scene from the `story:` section of the film's `movie.y
 
 ### C. Animator (`animator` / `src/animator.py`)
 
-Generates animated 720p 24fps video clips for each segment prompt in `films/<film>/out/scripts/<scene>_part<N>.md` using a pluggable video provider — Google Gemini Omni Flash (`gemini-omni-flash-preview`) by default, or OpenRouter's async videos API with MiniMax H3 (`minimax/hailuo-3`) at 768p — maintaining frame-0 visual continuity between segments, and combining them into a full video with crossfade transitions.
+Generates animated 720p 24fps video clips for each segment prompt in `films/<film>/out/scripts/<scene>_part<N>.md` using a pluggable video provider — MiniMax H3 via the MiniMax API directly (`MiniMax-H3`) at 768P by default, or Google Gemini Omni Flash (`gemini-omni-flash-preview`) or OpenRouter's async videos API with MiniMax H3 (`minimax/hailuo-3`) at 768p — maintaining frame-0 visual continuity between segments, and combining them into a full video with crossfade transitions.
 
 * **CLI Commands**:
   ```bash
-  # Generate all missing segment clips and combine into full.mp4 (Gemini)
+  # Generate all missing segment clips and combine into full.mp4 (MiniMax H3)
   uv run animator --scene <story_scene_name>
 
   # Generate using the OpenRouter provider (MiniMax H3 at 768p)
@@ -188,8 +188,8 @@ Generates animated 720p 24fps video clips for each segment prompt in `films/<fil
   * `--compose-only`: Skip API calls and combine existing `part-*.mp4` clips into `full.mp4`.
    * `--frame_start PATH` / `--frame-start PATH`: Use an image as the mandatory opening frame for every generated part, overriding automatically discovered prior-part continuity frames.
    * `--frame_end PATH` / `--frame-end PATH`: Use an image as the mandatory closing frame for every generated part, overriding automatically discovered next-part continuity frames.
-  * `--provider NAME`: Video generation provider (`google`, `openrouter` or `minimax`; `gemini` is an alias for `google`). Default: `google` (Gemini Omni Flash). The `openrouter` provider uses `OPENROUTER_API_KEY` and defaults to `minimax/hailuo-3` at `768p`. The `minimax` provider uses `MINIMAX_API_KEY` and defaults to `MiniMax-H3` at `768P`.
-  * `--video-model MODEL`: Video generation model ID (default: `gemini-omni-flash-preview` for `google`; OpenRouter e.g. `minimax/hailuo-3`; MiniMax e.g. `MiniMax-H3`).
+  * `--provider NAME`: Video generation provider (`google`, `openrouter` or `minimax`; `gemini` is an alias for `google`). Default: `minimax` (MiniMax H3 via the MiniMax API). The `openrouter` provider uses `OPENROUTER_API_KEY` and defaults to `minimax/hailuo-3` at `768p`. The `minimax` provider uses `MINIMAX_API_KEY` and defaults to `MiniMax-H3` at `768P`.
+  * `--video-model MODEL`: Video generation model ID (default: `MiniMax-H3` for `minimax`; `gemini-omni-flash-preview` for `google`; OpenRouter e.g. `minimax/hailuo-3`; MiniMax e.g. `MiniMax-H3`).
   * `--duration SECONDS`: Duration per segment (default: 10).
   * `--timeout SECONDS`: Polling timeout per video request (default: 600).
   * `--scripts-dir DIR`: Directory containing scene scripts (default: `films/<film>/out/scripts`).
@@ -224,10 +224,9 @@ A local Astro + Tailwind web UI over the pipeline tools — no authentication, i
 * **Features**:
   * Multi-film support: routes by film (`/<film>`, `/<film>/scene/...`); `/` redirects to the default film (first folder under `films/`, or `$FILM`). A film switcher appears in the header when more than one film exists, and the header title always reflects the selected film's `movie.yml` title.
   * Scene table driven by the `story:` section of the film's `movie.yml`, with live script/blueprint/video status from `films/<film>/out/`.
-  * **Create scripts** button runs `uv run scriptgen --film <film> --name <scene>` on the server and streams output into a terminal panel.
-  * **View scripts** page renders all three 10-second segment scripts with a sticky index.
+  * **View scripts** page renders all segment scripts with a sticky index, and hosts script generation: a **Generate scripts** button (when no scripts exist) or **Regenerate scripts** button (when they do), each with a number-of-parts selector, that runs `uv run scriptgen --film <film> --name <scene>` on the server and streams output into a terminal panel.
   * **Blueprint pages** view character and background design sheets and can trigger `generate-blueprint`.
-  * **Copy animator cmd** copies `uv run animator --film <film> --scene <scene>` to the clipboard; video generation is intentionally run by you in a terminal, not from the UI.
+  * **Animate page** presents one command per part and opens the CLI terminal modal to run it (streaming output) or copy it to your terminal; the scene page's **copy animator cmd** copies `uv run animator --film <film> --scene <scene>` to the clipboard.
 
 * See [`web/README.md`](./web/README.md) for details (production build, environment overrides).
 

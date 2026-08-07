@@ -26,8 +26,8 @@ def get_aspect_ratio(aspect: str = ASPECT) -> str:
 DEFAULT_VIDEO_MODEL = "gemini-omni-flash-preview"
 """Default video model for the Gemini provider."""
 
-DEFAULT_VIDEO_PROVIDER = "google"
-"""Default video generation provider (Google Gemini Omni Flash).
+DEFAULT_VIDEO_PROVIDER = "minimax"
+"""Default video generation provider (MiniMax H3 via the MiniMax API directly).
 Options: 'google' (or its 'gemini' alias), 'openrouter' or 'minimax'."""
 
 VIDEO_PROVIDERS = ("google", "openrouter", "minimax", "gemini")

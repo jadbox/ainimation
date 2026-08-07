@@ -223,39 +223,12 @@ const rows = movie.story.map((story, index) => {
               <td class="px-4 py-3">
                 <div class="flex flex-col items-end gap-1.5">
                   <div class="flex items-center justify-end gap-2">
-                  {row.partsDone === row.parts.length && (
-                    <a
-                      href={`/${film}/scene/${row.story.name}`}
-                      class="rounded-md bg-amber-key/15 px-3 py-1.5 text-xs font-medium text-amber-soft ring-1 ring-amber-key/40 hover:bg-amber-key/25 transition-colors"
-                    >
-                      View scripts
-                    </a>
-                  )}
-                  <details class="relative">
-                    <summary class="cursor-pointer list-none rounded-md bg-amber-key/15 px-3 py-1.5 text-xs font-medium text-amber-soft ring-1 ring-amber-key/40 hover:bg-amber-key/25 transition-colors">
-                      {row.partsDone > 0 ? "Regenerate scripts" : "Create scripts"}
-                    </summary>
-                    <div class="absolute right-0 z-20 mt-2 w-52 rounded-lg border border-line bg-panel p-3 shadow-xl shadow-black/40">
-                      <label class="block text-xs text-muted">
-                        Number of 10-second parts
-                        <select data-parts-select class="mt-1.5 w-full rounded-md border border-line bg-panel-2 px-2 py-1.5 text-sm text-slate-200 outline-none focus:border-teal-shadow">
-                          {Array.from({ length: 10 }, (_, index) => index + 1).map((parts) => (
-                            <option value={parts} selected={parts === 3}>{parts}</option>
-                          ))}
-                        </select>
-                      </label>
-                      <button
-                        type="button"
-                        data-action="generate"
-                        data-film={film}
-                        data-name={row.story.name}
-                        data-force={row.partsDone > 0 ? "true" : "false"}
-                        class="mt-3 w-full rounded-md bg-teal-shadow/10 px-3 py-1.5 text-xs font-medium text-teal-shadow ring-1 ring-teal-shadow/30 hover:bg-teal-shadow/20 transition-colors"
-                      >
-                        Generate scripts
-                      </button>
-                    </div>
-                  </details>
+                  <a
+                    href={`/${film}/scene/${row.story.name}`}
+                    class="rounded-md bg-amber-key/15 px-3 py-1.5 text-xs font-medium text-amber-soft ring-1 ring-amber-key/40 hover:bg-amber-key/25 transition-colors"
+                  >
+                    View scripts
+                  </a>
                   <a
                     href={`/${film}/animate/${row.story.name}`}
                     title={`Configure animation generation for ${row.story.title}`}
@@ -308,22 +281,10 @@ const rows = movie.story.map((story, index) => {
 <script>
   import { openCLITerminal } from "../../components/cli-terminal";
 
-  function runScriptgen(film: string, name: string, force: boolean, parts: number) {
-    openCLITerminal({
-      url: "/api/generate",
-      body: { film, name, force, parts },
-      command: `uv run scriptgen --film ${film} --name ${name} --parts ${parts}${force ? " --force" : ""}`,
-    });
-  }
-
   document.addEventListener("click", (event) => {
     const target = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-action]");
     if (!target) return;
-    const action = target.dataset.action;
-    const parts = Number(target.closest("details")?.querySelector<HTMLSelectElement>("[data-parts-select]")?.value ?? 3);
-    if (action === "generate" && target.dataset.name && target.dataset.film) {
-      runScriptgen(target.dataset.film, target.dataset.name, target.dataset.force === "true", parts);
-    } else if (action === "merge-film" && target.dataset.film) {
+    if (target.dataset.action === "merge-film" && target.dataset.film) {
       const command = `uv run python src/merge_film.py --film ${target.dataset.film}`;
       openCLITerminal({ url: "/api/merge-film", body: { film: target.dataset.film }, command });
     }

@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import Layout from "../../../layouts/Base.astro";
+import CLITerminal from "../../../components/CLITerminal.astro";
 import {
   animationsDir,
   backgroundBlueprintDir,
@@ -161,13 +162,15 @@ const nextFrameExists = nextFrame
               <button
                 type="button"
                 data-copy-part
+                data-film={film}
+                data-name={name}
                 data-command={baseCommand}
                 data-start-frame={canUsePreviousFrame ? previousFrame : undefined}
                 data-end-frame={canUseNextFrame ? nextFrame : undefined}
                 data-part={part}
                 class="rounded-md bg-teal-shadow/10 px-3 py-2 text-xs font-mono text-teal-shadow ring-1 ring-teal-shadow/30 transition-colors hover:bg-teal-shadow/20"
               >
-                copy part command
+                part command
               </button>
             ) : (
               <span class="rounded-full bg-amber-key/10 px-2.5 py-1 text-xs text-amber-soft ring-1 ring-amber-key/30">script missing</span>
@@ -205,38 +208,36 @@ const nextFrameExists = nextFrame
       );
     })}
   </div>
+
+  <CLITerminal />
 </Layout>
 
 <script>
-  async function copyText(text: string, button: HTMLButtonElement) {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch {
-      const textarea = document.createElement("textarea");
-      textarea.value = text;
-      textarea.style.position = "fixed";
-      textarea.style.opacity = "0";
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand("copy");
-      textarea.remove();
-    }
-    const original = button.textContent;
-    button.textContent = "copied!";
-    setTimeout(() => (button.textContent = original), 1200);
-  }
+  import { openCLITerminal } from "../../../components/cli-terminal";
 
   document.querySelectorAll<HTMLButtonElement>("[data-copy-part]").forEach((button) => {
     button.addEventListener("click", () => {
       const part = button.dataset.part;
       const start = document.querySelector<HTMLInputElement>(`[data-frame-option="part-${part}-start"]`);
       const end = document.querySelector<HTMLInputElement>(`[data-frame-option="part-${part}-end"]`);
+      const frameStart = start?.checked && button.dataset.startFrame ? button.dataset.startFrame : "";
+      const frameEnd = end?.checked && button.dataset.endFrame ? button.dataset.endFrame : "";
       const command = [
         button.dataset.command,
-        start?.checked && button.dataset.startFrame ? `--frame_start ${button.dataset.startFrame}` : "",
-        end?.checked && button.dataset.endFrame ? `--frame_end ${button.dataset.endFrame}` : "",
+        frameStart ? `--frame_start ${frameStart}` : "",
+        frameEnd ? `--frame_end ${frameEnd}` : "",
       ].filter(Boolean).join(" ");
-      void copyText(command, button);
+      openCLITerminal({
+        url: "/api/animator",
+        body: {
+          film: button.dataset.film,
+          name: button.dataset.name,
+          parts: Number(part),
+          frameStart,
+          frameEnd,
+        },
+        command,
+      });
     });
   });
 </script>

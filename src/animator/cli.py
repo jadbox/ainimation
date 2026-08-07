@@ -43,7 +43,13 @@ from animator.script import (
 )
 from blueprint_generator import slug
 from films import film_animations_dir, film_blueprint_dir, film_scripts_dir
-from movie_config import get_film, get_scene, get_story_scene, set_film
+from movie_config import (
+    get_film,
+    get_movie_info,
+    get_scene,
+    get_story_scene,
+    set_film,
+)
 
 logger = logging.getLogger("animator")
 
@@ -252,10 +258,16 @@ def run(args: argparse.Namespace) -> int:
             )
 
         for segment in pending:
+            movie_info = get_movie_info()
+            part_script_path = prompt_path(scene_dir, segment.index)
             logger.info(
-                "=== Generating segment %d of %d ===",
+                "=== Generating movie=%s film=%s scene=%s part=%d (final part "
+                "script: %s) ===",
+                movie_info.title,
+                get_film(),
+                args.scene,
                 segment.index,
-                len(segments) - 1,
+                part_script_path,
             )
             continuity_frame = frame_start or previous_frame(scene_dir, segment)
             closing_frame = frame_end or next_frame(scene_dir, segment)
@@ -292,7 +304,7 @@ def run(args: argparse.Namespace) -> int:
                 has_background_reference=background_plate is not None,
                 has_closing_continuity=closing_frame is not None,
             )
-            prompt_file = prompt_path(scene_dir, segment.index)
+            prompt_file = part_script_path
             prompt_file.write_text(direction, encoding="utf-8")
             logger.info("Saved prompt for segment %d: %s", segment.index, prompt_file)
 
@@ -363,8 +375,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
             f"Generate 10-second {DEFAULT_RESOLUTION} 24fps animated clips for a scene script "
-            "using a configurable video provider (default: Google Gemini Omni Flash; "
-            "alternative: OpenRouter minimax/hailuo-3 at 768p), with the scene's final "
+            "using a configurable video provider (default: MiniMax H3 via the MiniMax API "
+            "at 768P; alternative: OpenRouter minimax/hailuo-3 at 768p), with the scene's final "
             "character blueprints as reference images. Each script segment becomes "
             "films/<film>/out/animations/<scene>/part-<N>.mp4; the existing parts are then "
             "combined with 0.2s crossfade transitions into "
@@ -468,8 +480,8 @@ def main() -> None:
         choices=list(VIDEO_PROVIDERS),
         default=DEFAULT_VIDEO_PROVIDER,
         help=(
-            "Video generation provider (default: %(default)s, Google Gemini "
-            "Omni Flash). 'google' (alias 'gemini') uses the Gemini API. "
+            "Video generation provider (default: %(default)s, MiniMax H3 via the "
+            "MiniMax API at 768P). 'google' (alias 'gemini') uses the Gemini API. "
             "'openrouter' uses the async OpenRouter videos API with the "
             "OpenRouter API key. 'minimax' uses the MiniMax API directly "
             "(MiniMax H3, 768P default) with the MINIMAX_API_KEY."

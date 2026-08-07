@@ -545,8 +545,8 @@ def create_video_provider(
 ) -> VideoProvider:
     """Instantiate a video provider by name.
 
-    ``provider`` is one of :data:`VIDEO_PROVIDERS` (default: the Gemini backend,
-    preserving the original behaviour). ``model`` and ``api_key`` are optional
+    ``provider`` is one of :data:`VIDEO_PROVIDERS` (default: the MiniMax
+    backend, MiniMax H3 at 768P). ``model`` and ``api_key`` are optional
     and fall back to each provider's configured defaults.
     """
     name = (provider or DEFAULT_VIDEO_PROVIDER).lower()

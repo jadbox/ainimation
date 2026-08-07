@@ -55,8 +55,8 @@ const rows = movie.story.map((story, index) => {
     </p>
   </div>
 
-  <div class="overflow-x-auto rounded-xl border border-line bg-panel shadow-lg shadow-black/30">
-    <table class="w-full min-w-[720px] text-sm">
+  <div class="w-fit rounded-xl border border-line bg-panel shadow-lg shadow-black/30">
+    <table class="text-sm">
       <thead>
         <tr class="border-b border-line text-left text-xs uppercase tracking-wider text-muted">
           <th class="px-4 py-3 font-medium w-10">#</th>
@@ -197,14 +197,17 @@ const rows = movie.story.map((story, index) => {
                         ) : (
                           <span class="flex aspect-video w-full items-center justify-center bg-ink/60 text-[9px] text-muted">full</span>
                         )}
-                        <span class="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[8px] uppercase tracking-wide text-amber-soft">full</span>
+                        <span class="absolute bottom-0 right-0 rounded-tl bg-black/70 px-2.5 py-0.5 text-[20px] uppercase tracking-wide text-amber-soft">full</span>
                       </a>
                     )}
                     {row.videos.segments.map((seg) => (
                       <a
                         href={`/video/${row.story.name}_part_${seg.part}`}
                         title={`Part ${seg.part} · out/animations/${row.story.name}/${seg.video}`}
-                        class="relative block w-20 overflow-hidden rounded-md ring-1 ring-line transition hover:ring-amber-key/50"
+                        class:list={[
+                          "relative block overflow-hidden rounded-md ring-1 ring-line transition hover:ring-amber-key/50",
+                          row.videos.full ? "w-15" : "w-20",
+                        ]}
                       >
                         {seg.thumb ? (
                           <img
@@ -216,7 +219,7 @@ const rows = movie.story.map((story, index) => {
                         ) : (
                           <span class="flex aspect-video w-full items-center justify-center bg-ink/60 text-[9px] text-muted">p{seg.part}</span>
                         )}
-                        <span class="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[8px] text-teal-shadow">p{seg.part}</span>
+                        <span class="absolute bottom-0 right-0 rounded-tl bg-black/70 px-2.5 py-0.5 text-[20px] text-teal-shadow">p{seg.part}</span>
                       </a>
                     ))}
                   </div>

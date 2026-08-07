@@ -11,12 +11,12 @@ fi
 
 cd "$SCRIPT_DIR"
 
-# Available characters, mirrored from movie.yml for shell-side error messages.
-CHARACTERS="Mrs. Brisby, Mr. Ages, Nicodemus, Timothy Frisby, Justin, Jenner, Dragon, The Great Owl"
+# Available characters and scenes are defined in the selected film's movie.yml
+# (films/<film>/movie.yml; default film is the first folder under films/, or $FILM).
 
 err_no_character() {
     echo "Error: a character name is required." >&2
-    echo "Available characters: $CHARACTERS" >&2
+    echo "Available characters are listed in the film's movie.yml (films/<film>/movie.yml)." >&2
     echo "Usage: $0 <character-name>   or   $0 --character <character-name>   or   $0 --scene <scene-name>" >&2
     exit 2
 }

@@ -7,11 +7,11 @@ import logging
 import os
 from pathlib import Path
 
-from movie_config import get_movie_info, get_scene, get_story_scene, list_story_scenes
+from films import film_scripts_dir
+from movie_config import get_film, get_movie_info, get_scene, get_story_scene, list_story_scenes, set_film
 from scriptgen.api import generate_document
 from scriptgen.config import (
     DEFAULT_MODEL,
-    DEFAULT_SCRIPTS_DIR,
     GEMINI_OPENROUTER_MODEL,
     MAX_RETRIES,
     MAX_SCRIPT_CHARS,
@@ -48,7 +48,7 @@ def run(args: argparse.Namespace) -> int:
         else:
             base_path = out_path / scene_name
     else:
-        base_path = DEFAULT_SCRIPTS_DIR / scene_name
+        base_path = film_scripts_dir(get_film()) / scene_name
 
     base_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -197,6 +197,14 @@ def _generate_part(
 
 
 def main() -> None:
+    pre = argparse.ArgumentParser(add_help=False)
+    pre.add_argument("--film", default=None)
+    pre_args, _ = pre.parse_known_args()
+    try:
+        set_film(pre_args.film)
+    except ValueError as error:
+        pre.error(str(error))
+
     parser = _build_parser()
     args = parser.parse_args()
 
@@ -223,20 +231,29 @@ def main() -> None:
 
 def _build_parser() -> argparse.ArgumentParser:
     info = get_movie_info()
+    scripts_dir = film_scripts_dir(get_film())
     parser = argparse.ArgumentParser(
         description=(
             f"Expand an abridged story scene from movie.yml for {info.title} "
             "into detailed segment design files written to "
-            "out/scripts/<name>_part0.md, etc. Run without --name to "
+            f"{scripts_dir}/<name>_part0.md, etc. Run without --name to "
             "list the available story scenes."
         )
+    )
+    parser.add_argument(
+        "--film",
+        default=get_film(),
+        help=(
+            "Film slug under films/<film>/ whose movie.yml and out/ to use "
+            "(default: %(default)s)."
+        ),
     )
     parser.add_argument(
         "--name",
         default=None,
         help=(
             "Story scene name from the movie.yml `story:` section; segment "
-            "scripts are written to out/scripts/<name>_part0.md, etc. (e.g. "
+            f"scripts are written to {scripts_dir}/<name>_part0.md, etc. (e.g. "
             "frisby_visits_mr_ages). Omit to list all available story scenes."
         ),
     )
@@ -262,7 +279,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output",
         default=None,
-        help="Output base path or directory (default: out/scripts/<name>).",
+        help=f"Output base path or directory (default: {scripts_dir}/<name>).",
     )
     parser.add_argument(
         "--force",

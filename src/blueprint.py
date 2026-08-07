@@ -3,7 +3,7 @@
 
 Runs the generate/review loop for a character style guide (--character) or a
 scene's background plates (--scene), writing artifacts to
-``out/blueprint/<subject-slug>/``.
+``films/<film>/out/blueprint/<subject-slug>/``.
 
 Usage:
     python src/blueprint.py --character "Mrs Brisby"
@@ -39,7 +39,8 @@ from blueprint_generator.utils import (
     to_jpeg,
     write_iterations,
 )
-from movie_config import get_movie_info
+from films import film_blueprint_dir
+from movie_config import get_film, get_movie_info, set_film
 
 logger = logging.getLogger("blueprint_generator")
 
@@ -211,6 +212,13 @@ def main() -> None:
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
         datefmt="%H:%M:%S",
     )
+    pre = argparse.ArgumentParser(add_help=False)
+    pre.add_argument("--film", default=None)
+    pre_args, _ = pre.parse_known_args()
+    try:
+        set_film(pre_args.film)
+    except ValueError as error:
+        pre.error(str(error))
     available_characters = ", ".join(list_character_names())
     available_scenes = ", ".join(f"{spec.name} ({spec.slug})" for spec in SCENES.values())
     movie_info = get_movie_info()
@@ -233,12 +241,17 @@ def main() -> None:
         help=f"Name or slug of the scene whose background plates to generate. Available scenes: {available_scenes}.",
     )
     parser.add_argument(
+        "--film",
+        default=get_film(),
+        help="Film slug under films/<film>/ whose movie.yml and out/ to use (default: %(default)s).",
+    )
+    parser.add_argument(
         "--output",
         default=None,
         help=(
             "Output directory (default: auto-derived from the subject name, "
-            "e.g. ./out/blueprint/mr-ages/ for a character or "
-            "./out/blueprint/great-owl-hollow/ for a scene, with one "
+            f"e.g. {film_blueprint_dir(get_film()) / 'mr-ages'}/ for a character or "
+            f"{film_blueprint_dir(get_film()) / 'great-owl-hollow'}/ for a scene, with one "
             "subdirectory per background plate)."
         ),
     )

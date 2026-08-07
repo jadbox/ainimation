@@ -1,14 +1,19 @@
 ---
 import "../styles/global.css";
-import { loadMovie } from "../lib/movie";
+import { listFilms, loadMovie } from "../lib/movie";
 
 interface Props {
+  film: string;
   title?: string;
 }
 
-const { title } = Astro.props;
-const pageTitle = title ? `${title} · Animation Console` : "Animation Console";
-const movie = loadMovie();
+const { film, title } = Astro.props;
+const movie = loadMovie(film);
+const pageTitle = title
+  ? `${title} · ${movie.movie.title} Animation Console`
+  : `${movie.movie.title} Animation Console`;
+const films = listFilms();
+const logoLetter = (movie.movie.title.trim()[0] ?? "A").toUpperCase();
 ---
 
 <!doctype html>
@@ -21,10 +26,10 @@ const movie = loadMovie();
   <body class="text-slate-200 antialiased">
     <header class="border-b border-line/80 bg-panel/60 backdrop-blur sticky top-0 z-40">
       <div class="mx-auto max-w-6xl px-6 py-4 flex items-center justify-between gap-4">
-        <a href="/" class="flex items-center gap-3 group">
+        <a href={`/${film}`} class="flex items-center gap-3 group">
           <span
             class="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-amber-key/15 text-amber-key text-lg font-bold ring-1 ring-amber-key/40"
-            aria-hidden="true">N</span
+            aria-hidden="true">{logoLetter}</span
           >
           <span class="leading-tight">
             <span class="block font-display text-lg text-amber-soft group-hover:text-amber-key transition-colors"
@@ -34,7 +39,25 @@ const movie = loadMovie();
           </span>
         </a>
         <nav class="text-sm text-muted flex items-center gap-4">
-          <a href="/" class="hover:text-amber-soft transition-colors">Scenes</a>
+          <a href={`/${film}`} class="hover:text-amber-soft transition-colors">Scenes</a>
+          {films.length > 1 && (
+            <span class="flex items-center gap-1.5 rounded-full bg-panel-2 px-2 py-1 ring-1 ring-line">
+              <span class="text-[10px] uppercase tracking-wider text-muted">Film</span>
+              {films.map((f) => (
+                <a
+                  href={`/${f}`}
+                  class:list={[
+                    "rounded-full px-2 py-0.5 text-xs transition-colors",
+                    f === film
+                      ? "bg-amber-key/15 text-amber-soft ring-1 ring-amber-key/40"
+                      : "text-muted hover:text-amber-soft",
+                  ]}
+                >
+                  {f}
+                </a>
+              ))}
+            </span>
+          )}
         </nav>
       </div>
     </header>
@@ -44,7 +67,7 @@ const movie = loadMovie();
     </main>
 
     <footer class="mx-auto max-w-6xl px-6 pb-10 pt-4 text-xs text-muted/80">
-      Don Bluth style pipeline · scriptgen → blueprint → animator
+      scriptgen → blueprint → animator
     </footer>
   </body>
 </html>

@@ -1,26 +1,32 @@
 ---
 import { marked } from "marked";
-import Layout from "../../layouts/Base.astro";
+import Layout from "../../../layouts/Base.astro";
 import {
   animatorCommand,
+  isValidFilm,
   loadMovie,
   readScript,
-} from "../../lib/movie";
+} from "../../../lib/movie";
 
 export const prerender = false;
 
+const film = Astro.params.film ?? "";
 const name = Astro.params.name ?? "";
-const movie = loadMovie();
-const story = movie.story.find((s) => s.name === name);
-
-if (!story) {
+if (!isValidFilm(film)) {
   return Astro.redirect("/");
 }
 
+const movie = loadMovie(film);
+const story = movie.story.find((s) => s.name === name);
+
+if (!story) {
+  return Astro.redirect(`/${film}`);
+}
+
 const location = movie.scenes.find((s) => s.slug === story.scene);
-const scripts = [0, 1, 2].map((part) => readScript(name, part));
+const scripts = [0, 1, 2].map((part) => readScript(film, name, part));
 const missing = scripts.map((s, i) => (s === null ? i : -1)).filter((i) => i >= 0);
-const command = animatorCommand(name);
+const command = animatorCommand(film, name);
 
 marked.setOptions({ gfm: true, breaks: false });
 
@@ -28,9 +34,9 @@ const rendered = scripts.map((s) => (s === null ? null : marked.parse(s)));
 const timeRanges = ["0:00–0:10", "0:10–0:20", "0:20–0:30"];
 ---
 
-<Layout title={story.title}>
+<Layout film={film} title={story.title}>
   <nav class="mb-4 text-sm text-muted">
-    <a href="/" class="hover:text-amber-soft transition-colors">&larr; All scenes</a>
+    <a href={`/${film}`} class="hover:text-amber-soft transition-colors">&larr; All scenes</a>
   </nav>
 
   <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -67,10 +73,10 @@ const timeRanges = ["0:00–0:10", "0:10–0:20", "0:20–0:30"];
         Part {missing.map((m) => m + 1).join(" and ")}{" "}
         {missing.length > 1 ? "are" : "is"} missing. Generate{" "}
         {missing.length > 1 ? "them" : "it"} from the{" "}
-        <a href="/" class="underline hover:text-amber-key">
+        <a href={`/${film}`} class="underline hover:text-amber-key">
           scenes table
         </a>{" "}
-        or run <code class="text-teal-shadow">uv run scriptgen --name {story.name}</code>.
+        or run <code class="text-teal-shadow">uv run scriptgen --film {film} --name {story.name}</code>.
       </div>
     )
   }
@@ -115,7 +121,7 @@ const timeRanges = ["0:00–0:10", "0:10–0:20", "0:20–0:30"];
               Part {i} <span class="ml-2 text-xs font-normal text-muted">{timeRanges[i]}</span>
             </h2>
             <span class="font-mono text-xs text-muted">
-              {story.name}_part{i}.md
+              films/{film}/out/scripts/{story.name}_part{i}.md
             </span>
           </header>
           {s === null ? (

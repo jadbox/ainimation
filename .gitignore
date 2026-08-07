@@ -1,9 +1,12 @@
 .venv/
 __pycache__/
 *.py[cod]
+*.egg-info/
 mrages/
 out/*
+films/*/out/
 
 web/node_modules/
 web/dist/
 web/.astro/
+films/_*

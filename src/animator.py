@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Animate a scene script into clips via a pluggable video provider.
 
-Reads the scene segment prompt files at ``out/scripts/<scene>_part<N>.md``
+Reads the scene segment prompt files at ``films/<film>/out/scripts/<scene>_part<N>.md``
 (produced by ``src/scriptgen.py``), collects the final character blueprint
 images for the characters appearing in the scene, and sends the prompt plus
 reference images to a configured video provider (Google Gemini Omni Flash by
@@ -10,13 +10,13 @@ default, or OpenRouter's async videos API e.g. ``minimax/hailuo-3``).
 Each segment prompt file is mostly complete and self-contained; ``animator`` adds
 the necessary image reference tags (<IMAGE_REF_N>), opening/closing continuity
 frame instructions, and prefix headers, saving the final tagged prompt to
-``out/animations/<scene>/part-<N>-prompt.md``.
+``films/<film>/out/animations/<scene>/part-<N>-prompt.md``.
 
 Each segment is generated as its own 10-second clip saved to
-``out/animations/<scene>/part-<N>.mp4``, with its first and last frames exported
+``films/<film>/out/animations/<scene>/part-<N>.mp4``, with its first and last frames exported
 as ``part-<N>-start.jpg`` and ``part-<N>-end.jpg``. When all segments are
 present, they are concatenated with crossfade transitions into
-``out/animations/<scene>/full.mp4``.
+``films/<film>/out/animations/<scene>/full.mp4``.
 
 Usage:
     python src/animator.py --scene frisby_meets_greatowl            # all missing parts
@@ -31,14 +31,11 @@ from animator.config import (
     ASPECT,
     ASPECT_RATIO_MAP,
     CONTINUITY_MESSAGE,
-    DEFAULT_ANIMATIONS_DIR,
     DEFAULT_ASPECT_RATIO,
-    DEFAULT_BLUEPRINT_DIR,
     DEFAULT_DURATION_SECONDS,
     DEFAULT_OPENROUTER_RESOLUTION,
     DEFAULT_OPENROUTER_VIDEO_MODEL,
     DEFAULT_RESOLUTION,
-    DEFAULT_SCRIPTS_DIR,
     DEFAULT_TIMEOUT_SECONDS,
     DEFAULT_VIDEO_MODEL,
     DEFAULT_VIDEO_PROVIDER,
@@ -85,14 +82,11 @@ __all__ = [
     "ASPECT",
     "ASPECT_RATIO_MAP",
     "CONTINUITY_MESSAGE",
-    "DEFAULT_ANIMATIONS_DIR",
     "DEFAULT_ASPECT_RATIO",
-    "DEFAULT_BLUEPRINT_DIR",
     "DEFAULT_DURATION_SECONDS",
     "DEFAULT_OPENROUTER_RESOLUTION",
     "DEFAULT_OPENROUTER_VIDEO_MODEL",
     "DEFAULT_RESOLUTION",
-    "DEFAULT_SCRIPTS_DIR",
     "DEFAULT_TIMEOUT_SECONDS",
     "DEFAULT_VIDEO_MODEL",
     "DEFAULT_VIDEO_PROVIDER",

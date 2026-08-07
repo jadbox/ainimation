@@ -1,21 +1,26 @@
 ---
-import Layout from "../../layouts/Base.astro";
-import { animationFileUrl, loadMovie, sceneVideos } from "../../lib/movie";
+import Layout from "../../../layouts/Base.astro";
+import { animationFileUrl, isValidFilm, loadMovie, sceneVideos } from "../../../lib/movie";
 
 export const prerender = false;
 
+const film = Astro.params.film ?? "";
 const slug = Astro.params.slug ?? "";
+if (!isValidFilm(film)) {
+  return Astro.redirect("/");
+}
+
 const partMatch = slug.match(/^(.+)_part_(\d+)$/);
 const sceneName = partMatch ? partMatch[1] : slug;
 const part = partMatch ? Number(partMatch[2]) : null;
 
-const movie = loadMovie();
+const movie = loadMovie(film);
 const story = movie.story.find((s) => s.name === sceneName);
 if (!story) {
-  return Astro.redirect("/");
+  return Astro.redirect(`/${film}`);
 }
 
-const videos = sceneVideos(sceneName);
+const videos = sceneVideos(film, sceneName);
 const current =
   part === null
     ? videos.full && { file: "full.mp4", thumb: videos.full.thumb, label: "Full scene" }
@@ -26,18 +31,18 @@ const current =
       };
 
 if (!current) {
-  return Astro.redirect("/");
+  return Astro.redirect(`/${film}`);
 }
 
-const videoUrl = animationFileUrl(sceneName, current.file);
-const posterUrl = current.thumb ? animationFileUrl(sceneName, current.thumb) : undefined;
+const videoUrl = animationFileUrl(film, sceneName, current.file);
+const posterUrl = current.thumb ? animationFileUrl(film, sceneName, current.thumb) : undefined;
 
 const related = [
   ...(videos.full
-    ? [{ href: `/video/${sceneName}`, label: "Full", thumb: videos.full.thumb, active: part === null }]
+    ? [{ href: `/${film}/video/${sceneName}`, label: "Full", thumb: videos.full.thumb, active: part === null }]
     : []),
   ...videos.segments.map((s) => ({
-    href: `/video/${sceneName}_part_${s.part}`,
+    href: `/${film}/video/${sceneName}_part_${s.part}`,
     label: `Part ${s.part}`,
     thumb: s.thumb,
     active: part === s.part,
@@ -45,10 +50,10 @@ const related = [
 ];
 ---
 
-<Layout title={`${story.title} · ${current.label}`}>
+<Layout film={film} title={`${story.title} · ${current.label}`}>
   <nav class="mb-4">
     <a
-      href="/"
+      href={`/${film}`}
       class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-muted ring-1 ring-line hover:text-amber-soft hover:ring-amber-key/40 transition-colors"
     >
       &larr; Back
@@ -58,7 +63,7 @@ const related = [
   <div class="mb-6">
     <h1 class="font-display text-3xl text-amber-soft">{story.title}</h1>
     <p class="mt-1 font-mono text-sm text-muted">
-      {sceneName} · {current.label.toLowerCase()} · out/animations/{sceneName}/{current.file}
+      {sceneName} · {current.label.toLowerCase()} · films/{film}/out/animations/{sceneName}/{current.file}
     </p>
   </div>
 
@@ -83,7 +88,7 @@ const related = [
           >
             {r.thumb ? (
               <img
-                src={animationFileUrl(sceneName, r.thumb)}
+                src={animationFileUrl(film, sceneName, r.thumb)}
                 alt={`${story.title} ${r.label}`}
                 class="aspect-video w-full object-cover"
               />

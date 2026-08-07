@@ -10,4 +10,4 @@ if [ ! -d "$WEB_DIR/node_modules" ]; then
 fi
 
 echo "Starting Astro dev server at http://127.0.0.1:4321"
-exec npm --prefix "$WEB_DIR" run dev -- --host 127.0.0.1 --port 4321
+exec npm --prefix "$WEB_DIR" run dev -- --host 127.0.0.1 --force --port 4321

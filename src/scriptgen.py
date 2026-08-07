@@ -10,7 +10,7 @@ scene animations, sounds, and music — all held to the direction and lighting
 rules in ``movie.yml``.
 
 The scene is exported as one prompt file per segment:
-``out/scripts/<name>_part0.md``, ``out/scripts/<name>_part1.md``, etc.
+``films/<film>/out/scripts/<name>_part0.md``, ``films/<film>/out/scripts/<name>_part1.md``, etc.
 
 Usage:
     python src/scriptgen.py                         # list available story scenes

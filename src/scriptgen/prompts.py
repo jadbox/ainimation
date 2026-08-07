@@ -87,7 +87,7 @@ DEPTH & OCCLUSION (required — generative video flattens space unless depth is 
 DIALOGUE CRAFT & LITERARY ELEGANCE (required — dialogue must be simple, thoughtful, and deeply character-driven):
 - GROUNDED IN THE STORY BEAT (required): Every line must come directly from the beat's actions, talking points, and emotions — the request, the answer, or the warning happening NOW in this scene. STRICTLY NO invented backstory, past events, deaths, casualties, or implications beyond what the beat states (e.g. NEVER write lines like "The boy was always too stubborn to die quietly" or "I've seen it take three before the frost"). Simple and clear beats poetic invention: a line is good when it plainly moves this scene forward.
 - BANNED DIALOGUE TROPES: STRICTLY FORBID generic TV scolding, modern slang, melodrama, or harsh outbursts (e.g. NEVER write lines like "I told you...", "woman!", "calm down!", "hey you").
-- CLASSIC FEATURE ANIMATION TONE: Mimic the elevated, literary, 1980s theatrical tone of classic Don Bluth cinema (The Secret of NIMH). Dialogue must feel poetic, rhythmic, and dignified — but never at the cost of inventing story content.
+- FEATURE ANIMATION TONE: Dialogue must carry a theatrical, feature-animation register that matches the tone mandated by the film's style ({movie_info.style}) and the hard direction rules — but never at the cost of inventing story content.
 - CHARACTER-SPECIFIC VOCABULARY & SUBTEXT:
 {char_voices}
 - SUBTEXT OVER EXPOSITION: Lines must convey feeling and stakes through subtext rather than blunt facts, using ONLY what the beat provides (e.g. instead of "Will you help my son or not?", write "His breath rattles like dry leaves, sir... I have no one else to ask.").

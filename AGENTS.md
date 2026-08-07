@@ -4,15 +4,11 @@
 
 ## Core Mandates for AI Agents
 
-1. **Read `readme.md` First**: Always consult `readme.md` for complete design specifications, color palettes, traditional animation research, and technical schemas.
-2. **Strict Adherence to Don Bluth Style**: All visual generation must faithfully recreate the 1982 *The Secret of NIMH* aesthetic (hand-inked tapered lines, painterly gouache backgrounds, 2-tone cel shading, oversized glossy eyes with stacked highlights, tufted spiky fur).
-3. **Execute Scene Directing & Lighting Rules**:
-   * Camera height must remain at rodent eye-level (2–12 inches high).
-   * Frame lighting must be driven by a single dominant practical point-source.
-   * Maintain the Warm Key (amber/gold) vs. Cool Shadow (teal/indigo) temperature dichotomy.
-   * Ensure 360-degree rim lighting separates character silhouettes from dark backgrounds.
-   * Obscure 20–30% of frame borders with soft-focus dark foreground elements.
-4. **Follow Character & Movement Specifications**: Ensure character recipes (Mrs. Brisby, Mr. Ages, Nicodemus) and animation mechanics (animating on ones/twos, anticipation, recoil, drag on ears/tails, follow-through) are strictly applied.
-5. **Use the Standard Prompt Template & Pipeline**: Refer to Section 8 & Section 9 of `readme.md` for generation prompt templates and multi-pass AI compositing graphs.
+1. **Read `readme.md` First**: Always consult `readme.md` for the complete pipeline overview, tooling usage, and project layout.
+2. **The Tools Are Film-Agnostic**: The pipeline tools (`scriptgen`, `generate-blueprint`, `animator`, and the web console) work for any film. Never hard-code a specific film, art style, or aesthetic into tool code, prompts, UI, or documentation.
+3. **All Film-Specific Direction Lives in the Film Folder**: Every style, character, lighting, camera, and narrative mandate for a given film is defined in that film's `films/<film>/movie.md` (style bible) and `films/<film>/movie.yml` (machine-readable config). When working on a specific film, read both files and strictly adhere to them. For example, the `films/rats/` folder carries the Don Bluth / *The Rats of NIMH* specifications in its `movie.md` and `movie.yml`.
+4. **Execute the Selected Film's Directing Rules**: Apply the `hard_direction_rules`, camera rules, lighting mandates, and character recipes from the selected film's `movie.yml`/`movie.md` rather than any global style assumptions.
+5. **Use the Standard Prompt Template & Pipeline**: Refer to `readme.md` for generation prompt structure and pipeline architecture; per-film prompt templates belong in that film's `movie.md`.
 6. NEVER run animator.py or generate movies. Instead request the user to run commands to test any video generation action or test.
 7. NEVER update out/scripts contents directly. This should always be written to only by scriptgen.py.
+8. Assume the dev server is already loaded and running on http://127.0.0.1:4321.

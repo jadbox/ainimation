@@ -10,13 +10,10 @@ from pathlib import Path
 import requests
 
 from animator.config import (
-    DEFAULT_ANIMATIONS_DIR,
-    DEFAULT_BLUEPRINT_DIR,
     DEFAULT_DURATION_SECONDS,
     DEFAULT_MINIMAX_VIDEO_MODEL,
     DEFAULT_OPENROUTER_VIDEO_MODEL,
     DEFAULT_RESOLUTION,
-    DEFAULT_SCRIPTS_DIR,
     DEFAULT_TIMEOUT_SECONDS,
     DEFAULT_VIDEO_MODEL,
     DEFAULT_VIDEO_PROVIDER,
@@ -45,7 +42,8 @@ from animator.script import (
     strip_html_comments,
 )
 from blueprint_generator import slug
-from movie_config import get_scene, get_story_scene
+from films import film_animations_dir, film_blueprint_dir, film_scripts_dir
+from movie_config import get_film, get_scene, get_story_scene, set_film
 
 logger = logging.getLogger("animator")
 
@@ -73,7 +71,9 @@ def ensure_character_reference(character: str, blueprint_dir: Path) -> Path:
     folder = blueprint_dir / slug(character)
     image = latest_attempt(folder)
     if image is None:
-        run_blueprint_generator(["uv", "run", "generate-blueprint", "--character", character])
+        run_blueprint_generator(
+            ["uv", "run", "generate-blueprint", "--film", get_film(), "--character", character]
+        )
         image = latest_attempt(folder)
     if image is None:
         raise RuntimeError(
@@ -125,7 +125,9 @@ def ensure_background_plate(
     """Return the scene's latest background plate, generating it if missing."""
     plate = find_scene_background_plate(scene_slug, blueprint_dir, script_text)
     if plate is None:
-        run_blueprint_generator(["uv", "run", "generate-blueprint", "--scene", scene_slug])
+        run_blueprint_generator(
+            ["uv", "run", "generate-blueprint", "--film", get_film(), "--scene", scene_slug]
+        )
         plate = find_scene_background_plate(scene_slug, blueprint_dir, script_text)
     if plate is None:
         try:
@@ -144,7 +146,8 @@ def ensure_background_plate(
 
 def run(args: argparse.Namespace) -> int:
     """Execute the animation generation or composition pipeline."""
-    scripts_dir = Path(args.scripts_dir)
+    default_scripts_dir = film_scripts_dir(get_film())
+    scripts_dir = Path(args.scripts_dir) if args.scripts_dir else default_scripts_dir
     part_scripts = find_scene_part_scripts(scripts_dir, args.scene)
 
     if not part_scripts:
@@ -169,7 +172,8 @@ def run(args: argparse.Namespace) -> int:
             "Loaded %d scene segment script(s) for %r", len(segments), args.scene
         )
 
-    scene_dir = Path(args.output) if args.output else DEFAULT_ANIMATIONS_DIR / args.scene
+    default_animations_dir = film_animations_dir(get_film())
+    scene_dir = Path(args.output) if args.output else default_animations_dir / args.scene
     scene_dir.mkdir(parents=True, exist_ok=True)
 
     if args.compose_only:
@@ -199,7 +203,8 @@ def run(args: argparse.Namespace) -> int:
     else:
         selected = segments
 
-    blueprint_dir = Path(args.blueprint_dir)
+    default_blueprint_dir = film_blueprint_dir(get_film())
+    blueprint_dir = Path(args.blueprint_dir) if args.blueprint_dir else default_blueprint_dir
 
     pending = [
         segment
@@ -328,15 +333,22 @@ def main() -> None:
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
         datefmt="%H:%M:%S",
     )
+    pre = argparse.ArgumentParser(add_help=False)
+    pre.add_argument("--film", default=None)
+    pre_args, _ = pre.parse_known_args()
+    try:
+        set_film(pre_args.film)
+    except ValueError as error:
+        pre.error(str(error))
     parser = argparse.ArgumentParser(
         description=(
             f"Generate 10-second {DEFAULT_RESOLUTION} 24fps animated clips for a scene script "
             "using a configurable video provider (default: Google Gemini Omni Flash; "
             "alternative: OpenRouter minimax/hailuo-3 at 768p), with the scene's final "
             "character blueprints as reference images. Each script segment becomes "
-            "out/animations/<scene>/part-<N>.mp4; the existing parts are then "
+            "films/<film>/out/animations/<scene>/part-<N>.mp4; the existing parts are then "
             "combined with 0.2s crossfade transitions into "
-            "out/animations/<scene>/full.mp4."
+            "films/<film>/out/animations/<scene>/full.mp4."
         ),
         epilog=(
             "examples:\n"
@@ -361,9 +373,17 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument(
+        "--film",
+        default=get_film(),
+        help=(
+            "Film slug under films/<film>/ whose movie.yml and out/ to use "
+            "(default: %(default)s)."
+        ),
+    )
+    parser.add_argument(
         "--scene",
         required=True,
-        help="Scene name; reads out/scripts/<scene>.md (e.g. frisby_meets_greatowl).",
+        help="Scene name; reads <scripts-dir>/<scene>_part<N>.md (e.g. frisby_meets_greatowl).",
     )
     parser.add_argument(
         "--parts",
@@ -421,18 +441,24 @@ def main() -> None:
     )
     parser.add_argument(
         "--scripts-dir",
-        default=str(DEFAULT_SCRIPTS_DIR),
-        help=f"Directory of scene scripts (default: {DEFAULT_SCRIPTS_DIR}).",
+        default=None,
+        help=f"Directory of scene scripts (default: {film_scripts_dir(get_film())}).",
     )
     parser.add_argument(
         "--blueprint-dir",
-        default=str(DEFAULT_BLUEPRINT_DIR),
-        help=f"Directory of character/scene blueprint outputs (default: {DEFAULT_BLUEPRINT_DIR}).",
+        default=None,
+        help=(
+            "Directory of character/scene blueprint outputs "
+            f"(default: {film_blueprint_dir(get_film())})."
+        ),
     )
     parser.add_argument(
         "--output",
         default=None,
-        help="Output directory for clips (default: out/animations/<scene>/).",
+        help=(
+            "Output directory for clips "
+            f"(default: {film_animations_dir(get_film())}/<scene>/)."
+        ),
     )
     parser.add_argument(
         "--timeout",

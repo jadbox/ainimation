@@ -9,7 +9,8 @@ from blueprint_generator import slug
 from blueprint_generator.utils.characters import CharacterSpec, get_character
 from blueprint_generator.utils.scenes import BackgroundSpec, SceneSpec, get_scene
 from blueprint_generator.utils.models import Attempt, Subject
-from movie_config import get_movie_info
+from films import film_blueprint_dir
+from movie_config import get_film, get_movie_info
 
 
 def build_initial_prompt(character: CharacterSpec) -> str:
@@ -151,7 +152,7 @@ def build_subjects(args: argparse.Namespace) -> list[Subject]:
         output = (
             Path(args.output)
             if args.output
-            else Path("out") / "blueprint" / slug(character.name)
+            else film_blueprint_dir(get_film()) / slug(character.name)
         )
         return [
             Subject(
@@ -165,7 +166,11 @@ def build_subjects(args: argparse.Namespace) -> list[Subject]:
         ]
 
     scene = get_scene(args.scene)
-    base = Path(args.output) if args.output else Path("out") / "blueprint" / scene.slug
+    base = (
+        Path(args.output)
+        if args.output
+        else film_blueprint_dir(get_film()) / scene.slug
+    )
     return [
         Subject(
             label=f"scene {scene.name!r} background {background.key!r}",

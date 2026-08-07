@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 # OpenRouter models are identified by a vendor/name slug (e.g. "qwen/qwen3.8-max").
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 # Shortcut: "--model gemini" maps to Google's flagship Gemini model on OpenRouter.
 GEMINI_OPENROUTER_MODEL = "google/gemini-3.6-flash"
 DEFAULT_MODEL = "qwen/qwen3.8-max"
-DEFAULT_SCRIPTS_DIR = Path("out") / "scripts"
 
 # Reasoning effort passed to OpenRouter for reasoning-capable models (the
 # default model). Reduces excessive "thinking" time while keeping quality.

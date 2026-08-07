@@ -51,7 +51,7 @@ function findProjectRoot(): string {
   if (process.env.ANIMATION_ROOT) return path.resolve(process.env.ANIMATION_ROOT);
   let dir = import.meta.dirname;
   for (let i = 0; i < 8; i++) {
-    if (fs.existsSync(path.join(dir, "movie.yml"))) return dir;
+    if (fs.existsSync(path.join(dir, "films"))) return dir;
     const parent = path.dirname(dir);
     if (parent === dir) break;
     dir = parent;
@@ -60,46 +60,91 @@ function findProjectRoot(): string {
 }
 
 export const PROJECT_ROOT = findProjectRoot();
+export const FILMS_DIR = path.join(PROJECT_ROOT, "films");
 
-export const MOVIE_YML = path.join(PROJECT_ROOT, "movie.yml");
-export const SCRIPTS_DIR = path.join(PROJECT_ROOT, "out", "scripts");
-export const BLUEPRINT_DIR = path.join(PROJECT_ROOT, "out", "blueprint");
-export const ANIMATIONS_DIR = path.join(PROJECT_ROOT, "out", "animations");
+export function listFilms(): string[] {
+  if (!fs.existsSync(FILMS_DIR)) return [];
+  return fs
+    .readdirSync(FILMS_DIR, { withFileTypes: true })
+    .filter((e) => e.isDirectory() && fs.existsSync(path.join(FILMS_DIR, e.name, "movie.yml")))
+    .map((e) => e.name)
+    .sort();
+}
 
-let cache: { mtimeMs: number; config: MovieConfig } | null = null;
+export function isValidFilm(film: string): boolean {
+  return listFilms().includes(film);
+}
 
-export function loadMovie(): MovieConfig {
-  const stat = fs.statSync(MOVIE_YML);
-  if (cache && cache.mtimeMs === stat.mtimeMs) return cache.config;
-  const config = loadYaml(fs.readFileSync(MOVIE_YML, "utf8")) as MovieConfig;
-  cache = { mtimeMs: stat.mtimeMs, config };
+export function defaultFilm(): string {
+  const films = listFilms();
+  const env = process.env.FILM;
+  if (env && films.includes(env)) return env;
+  return films[0] ?? "";
+}
+
+export function requireFilm(film: string): string {
+  if (!isValidFilm(film)) {
+    throw new Error(`Unknown film "${film}". Available films: ${listFilms().join(", ")}`);
+  }
+  return film;
+}
+
+export function filmRoot(film: string): string {
+  return path.join(FILMS_DIR, requireFilm(film));
+}
+
+export function movieYmlPath(film: string): string {
+  return path.join(filmRoot(film), "movie.yml");
+}
+
+export function scriptsDir(film: string): string {
+  return path.join(filmRoot(film), "out", "scripts");
+}
+
+export function blueprintsDir(film: string): string {
+  return path.join(filmRoot(film), "out", "blueprint");
+}
+
+export function animationsDir(film: string): string {
+  return path.join(filmRoot(film), "out", "animations");
+}
+
+const cache = new Map<string, { mtimeMs: number; config: MovieConfig }>();
+
+export function loadMovie(film: string): MovieConfig {
+  const file = movieYmlPath(film);
+  const stat = fs.statSync(file);
+  const cached = cache.get(film);
+  if (cached && cached.mtimeMs === stat.mtimeMs) return cached.config;
+  const config = loadYaml(fs.readFileSync(file, "utf8")) as MovieConfig;
+  cache.set(film, { mtimeMs: stat.mtimeMs, config });
   return config;
 }
 
-export function scriptPath(name: string, part: number): string {
-  return path.join(SCRIPTS_DIR, `${name}_part${part}.md`);
+export function scriptPath(film: string, name: string, part: number): string {
+  return path.join(scriptsDir(film), `${name}_part${part}.md`);
 }
 
-export function scriptStatus(name: string): boolean[] {
-  return [0, 1, 2].map((part) => fs.existsSync(scriptPath(name, part)));
+export function scriptStatus(film: string, name: string): boolean[] {
+  return [0, 1, 2].map((part) => fs.existsSync(scriptPath(film, name, part)));
 }
 
-export function readScript(name: string, part: number): string | null {
-  const file = scriptPath(name, part);
+export function readScript(film: string, name: string, part: number): string | null {
+  const file = scriptPath(film, name, part);
   if (!fs.existsSync(file)) return null;
   return fs.readFileSync(file, "utf8");
 }
 
-export function animatorCommand(name: string): string {
-  return `uv run animator --scene ${name}`;
+export function animatorCommand(film: string, name: string): string {
+  return `uv run animator --film ${film} --scene ${name}`;
 }
 
-export function scriptgenCommand(name: string, force = false): string {
-  return `uv run scriptgen --name ${name}${force ? " --force" : ""}`;
+export function scriptgenCommand(film: string, name: string, force = false): string {
+  return `uv run scriptgen --film ${film} --name ${name}${force ? " --force" : ""}`;
 }
 
-export function isValidStoryName(name: string): boolean {
-  return loadMovie().story.some((s) => s.name === name);
+export function isValidStoryName(film: string, name: string): boolean {
+  return loadMovie(film).story.some((s) => s.name === name);
 }
 
 export function slugify(value: string): string {
@@ -109,12 +154,12 @@ export function slugify(value: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-export function blueprintDir(subject: string): string {
-  return path.join(BLUEPRINT_DIR, slugify(subject));
+export function subjectBlueprintDir(film: string, subject: string): string {
+  return path.join(blueprintsDir(film), slugify(subject));
 }
 
-export function backgroundBlueprintDir(sceneSlug: string, bgKey: string): string {
-  return path.join(BLUEPRINT_DIR, slugify(sceneSlug), slugify(bgKey));
+export function backgroundBlueprintDir(film: string, sceneSlug: string, bgKey: string): string {
+  return path.join(blueprintsDir(film), slugify(sceneSlug), slugify(bgKey));
 }
 
 export interface BlueprintInfo {
@@ -137,8 +182,8 @@ function dirHasBlueprintImages(dir: string): boolean {
   return info.latest !== null || info.style !== null;
 }
 
-export function hasBlueprint(subject: string): boolean {
-  const dir = blueprintDir(subject);
+export function hasBlueprint(film: string, subject: string): boolean {
+  const dir = subjectBlueprintDir(film, subject);
   if (!fs.existsSync(dir)) return false;
   if (dirHasBlueprintImages(dir)) return true;
   return fs
@@ -147,22 +192,25 @@ export function hasBlueprint(subject: string): boolean {
     .some((e) => dirHasBlueprintImages(path.join(dir, e.name)));
 }
 
-export function isValidCharacter(name: string): boolean {
-  return loadMovie().characters.some((c) => c.name === name);
+export function isValidCharacter(film: string, name: string): boolean {
+  return loadMovie(film).characters.some((c) => c.name === name);
 }
 
-export function isValidSceneSlug(slug: string): boolean {
-  return loadMovie().scenes.some((s) => s.slug === slug);
+export function isValidSceneSlug(film: string, slug: string): boolean {
+  return loadMovie(film).scenes.some((s) => s.slug === slug);
 }
 
-export function blueprintCommand(target: { character?: string; scene?: string }): string {
+export function blueprintCommand(
+  film: string,
+  target: { character?: string; scene?: string },
+): string {
   return target.character
-    ? `uv run generate-blueprint --character "${target.character}"`
-    : `uv run generate-blueprint --scene ${target.scene}`;
+    ? `uv run generate-blueprint --film ${film} --character "${target.character}"`
+    : `uv run generate-blueprint --film ${film} --scene ${target.scene}`;
 }
 
-export function hasAnimation(name: string): boolean {
-  return fs.existsSync(path.join(ANIMATIONS_DIR, name, "full.mp4"));
+export function hasAnimation(film: string, name: string): boolean {
+  return fs.existsSync(path.join(animationsDir(film), name, "full.mp4"));
 }
 
 export interface SegmentVideo {
@@ -182,8 +230,8 @@ function pickThumb(files: Set<string>, base: string): string | null {
   return null;
 }
 
-export function sceneVideos(name: string): SceneVideos {
-  const dir = path.join(ANIMATIONS_DIR, name);
+export function sceneVideos(film: string, name: string): SceneVideos {
+  const dir = path.join(animationsDir(film), name);
   const empty: SceneVideos = { full: null, segments: [] };
   if (!fs.existsSync(dir)) return empty;
   const files = new Set(fs.readdirSync(dir));
@@ -197,6 +245,10 @@ export function sceneVideos(name: string): SceneVideos {
   return { full, segments };
 }
 
-export function animationFileUrl(name: string, file: string): string {
-  return `/api/animation/${name}/${file}`;
+export function animationFileUrl(film: string, name: string, file: string): string {
+  return `/api/animation/${film}/${name}/${file}`;
+}
+
+export function blueprintImageUrl(film: string, relDir: string, file: string): string {
+  return `/api/blueprint-image/${film}/${relDir}/${file}`;
 }

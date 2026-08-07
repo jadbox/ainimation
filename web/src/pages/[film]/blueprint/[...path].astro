@@ -1,16 +1,23 @@
 ---
-import Layout from "../../layouts/Base.astro";
-import CLITerminal from "../../components/CLITerminal.astro";
+import Layout from "../../../layouts/Base.astro";
+import CLITerminal from "../../../components/CLITerminal.astro";
 import {
   backgroundBlueprintDir,
   blueprintCommand,
-  blueprintDir,
+  blueprintImageUrl,
   blueprintInfo,
+  isValidFilm,
   loadMovie,
   slugify,
-} from "../../lib/movie";
+  subjectBlueprintDir,
+} from "../../../lib/movie";
 
 export const prerender = false;
+
+const film = Astro.params.film ?? "";
+if (!isValidFilm(film)) {
+  return Astro.redirect("/");
+}
 
 const segments = (Astro.params.path ?? "")
   .split("/")
@@ -18,10 +25,10 @@ const segments = (Astro.params.path ?? "")
   .filter(Boolean);
 
 if (segments.length < 1 || segments.length > 2) {
-  return Astro.redirect("/");
+  return Astro.redirect(`/${film}`);
 }
 
-const movie = loadMovie();
+const movie = loadMovie(film);
 const [name, name2] = segments;
 const character = movie.characters.find((c) => slugify(c.name) === name);
 const scene = movie.scenes.find((s) => slugify(s.slug) === name);
@@ -42,13 +49,13 @@ let view:
 if (name2) {
   const background = scene?.backgrounds.find((b) => slugify(b.key) === name2);
   if (!scene || !background) {
-    return Astro.redirect("/");
+    return Astro.redirect(`/${film}`);
   }
   view = {
     kind: "subject",
     title: `${scene.name} — ${background.key}`,
     subtitle: `scene background · ${scene.slug}/${background.key}`,
-    dir: backgroundBlueprintDir(scene.slug, background.key),
+    dir: backgroundBlueprintDir(film, scene.slug, background.key),
     relDir: `${slugify(scene.slug)}/${slugify(background.key)}`,
     target: { scene: scene.slug },
     note: `Generating recreates all ${scene.backgrounds.length} background plate(s) for this scene.`,
@@ -58,16 +65,16 @@ if (name2) {
     kind: "subject",
     title: character.name,
     subtitle: `character · ${slugify(character.name)}`,
-    dir: blueprintDir(character.name),
+    dir: subjectBlueprintDir(film, character.name),
     relDir: slugify(character.name),
     target: { character: character.name },
   };
 } else if (scene && scene.backgrounds.length === 1) {
-  return Astro.redirect(`/blueprint/${slugify(scene.slug)}/${slugify(scene.backgrounds[0].key)}`);
+  return Astro.redirect(`/${film}/blueprint/${slugify(scene.slug)}/${slugify(scene.backgrounds[0].key)}`);
 } else if (scene) {
   view = { kind: "scene-picker" };
 } else {
-  return Astro.redirect("/");
+  return Astro.redirect(`/${film}`);
 }
 
 const info = view.kind === "subject" ? blueprintInfo(view.dir) : null;
@@ -77,13 +84,13 @@ const thumbnails = info
     ? info.attempts.slice(0, -1)
     : info.attempts
   : [];
-const command = view.kind === "subject" ? blueprintCommand(view.target) : "";
+const command = view.kind === "subject" ? blueprintCommand(film, view.target) : "";
 ---
 
-<Layout title={view.kind === "subject" ? view.title : scene?.name ?? "Blueprint"}>
+<Layout film={film} title={view.kind === "subject" ? view.title : scene?.name ?? "Blueprint"}>
   <nav class="mb-4">
     <a
-      href="/"
+      href={`/${film}`}
       class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-muted ring-1 ring-line hover:text-amber-soft hover:ring-amber-key/40 transition-colors"
     >
       &larr; Back
@@ -98,7 +105,7 @@ const command = view.kind === "subject" ? blueprintCommand(view.target) : "";
       <div class="mt-3 flex flex-wrap gap-2">
         {scene.backgrounds.map((bg) => (
           <a
-            href={`/blueprint/${slugify(scene.slug)}/${slugify(bg.key)}`}
+            href={`/${film}/blueprint/${slugify(scene.slug)}/${slugify(bg.key)}`}
             class="rounded-md bg-teal-shadow/10 px-3 py-1.5 text-sm text-teal-shadow ring-1 ring-teal-shadow/30 hover:bg-teal-shadow/20 transition-colors"
           >
             {bg.key}
@@ -119,6 +126,7 @@ const command = view.kind === "subject" ? blueprintCommand(view.target) : "";
           <button
             type="button"
             id="generate-btn"
+            data-film={film}
             data-target={JSON.stringify(view.target)}
             title={command}
             class="rounded-md bg-amber-key/15 px-4 py-2 text-xs font-medium text-amber-soft ring-1 ring-amber-key/40 hover:bg-amber-key/25 transition-colors"
@@ -132,12 +140,12 @@ const command = view.kind === "subject" ? blueprintCommand(view.target) : "";
       {mainImage ? (
         <figure class="overflow-hidden rounded-xl border border-line bg-panel shadow-lg shadow-black/30">
           <img
-            src={`/api/blueprint-image/${view.relDir}/${mainImage}`}
+            src={blueprintImageUrl(film, view.relDir, mainImage)}
             alt={`${view.title} blueprint`}
             class="w-full"
           />
           <figcaption class="border-t border-line px-5 py-3 font-mono text-xs text-muted">
-            out/blueprint/{view.relDir}/{mainImage}
+            films/{film}/out/blueprint/{view.relDir}/{mainImage}
           </figcaption>
         </figure>
       ) : (
@@ -157,14 +165,14 @@ const command = view.kind === "subject" ? blueprintCommand(view.target) : "";
           <div class="flex flex-wrap gap-2">
             {thumbnails.map((t) => (
               <a
-                href={`/api/blueprint-image/${view.relDir}/${t}`}
+                href={blueprintImageUrl(film, view.relDir, t)}
                 target="_blank"
                 rel="noreferrer"
                 class="block overflow-hidden rounded-md ring-1 ring-line hover:ring-amber-key/50 transition"
-                title={`out/blueprint/${view.relDir}/${t}`}
+                title={`films/${film}/out/blueprint/${view.relDir}/${t}`}
               >
                 <img
-                  src={`/api/blueprint-image/${view.relDir}/${t}`}
+                  src={blueprintImageUrl(film, view.relDir, t)}
                   alt={`${view.title} ${t}`}
                   class="h-20 w-auto"
                 />
@@ -180,19 +188,20 @@ const command = view.kind === "subject" ? blueprintCommand(view.target) : "";
 <CLITerminal />
 
 <script>
-  import { openCLITerminal } from "../../components/cli-terminal";
+  import { openCLITerminal } from "../../../components/cli-terminal";
 
   const generateBtn = document.getElementById("generate-btn") as HTMLButtonElement | null;
   generateBtn?.addEventListener("click", () => {
     try {
+      const film = generateBtn.dataset.film ?? "";
       const target = JSON.parse(generateBtn.dataset.target ?? "{}") as {
         character?: string;
         scene?: string;
       };
       const command = target.character
-        ? `uv run generate-blueprint --character "${target.character}"`
-        : `uv run generate-blueprint --scene ${target.scene}`;
-      openCLITerminal({ url: "/api/generate-blueprint", body: target, command });
+        ? `uv run generate-blueprint --film ${film} --character "${target.character}"`
+        : `uv run generate-blueprint --film ${film} --scene ${target.scene}`;
+      openCLITerminal({ url: "/api/generate-blueprint", body: { film, ...target }, command });
     } catch {
       /* invalid target; ignore */
     }

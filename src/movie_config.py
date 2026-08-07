@@ -9,7 +9,7 @@ from pathlib import Path
 
 import yaml
 
-DEFAULT_MOVIE_FILE = Path("movie.yml")
+from films import film_movie_yml, resolve_film
 
 
 def standardize_name(name: str) -> str:
@@ -84,15 +84,12 @@ def _find_movie_file() -> Path:
         path = Path(env_path)
         if path.is_file():
             return path
-    if DEFAULT_MOVIE_FILE.is_file():
-        return DEFAULT_MOVIE_FILE
-    # Fallback search up hierarchy
-    current = Path.cwd()
-    for parent in [current, *current.parents]:
-        candidate = parent / "movie.yml"
-        if candidate.is_file():
-            return candidate
-    raise FileNotFoundError("movie.yml not found in root or current working directory.")
+    candidate = film_movie_yml(_FILM)
+    if candidate.is_file():
+        return candidate
+    raise FileNotFoundError(
+        f"movie.yml not found for film {_FILM!r} (expected at {candidate})."
+    )
 
 
 def load_movie_config(
@@ -159,7 +156,36 @@ def load_movie_config(
     return movie_info, characters, scenes, story
 
 
+_FILM = resolve_film()
 _MOVIE_INFO, CHARACTERS, SCENES, STORY = load_movie_config()
+
+
+def get_film() -> str:
+    """Return the film slug all movie_config lookups currently target."""
+    return _FILM
+
+
+def set_film(name: str | None = None) -> str:
+    """Point all movie_config lookups at ``films/<name>/movie.yml``.
+
+    ``None`` falls back to the ``FILM`` environment variable, then the
+    default film. Reloading mutates the shared ``CHARACTERS``/``SCENES``/
+    ``STORY`` dicts in place so every importer sees the new film's data.
+    Returns the resolved film slug.
+    """
+    global _MOVIE_INFO, _FILM
+    film = resolve_film(name)
+    if film != _FILM or not CHARACTERS:
+        _FILM = film
+        movie_info, characters, scenes, story = load_movie_config()
+        _MOVIE_INFO = movie_info
+        CHARACTERS.clear()
+        CHARACTERS.update(characters)
+        SCENES.clear()
+        SCENES.update(scenes)
+        STORY.clear()
+        STORY.update(story)
+    return film
 
 
 def get_movie_info() -> MovieInfo:

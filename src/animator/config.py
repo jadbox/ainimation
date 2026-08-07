@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
 ASPECT = "landscape"
 """Static configuration for aspect ratio orientation. Options: 'landscape' or 'portrait'."""
 
@@ -51,9 +49,6 @@ DEFAULT_MINIMAX_RESOLUTION = "768P"
 DEFAULT_DURATION_SECONDS = 10
 DEFAULT_RESOLUTION = RESOLUTION
 DEFAULT_ASPECT_RATIO = get_aspect_ratio(ASPECT)
-DEFAULT_SCRIPTS_DIR = Path("out") / "scripts"
-DEFAULT_BLUEPRINT_DIR = Path("out") / "blueprint"
-DEFAULT_ANIMATIONS_DIR = Path("out") / "animations"
 DEFAULT_TIMEOUT_SECONDS = 600
 POLL_INTERVAL_SECONDS = 5
 

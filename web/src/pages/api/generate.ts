@@ -1,10 +1,10 @@
 import { spawn } from "node:child_process";
-import { PROJECT_ROOT, isValidStoryName, scriptgenCommand } from "../../lib/movie";
+import { PROJECT_ROOT, isValidFilm, isValidStoryName, scriptgenCommand } from "../../lib/movie";
 
 export const prerender = false;
 
 export async function POST({ request }: { request: Request }) {
-  let body: { name?: string; force?: boolean };
+  let body: { film?: string; name?: string; force?: boolean };
   try {
     body = await request.json();
   } catch {
@@ -14,17 +14,25 @@ export async function POST({ request }: { request: Request }) {
     });
   }
 
+  const film = typeof body.film === "string" ? body.film.trim() : "";
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const force = Boolean(body.force);
 
-  if (!name || !isValidStoryName(name)) {
+  if (!film || !isValidFilm(film)) {
+    return new Response(JSON.stringify({ error: `Unknown film: "${film}"` }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (!name || !isValidStoryName(film, name)) {
     return new Response(
       JSON.stringify({ error: `Unknown story scene name: "${name}"` }),
       { status: 400, headers: { "Content-Type": "application/json" } },
     );
   }
 
-  const args = ["run", "scriptgen", "--name", name];
+  const args = ["run", "scriptgen", "--film", film, "--name", name];
   if (force) args.push("--force");
 
   const encoder = new TextEncoder();
@@ -39,7 +47,7 @@ export async function POST({ request }: { request: Request }) {
       const push = (chunk: Buffer | string) =>
         controller.enqueue(encoder.encode(chunk.toString()));
 
-      push(`$ ${scriptgenCommand(name, force)}\n`);
+      push(`$ ${scriptgenCommand(film, name, force)}\n`);
       push(`(cwd: ${PROJECT_ROOT})\n\n`);
 
       child.stdout.on("data", push);

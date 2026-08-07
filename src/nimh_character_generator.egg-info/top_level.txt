@@ -1,4 +1,0 @@
-animator
-blueprint
-blueprint_generator
-scriptgen

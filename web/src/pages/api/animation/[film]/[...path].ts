@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { Readable } from "node:stream";
-import { ANIMATIONS_DIR } from "../../../lib/movie";
+import { animationsDir, isValidFilm } from "../../../../lib/movie";
 
 export const prerender = false;
 
@@ -16,13 +16,18 @@ export async function GET({
   params,
   request,
 }: {
-  params: { path?: string };
+  params: { film?: string; path?: string };
   request: Request;
 }) {
+  const film = params.film ?? "";
+  if (!isValidFilm(film)) {
+    return new Response("Not found", { status: 404 });
+  }
+  const baseDir = animationsDir(film);
   const rel = params.path ?? "";
-  const file = path.resolve(ANIMATIONS_DIR, rel);
+  const file = path.resolve(baseDir, rel);
   if (
-    !file.startsWith(ANIMATIONS_DIR + path.sep) ||
+    !file.startsWith(baseDir + path.sep) ||
     !fs.existsSync(file) ||
     !fs.statSync(file).isFile()
   ) {

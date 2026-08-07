@@ -3,13 +3,14 @@ import {
   PROJECT_ROOT,
   blueprintCommand,
   isValidCharacter,
+  isValidFilm,
   isValidSceneSlug,
 } from "../../lib/movie";
 
 export const prerender = false;
 
 export async function POST({ request }: { request: Request }) {
-  let body: { character?: string; scene?: string };
+  let body: { film?: string; character?: string; scene?: string };
   try {
     body = await request.json();
   } catch {
@@ -19,17 +20,25 @@ export async function POST({ request }: { request: Request }) {
     });
   }
 
+  const film = typeof body.film === "string" ? body.film.trim() : "";
   const character = typeof body.character === "string" ? body.character.trim() : "";
   const scene = typeof body.scene === "string" ? body.scene.trim() : "";
 
+  if (!film || !isValidFilm(film)) {
+    return new Response(JSON.stringify({ error: `Unknown film: "${film}"` }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   let args: string[];
   let command: string;
-  if (character && isValidCharacter(character)) {
-    args = ["run", "generate-blueprint", "--character", character];
-    command = blueprintCommand({ character });
-  } else if (scene && isValidSceneSlug(scene)) {
-    args = ["run", "generate-blueprint", "--scene", scene];
-    command = blueprintCommand({ scene });
+  if (character && isValidCharacter(film, character)) {
+    args = ["run", "generate-blueprint", "--film", film, "--character", character];
+    command = blueprintCommand(film, { character });
+  } else if (scene && isValidSceneSlug(film, scene)) {
+    args = ["run", "generate-blueprint", "--film", film, "--scene", scene];
+    command = blueprintCommand(film, { scene });
   } else {
     return new Response(
       JSON.stringify({ error: `Unknown blueprint subject: "${character || scene}"` }),

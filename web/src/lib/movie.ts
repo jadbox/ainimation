@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { load as loadYaml } from "js-yaml";
@@ -188,6 +189,36 @@ export function blueprintInfo(dir: string): BlueprintInfo {
   const attempts = files.filter((f) => /^attempt-\d+\.jpg$/.test(f)).sort();
   const style = files.find((f) => f.endsWith("-style.jpg")) ?? null;
   return { attempts, latest: attempts.length > 0 ? attempts[attempts.length - 1] : null, style };
+}
+
+function extractFrame(clipPath: string, destination: string, first: boolean): boolean {
+  const args = ["-y"];
+  if (!first) args.push("-sseof", "-0.1");
+  args.push("-i", clipPath, "-frames:v", "1", "-q:v", "2", destination);
+  const result = spawnSync("ffmpeg", args, { encoding: "utf8" });
+  return result.status === 0 && fs.existsSync(destination);
+}
+
+export function resolveSceneFrame(
+  film: string,
+  sceneName: string,
+  part: number,
+  kind: "start" | "end",
+): string | null {
+  const dir = path.join(animationsDir(film), sceneName);
+  if (!fs.existsSync(dir)) return null;
+  const named = `part-${part}-${kind}.jpg`;
+  const namedPath = path.join(dir, named);
+  if (fs.existsSync(namedPath)) return `films/${film}/out/animations/${sceneName}/${named}`;
+  if (kind === "end") {
+    const legacy = path.join(dir, `part-${part}.jpg`);
+    if (fs.existsSync(legacy)) return `films/${film}/out/animations/${sceneName}/part-${part}.jpg`;
+  }
+  const clip = path.join(dir, `part-${part}.mp4`);
+  if (fs.existsSync(clip) && extractFrame(clip, namedPath, kind === "start")) {
+    return `films/${film}/out/animations/${sceneName}/${named}`;
+  }
+  return null;
 }
 
 function dirHasBlueprintImages(dir: string): boolean {

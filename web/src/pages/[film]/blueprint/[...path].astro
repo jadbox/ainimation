@@ -42,6 +42,7 @@ let view:
       relDir: string;
       target: { character?: string; scene?: string };
       note?: string;
+      details: string;
     }
   | { kind: "scene-picker" }
   | null = null;
@@ -59,6 +60,18 @@ if (name2) {
     relDir: `${slugify(scene.slug)}/${slugify(background.key)}`,
     target: { scene: scene.slug },
     note: `Generating recreates all ${scene.backgrounds.length} background plate(s) for this scene.`,
+    details: JSON.stringify(
+      {
+        scene: {
+          name: scene.name,
+          slug: scene.slug,
+          logline: scene.logline,
+        },
+        background: background,
+      },
+      null,
+      2,
+    ),
   };
 } else if (character) {
   view = {
@@ -68,6 +81,7 @@ if (name2) {
     dir: subjectBlueprintDir(film, character.name),
     relDir: slugify(character.name),
     target: { character: character.name },
+    details: JSON.stringify(character, null, 2),
   };
 } else if (scene && scene.backgrounds.length === 1) {
   return Astro.redirect(`/${film}/blueprint/${slugify(scene.slug)}/${slugify(scene.backgrounds[0].key)}`);
@@ -181,6 +195,20 @@ const command = view.kind === "subject" ? blueprintCommand(film, view.target) : 
           </div>
         </section>
       )}
+
+      <section>
+        <h2 class="mb-2 text-xs font-medium uppercase tracking-wider text-muted">
+          movie.yml details
+        </h2>
+        <textarea
+          readonly
+          rows={16}
+          spellcheck={false}
+          class="w-full resize-y rounded-lg border border-line bg-ink/40 p-3 font-mono text-xs leading-relaxed text-slate-300"
+        >
+          {view.details}
+        </textarea>
+      </section>
     </div>
   )}
 </Layout>

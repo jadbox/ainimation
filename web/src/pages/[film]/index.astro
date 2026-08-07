@@ -51,20 +51,29 @@ const rows = movie.story.map((story, index) => {
     <div>
       <h1 class="font-display text-2xl text-amber-soft">Story Scenes</h1>
       <p class="mt-1 text-sm text-muted">
-        {movie.story.length} scene(s) from <code class="text-teal-shadow">films/{film}/movie.yml</code> ·
-        scripts live in <code class="text-teal-shadow">films/{film}/out/scripts/</code>
+        {movie.story.length} scene(s) from <code class="text-teal-shadow"
+          >films/{film}/movie.yml</code
+        > · scripts live in <code class="text-teal-shadow"
+          >films/{film}/out/scripts/</code
+        >
       </p>
     </div>
     <p class="text-xs text-muted max-w-md">
-      Generate scripts with <code class="text-teal-shadow">scriptgen</code>, then copy the
-      <code class="text-teal-shadow">animator</code> command to run video generation in your terminal.
+      Generate scripts with <code class="text-teal-shadow">scriptgen</code>,
+      then copy the
+      <code class="text-teal-shadow">animator</code> command to run video generation
+      in your terminal.
     </p>
   </div>
 
-  <div class="w-fit rounded-xl border border-line bg-panel shadow-lg shadow-black/30">
+  <div
+    class="w-fit rounded-xl border border-line bg-panel shadow-lg shadow-black/30"
+  >
     <table class="text-sm">
       <thead>
-        <tr class="border-b border-line text-left text-xs uppercase tracking-wider text-muted">
+        <tr
+          class="border-b border-line text-left text-xs uppercase tracking-wider text-muted"
+        >
           <th class="px-4 py-3 font-medium w-10">#</th>
           <th class="px-4 py-3 font-medium">Scene</th>
           <th class="px-4 py-3 font-medium">Location</th>
@@ -139,22 +148,34 @@ const rows = movie.story.map((story, index) => {
                 </div>
               </td>
               <td class="px-4 py-3" data-status>
+                <a href={`/${film}/scene/${row.story.name}`} class="">
                   {row.partsDone === row.parts.length ? (
                     <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-300 ring-1 ring-emerald-400/30">
-                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-400" /> {row.partsDone}/{row.parts.length} ready
-                  </span>
-                ) : row.partsDone > 0 ? (
-                  <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-key/10 px-2.5 py-1 text-xs text-amber-soft ring-1 ring-amber-key/30">
-                    <span class="h-1.5 w-1.5 rounded-full bg-amber-key" /> {row.partsDone}/{row.parts.length} parts
-                  </span>
-                ) : (
-                  <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-500/10 px-2.5 py-1 text-xs text-muted ring-1 ring-slate-400/20">
-                    <span class="h-1.5 w-1.5 rounded-full bg-slate-500" /> none
-                  </span>
-                )}
+                      <span class="h-1.5 w-1.5 rounded-full bg-emerald-400" />{" "}
+                      {row.partsDone}/{row.parts.length} ready
+                    </span>
+                  ) : row.partsDone > 0 ? (
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-key/10 px-2.5 py-1 text-xs text-amber-soft ring-1 ring-amber-key/30">
+                      <span class="h-1.5 w-1.5 rounded-full bg-amber-key" />{" "}
+                      {row.partsDone}/{row.parts.length} parts
+                    </span>
+                  ) : (
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-500/10 px-2.5 py-1 text-xs text-muted ring-1 ring-slate-400/20">
+                      <span class="h-1.5 w-1.5 rounded-full bg-slate-500" />{" "}
+                      none
+                    </span>
+                  )}
+                </a>
               </td>
               <td class="px-4 py-3">
-                <div class="flex flex-wrap gap-1" title={row.blueprints.map((b) => `${b.subject}: ${b.ready ? "ready" : "missing"}`).join("\n")}>
+                <div
+                  class="flex flex-wrap gap-1"
+                  title={row.blueprints
+                    .map(
+                      (b) => `${b.subject}: ${b.ready ? "ready" : "missing"}`,
+                    )
+                    .join("\n")}
+                >
                   {row.blueprints.map((b) => (
                     <span
                       class:list={[
@@ -172,7 +193,8 @@ const rows = movie.story.map((story, index) => {
                 </div>
               </td>
               <td class="px-4 py-3">
-                {row.videos.full === null && row.videos.segments.length === 0 ? (
+                {row.videos.full === null &&
+                row.videos.segments.length === 0 ? (
                   <span class="text-xs text-muted/70">none</span>
                 ) : (
                   <div class="flex items-center gap-2">
@@ -184,15 +206,23 @@ const rows = movie.story.map((story, index) => {
                       >
                         {row.videos.full.thumb ? (
                           <img
-                            src={animationFileUrl(film, row.story.name, row.videos.full.thumb)}
+                            src={animationFileUrl(
+                              film,
+                              row.story.name,
+                              row.videos.full.thumb,
+                            )}
                             alt={`Full scene ${row.story.name}`}
                             class="aspect-video w-full object-cover"
                             loading="lazy"
                           />
                         ) : (
-                          <span class="flex aspect-video w-full items-center justify-center bg-ink/60 text-[9px] text-muted">full</span>
+                          <span class="flex aspect-video w-full items-center justify-center bg-ink/60 text-[9px] text-muted">
+                            full
+                          </span>
                         )}
-                        <span class="absolute bottom-0 right-0 rounded-tl bg-black/70 px-2.5 py-0.5 text-[20px] uppercase tracking-wide text-amber-soft">full</span>
+                        <span class="absolute bottom-0 right-0 rounded-tl bg-black/70 px-2.5 py-0.5 text-[20px] uppercase tracking-wide text-amber-soft">
+                          full
+                        </span>
                       </a>
                     )}
                     {row.videos.segments.map((seg) => (
@@ -206,15 +236,23 @@ const rows = movie.story.map((story, index) => {
                       >
                         {seg.thumb ? (
                           <img
-                            src={animationFileUrl(film, row.story.name, seg.thumb)}
+                            src={animationFileUrl(
+                              film,
+                              row.story.name,
+                              seg.thumb,
+                            )}
                             alt={`Part ${seg.part} ${row.story.name}`}
                             class="aspect-video w-full object-cover"
                             loading="lazy"
                           />
                         ) : (
-                          <span class="flex aspect-video w-full items-center justify-center bg-ink/60 text-[9px] text-muted">p{seg.part}</span>
+                          <span class="flex aspect-video w-full items-center justify-center bg-ink/60 text-[9px] text-muted">
+                            p{seg.part}
+                          </span>
                         )}
-                        <span class="absolute bottom-0 right-0 rounded-tl bg-black/70 px-2.5 py-0.5 text-[20px] text-teal-shadow">p{seg.part}</span>
+                        <span class="absolute bottom-0 right-0 rounded-tl bg-black/70 px-2.5 py-0.5 text-[20px] text-teal-shadow">
+                          p{seg.part}
+                        </span>
                       </a>
                     ))}
                   </div>
@@ -223,28 +261,29 @@ const rows = movie.story.map((story, index) => {
               <td class="px-4 py-3">
                 <div class="flex flex-col items-end gap-1.5">
                   <div class="flex items-center justify-end gap-2">
-                  <a
-                    href={`/${film}/scene/${row.story.name}`}
-                    class="rounded-md bg-amber-key/15 px-3 py-1.5 text-xs font-medium text-amber-soft ring-1 ring-amber-key/40 hover:bg-amber-key/25 transition-colors"
-                  >
-                    View scripts
-                  </a>
-                  <a
-                    href={`/${film}/animate/${row.story.name}`}
-                    title={`Configure animation generation for ${row.story.title}`}
-                    class="rounded-md px-3 py-1.5 text-xs font-mono text-teal-shadow ring-1 ring-teal-shadow/30 hover:bg-teal-shadow/10 transition-colors"
-                  >
-                    configure animate
-                  </a>
-                  </div>
-                  {row.partsDone === row.parts.length && row.blueprintsDone === row.blueprints.length && (
-                    <span
-                      class="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] uppercase tracking-wide text-emerald-300 ring-1 ring-emerald-400/30"
-                      title="All scripts and blueprints are ready"
+                    <a
+                      href={`/${film}/scene/${row.story.name}`}
+                      class="rounded-md bg-amber-key/15 px-3 py-1.5 text-xs font-medium text-amber-soft ring-1 ring-amber-key/40 hover:bg-amber-key/25 transition-colors"
                     >
-                      ready
-                    </span>
-                  )}
+                      View scripts
+                    </a>
+                    <a
+                      href={`/${film}/animate/${row.story.name}`}
+                      title={`Configure animation generation for ${row.story.title}`}
+                      class="rounded-md px-3 py-1.5 text-xs font-mono text-teal-shadow ring-1 ring-teal-shadow/30 hover:bg-teal-shadow/10 transition-colors"
+                    >
+                      configure animate
+                    </a>
+                  </div>
+                  {row.partsDone === row.parts.length &&
+                    row.blueprintsDone === row.blueprints.length && (
+                      <span
+                        class="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] uppercase tracking-wide text-emerald-300 ring-1 ring-emerald-400/30"
+                        title="All scripts and blueprints are ready"
+                      >
+                        ready
+                      </span>
+                    )}
                 </div>
               </td>
             </tr>
@@ -254,10 +293,15 @@ const rows = movie.story.map((story, index) => {
     </table>
   </div>
 
-  <section class="mt-6 flex flex-wrap items-start gap-4 rounded-xl border border-line bg-panel/70 p-4 shadow-lg shadow-black/20">
+  <section
+    class="mt-6 flex flex-wrap items-start gap-4 rounded-xl border border-line bg-panel/70 p-4 shadow-lg shadow-black/20"
+  >
     <div class="flex-1">
       <h2 class="font-display text-lg text-amber-soft">Full film</h2>
-      <p class="mt-1 text-sm text-muted">Combine available scene <code>full.mp4</code> files in story order and extract a midpoint thumbnail.</p>
+      <p class="mt-1 text-sm text-muted">
+        Combine available scene <code>full.mp4</code> files in story order and extract
+        a midpoint thumbnail.
+      </p>
     </div>
     <button
       type="button"
@@ -267,12 +311,24 @@ const rows = movie.story.map((story, index) => {
     >
       Merge all full scenes
     </button>
-    {mergedFilm && (
-      <a href={`/${film}/video/`} class="block w-40 overflow-hidden rounded-lg ring-1 ring-line transition hover:ring-amber-key/50" title="Watch full film">
-        <img src={filmAnimationFileUrl(film, mergedFilm.thumb)} alt={`${movie.movie.title} full film`} class="aspect-video w-full object-cover" />
-        <span class="block bg-panel-2 px-2 py-1 text-[10px] uppercase tracking-wide text-amber-soft">View film</span>
-      </a>
-    )}
+    {
+      mergedFilm && (
+        <a
+          href={`/${film}/video/`}
+          class="block w-40 overflow-hidden rounded-lg ring-1 ring-line transition hover:ring-amber-key/50"
+          title="Watch full film"
+        >
+          <img
+            src={filmAnimationFileUrl(film, mergedFilm.thumb)}
+            alt={`${movie.movie.title} full film`}
+            class="aspect-video w-full object-cover"
+          />
+          <span class="block bg-panel-2 px-2 py-1 text-[10px] uppercase tracking-wide text-amber-soft">
+            View film
+          </span>
+        </a>
+      )
+    }
   </section>
 
   <CLITerminal />
@@ -282,11 +338,17 @@ const rows = movie.story.map((story, index) => {
   import { openCLITerminal } from "../../components/cli-terminal";
 
   document.addEventListener("click", (event) => {
-    const target = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-action]");
+    const target = (event.target as HTMLElement).closest<HTMLButtonElement>(
+      "[data-action]",
+    );
     if (!target) return;
     if (target.dataset.action === "merge-film" && target.dataset.film) {
       const command = `uv run python src/merge_film.py --film ${target.dataset.film}`;
-      openCLITerminal({ url: "/api/merge-film", body: { film: target.dataset.film }, command });
+      openCLITerminal({
+        url: "/api/merge-film",
+        body: { film: target.dataset.film },
+        command,
+      });
     }
   });
 </script>

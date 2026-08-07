@@ -11,7 +11,7 @@ from pathlib import Path
 from films import film_animations_dir
 from movie_config import get_film, list_story_scenes, set_film
 
-FILM_VIDEO_NAME = "film.mpeg"
+FILM_VIDEO_NAME = "film.mp4"
 FILM_THUMB_NAME = "film-thumb.jpg"
 
 
@@ -41,8 +41,9 @@ def run(args: argparse.Namespace) -> int:
         subprocess.run(
             [
                 "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", concat_file.name,
-                "-map", "0:v:0", "-map", "0:a?", "-c:v", "mpeg2video", "-q:v", "2",
-                "-c:a", "mp2", "-b:a", "192k", film_path.name,
+                "-map", "0:v:0", "-map", "0:a?", "-c:v", "libx264", "-crf", "18",
+                "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
+                "-movflags", "+faststart", film_path.name,
             ],
             cwd=animations_dir,
             check=True,
@@ -83,7 +84,7 @@ def run(args: argparse.Namespace) -> int:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Merge existing scene full.mp4 files into film.mpeg.")
+    parser = argparse.ArgumentParser(description="Merge existing scene full.mp4 files into film.mp4.")
     parser.add_argument("--film", default=None, help="Film slug under films/<film>.")
     args = parser.parse_args()
     try:

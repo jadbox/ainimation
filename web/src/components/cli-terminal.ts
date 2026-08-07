@@ -74,6 +74,7 @@ function closeModal(): void {
   if (!els) return;
   els.modal.classList.add("hidden");
   els.modal.classList.remove("flex");
+  window.setTimeout(() => location.reload(), 150);
 }
 
 function showPending(options: CLIRunOptions): void {

@@ -2,6 +2,7 @@
 import Layout from "../../../layouts/Base.astro";
 import CLITerminal from "../../../components/CLITerminal.astro";
 import {
+  animationFileUrl,
   backgroundBlueprintDir,
   blueprintImageUrl,
   blueprintInfo,
@@ -9,6 +10,7 @@ import {
   loadMovie,
   readScript,
   resolveSceneFrame,
+  sceneVideos,
   scriptPartIndices,
   slugify,
   subjectBlueprintDir,
@@ -32,6 +34,7 @@ const story = movie.story[storyIndex];
 const location = movie.scenes.find((scene) => scene.slug === story.scene);
 const parts = scriptPartIndices(film, name);
 const scripts = parts.map((part) => readScript(film, name, part));
+const videos = sceneVideos(film, name);
 const timeRange = (part: number) =>
   `${Math.floor((part * 10) / 60)}:${String((part * 10) % 60).padStart(2, "0")}-${Math.floor(((part + 1) * 10) / 60)}:${String(((part + 1) * 10) % 60).padStart(2, "0")}`;
 const command = (part: number, startFrame?: string, endFrame?: string) =>
@@ -223,6 +226,7 @@ const nextFrame =
         const canUsePreviousFrame = index === 0 && previousFrame;
         const canUseNextFrame = index === parts.length - 1 && nextFrame;
         const baseCommand = command(part);
+        const segVideo = videos.segments.find((s) => s.part === part);
         return (
           <section class="rounded-xl border border-line bg-panel shadow-lg shadow-black/20">
             <header class="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
@@ -260,6 +264,74 @@ const nextFrame =
               )}
             </header>
             <div class="space-y-3 px-5 py-4">
+              {segVideo && (
+                <div class="flex flex-wrap items-end gap-3">
+                  {segVideo.startThumb && (
+                    <a
+                      href={animationFileUrl(film, name, segVideo.startThumb)}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={`Part ${part} start frame`}
+                      class="group block w-40 overflow-hidden rounded-lg border border-line bg-ink/40 transition-colors hover:border-amber-key/50"
+                    >
+                      <img
+                        src={animationFileUrl(film, name, segVideo.startThumb)}
+                        alt={`Part ${part} start frame`}
+                        class="aspect-video w-full object-cover"
+                        loading="lazy"
+                      />
+                      <span class="block border-t border-line px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wide text-muted">
+                        start
+                      </span>
+                    </a>
+                  )}
+                  <a
+                    href={`/${film}/video/${name}_part_${part}`}
+                    title={`View Part ${part} video`}
+                    class="group block w-[300px] overflow-hidden rounded-lg border border-line bg-ink/40 transition-colors hover:border-amber-key/50"
+                  >
+                    {segVideo.thumb ? (
+                      <img
+                        src={animationFileUrl(film, name, segVideo.thumb)}
+                        alt={`Part ${part} video thumbnail`}
+                        class="aspect-video w-full object-cover"
+                        loading="lazy"
+                      />
+                    ) : (
+                      <div class="flex aspect-video items-center justify-center px-3 text-center text-xs text-muted">
+                        Part {part} video generated
+                      </div>
+                    )}
+                    <figcaption class="border-t border-line px-2.5 py-2">
+                      <span class="block truncate text-xs text-slate-200">
+                        Part {part} video
+                      </span>
+                      <span class="mt-0.5 block truncate font-mono text-[10px] text-muted">
+                        {name}_part_{part}.mp4
+                      </span>
+                    </figcaption>
+                  </a>
+                  {segVideo.endThumb && (
+                    <a
+                      href={animationFileUrl(film, name, segVideo.endThumb)}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={`Part ${part} end frame`}
+                      class="group block w-40 overflow-hidden rounded-lg border border-line bg-ink/40 transition-colors hover:border-amber-key/50"
+                    >
+                      <img
+                        src={animationFileUrl(film, name, segVideo.endThumb)}
+                        alt={`Part ${part} end frame`}
+                        class="aspect-video w-full object-cover"
+                        loading="lazy"
+                      />
+                      <span class="block border-t border-line px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wide text-muted">
+                        end
+                      </span>
+                    </a>
+                  )}
+                </div>
+              )}
               {canUsePreviousFrame && (
                 <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-teal-shadow/25 bg-teal-shadow/5 px-3 py-3 text-sm text-slate-300">
                   <input

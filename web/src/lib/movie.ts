@@ -49,7 +49,8 @@ export interface MovieConfig {
 }
 
 function findProjectRoot(): string {
-  if (process.env.ANIMATION_ROOT) return path.resolve(process.env.ANIMATION_ROOT);
+  if (process.env.ANIMATION_ROOT)
+    return path.resolve(process.env.ANIMATION_ROOT);
   let dir = import.meta.dirname;
   for (let i = 0; i < 8; i++) {
     if (fs.existsSync(path.join(dir, "films"))) return dir;
@@ -67,7 +68,11 @@ export function listFilms(): string[] {
   if (!fs.existsSync(FILMS_DIR)) return [];
   return fs
     .readdirSync(FILMS_DIR, { withFileTypes: true })
-    .filter((e) => e.isDirectory() && fs.existsSync(path.join(FILMS_DIR, e.name, "movie.yml")))
+    .filter(
+      (e) =>
+        e.isDirectory() &&
+        fs.existsSync(path.join(FILMS_DIR, e.name, "movie.yml")),
+    )
     .map((e) => e.name)
     .sort();
 }
@@ -85,7 +90,9 @@ export function defaultFilm(): string {
 
 export function requireFilm(film: string): string {
   if (!isValidFilm(film)) {
-    throw new Error(`Unknown film "${film}". Available films: ${listFilms().join(", ")}`);
+    throw new Error(
+      `Unknown film "${film}". Available films: ${listFilms().join(", ")}`,
+    );
   }
   return film;
 }
@@ -134,8 +141,12 @@ export function scriptStatus(film: string, name: string): boolean[] {
 export function scriptPartIndices(film: string, name: string): number[] {
   const dir = scriptsDir(film);
   if (!fs.existsSync(dir)) return [0, 1, 2];
-  const pattern = new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}_part(\\d+)\\.md$`, "i");
-  const parts = fs.readdirSync(dir)
+  const pattern = new RegExp(
+    `^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}_part(\\d+)\\.md$`,
+    "i",
+  );
+  const parts = fs
+    .readdirSync(dir)
     .map((file) => file.match(pattern))
     .filter((match): match is RegExpMatchArray => match !== null)
     .map((match) => Number(match[1]))
@@ -143,7 +154,11 @@ export function scriptPartIndices(film: string, name: string): number[] {
   return parts.length > 0 ? parts : [0, 1, 2];
 }
 
-export function readScript(film: string, name: string, part: number): string | null {
+export function readScript(
+  film: string,
+  name: string,
+  part: number,
+): string | null {
   const file = scriptPath(film, name, part);
   if (!fs.existsSync(file)) return null;
   return fs.readFileSync(file, "utf8");
@@ -153,7 +168,12 @@ export function animatorCommand(film: string, name: string): string {
   return `uv run animator --film ${film} --scene ${name}`;
 }
 
-export function scriptgenCommand(film: string, name: string, force = false, parts = 3): string {
+export function scriptgenCommand(
+  film: string,
+  name: string,
+  force = false,
+  parts = 3,
+): string {
   return `uv run scriptgen --film ${film} --name ${name} --parts ${parts}${force ? " --force" : ""}`;
 }
 
@@ -172,7 +192,11 @@ export function subjectBlueprintDir(film: string, subject: string): string {
   return path.join(blueprintsDir(film), slugify(subject));
 }
 
-export function backgroundBlueprintDir(film: string, sceneSlug: string, bgKey: string): string {
+export function backgroundBlueprintDir(
+  film: string,
+  sceneSlug: string,
+  bgKey: string,
+): string {
   return path.join(blueprintsDir(film), slugify(sceneSlug), slugify(bgKey));
 }
 
@@ -188,10 +212,18 @@ export function blueprintInfo(dir: string): BlueprintInfo {
   const files = fs.readdirSync(dir);
   const attempts = files.filter((f) => /^attempt-\d+\.jpg$/.test(f)).sort();
   const style = files.find((f) => f.endsWith("-style.jpg")) ?? null;
-  return { attempts, latest: attempts.length > 0 ? attempts[attempts.length - 1] : null, style };
+  return {
+    attempts,
+    latest: attempts.length > 0 ? attempts[attempts.length - 1] : null,
+    style,
+  };
 }
 
-function extractFrame(clipPath: string, destination: string, first: boolean): boolean {
+function extractFrame(
+  clipPath: string,
+  destination: string,
+  first: boolean,
+): boolean {
   const args = ["-y"];
   if (!first) args.push("-sseof", "-0.1");
   args.push("-i", clipPath, "-frames:v", "1", "-q:v", "2", destination);
@@ -209,10 +241,12 @@ export function resolveSceneFrame(
   if (!fs.existsSync(dir)) return null;
   const named = `part-${part}-${kind}.jpg`;
   const namedPath = path.join(dir, named);
-  if (fs.existsSync(namedPath)) return `films/${film}/out/animations/${sceneName}/${named}`;
+  if (fs.existsSync(namedPath))
+    return `films/${film}/out/animations/${sceneName}/${named}`;
   if (kind === "end") {
     const legacy = path.join(dir, `part-${part}.jpg`);
-    if (fs.existsSync(legacy)) return `films/${film}/out/animations/${sceneName}/part-${part}.jpg`;
+    if (fs.existsSync(legacy))
+      return `films/${film}/out/animations/${sceneName}/part-${part}.jpg`;
   }
   const clip = path.join(dir, `part-${part}.mp4`);
   if (fs.existsSync(clip) && extractFrame(clip, namedPath, kind === "start")) {
@@ -264,9 +298,10 @@ export interface FilmVideo {
 
 export function filmVideo(film: string): FilmVideo | null {
   const dir = animationsDir(film);
-  const file = "film.mpeg";
+  const file = "film.mp4";
   const thumb = "film-thumb.jpg";
-  return fs.existsSync(path.join(dir, file)) && fs.existsSync(path.join(dir, thumb))
+  return fs.existsSync(path.join(dir, file)) &&
+    fs.existsSync(path.join(dir, thumb))
     ? { file, thumb }
     : null;
 }
@@ -275,6 +310,8 @@ export interface SegmentVideo {
   part: number;
   video: string;
   thumb: string | null;
+  startThumb: string | null;
+  endThumb: string | null;
 }
 
 export interface SceneVideos {
@@ -296,14 +333,29 @@ export function sceneVideos(film: string, name: string): SceneVideos {
   const segments: SegmentVideo[] = [];
   for (const file of files) {
     const match = file.match(/^part-(\d+)\.mp4$/);
-    if (match) segments.push({ part: Number(match[1]), video: file, thumb: pickThumb(files, `part-${match[1]}`) });
+    if (match) {
+      const base = `part-${match[1]}`;
+      segments.push({
+        part: Number(match[1]),
+        video: file,
+        thumb: pickThumb(files, base),
+        startThumb: files.has(`${base}-start.jpg`) ? `${base}-start.jpg` : null,
+        endThumb: files.has(`${base}-end.jpg`) ? `${base}-end.jpg` : null,
+      });
+    }
   }
   segments.sort((a, b) => a.part - b.part);
-  const full = files.has("full.mp4") ? { thumb: pickThumb(files, "part-0") } : null;
+  const full = files.has("full.mp4")
+    ? { thumb: pickThumb(files, "part-0") }
+    : null;
   return { full, segments };
 }
 
-export function animationFileUrl(film: string, name: string, file: string): string {
+export function animationFileUrl(
+  film: string,
+  name: string,
+  file: string,
+): string {
   return `/api/animation/${film}/${name}/${file}`;
 }
 
@@ -311,6 +363,10 @@ export function filmAnimationFileUrl(film: string, file: string): string {
   return `/api/animation/${film}/${file}`;
 }
 
-export function blueprintImageUrl(film: string, relDir: string, file: string): string {
+export function blueprintImageUrl(
+  film: string,
+  relDir: string,
+  file: string,
+): string {
   return `/api/blueprint-image/${film}/${relDir}/${file}`;
 }

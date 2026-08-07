@@ -9,6 +9,7 @@ movie:
     heavy vignette, soft-focus dark foreground occlusion on 20-30% of the frame
     borders, film grain.
   camera_rules: "Keep the camera at rodent eye-level (2-12 inches high) around a single dominant practical light source."
+  orientation: "16:9"
   hard_direction_rules:
     - "Camera height stays at rodent eye-level (2-12 inches above ground) unless a shot is deliberately a predator POV. Environments dominate ~70% of frame volume; characters occupy the lower third."
     - "Every shot orbits a single identifiable practical light source (candle, lantern, amulet glow, moonlight shaft). 60-70% of the frame sits in deep shadow."

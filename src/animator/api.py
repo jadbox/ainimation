@@ -23,7 +23,6 @@ from animator.config import (
     CONTINUITY_MESSAGE,
     DEFAULT_VIDEO_MODEL,
     POLL_INTERVAL_SECONDS,
-    get_aspect_ratio,
 )
 from animator.provider import VideoProvider, VideoRequest
 
@@ -119,7 +118,11 @@ class GeminiVideoProvider(VideoProvider):
         t0 = time.monotonic()
         input_items = build_gemini_input_items(request)
         interaction = create_video_interaction(
-            self._client, self.model, input_items, request.duration
+            self._client,
+            self.model,
+            input_items,
+            request.duration,
+            request.aspect_ratio,
         )
         interaction = wait_for_completion(self._client, interaction, timeout)
         video = extract_video_bytes(interaction)
@@ -135,11 +138,12 @@ def create_video_interaction(
     model: str,
     input_items: list[dict[str, Any]],
     duration: int,
+    aspect_ratio: str,
 ) -> Any:
     """Request the video from Omni Flash, falling back to a minimal request.
 
     The full request asks for the reference_to_video task with an inline
-    video response matching the configured ASPECT orientation; if the API
+    video response matching the request's aspect ratio; if the API
     rejects those parameters, retry with just the model and input.
     """
     logger.info("Requesting video generation from model=%s ...", model)
@@ -155,7 +159,7 @@ def create_video_interaction(
             },
             response_format={
                 "type": "video",
-                "aspect_ratio": get_aspect_ratio(),
+                "aspect_ratio": aspect_ratio,
                 "delivery": "inline",
                 "duration": f"{duration}s",
             },

@@ -11,6 +11,9 @@ import yaml
 
 from films import film_movie_yml, resolve_film
 
+DEFAULT_ORIENTATION = "16:9"
+"""Default film orientation (aspect ratio) when movie.yml omits ``orientation``."""
+
 
 def standardize_name(name: str) -> str:
     """Standardize a character name to ALL CAPS with no punctuation marks."""
@@ -28,6 +31,7 @@ class MovieInfo:
     style_summary: str
     camera_rules: str
     hard_direction_rules: tuple[str, ...]
+    orientation: str = DEFAULT_ORIENTATION
 
 
 @dataclass(frozen=True)
@@ -107,6 +111,7 @@ def load_movie_config(
         style_summary=movie_raw.get("style_summary", ""),
         camera_rules=movie_raw.get("camera_rules", ""),
         hard_direction_rules=tuple(movie_raw.get("hard_direction_rules", [])),
+        orientation=movie_raw.get("orientation", DEFAULT_ORIENTATION),
     )
 
     characters: dict[str, CharacterSpec] = {}

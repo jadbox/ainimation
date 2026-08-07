@@ -426,12 +426,24 @@ class MiniMaxVideoProvider(VideoProvider):
                     }
                 )
 
+        has_images = bool(
+            request.continuity_frame is not None
+            or request.closing_frame is not None
+            or request.character_references
+            or request.background_reference is not None
+        )
+        ratio = request.aspect_ratio
+        if not has_images and (not ratio or ratio == "adaptive"):
+            # MiniMax requires a concrete ratio (never 'adaptive') for
+            # text-to-video, where no image input determines the framing.
+            ratio = DEFAULT_ASPECT_RATIO
+
         payload: dict[str, Any] = {
             "model": self.model,
             "content": content,
             "duration": request.duration,
             "resolution": self.resolution,
-            "ratio": request.aspect_ratio,
+            "ratio": ratio,
         }
         payload.update(request.extra)
         return payload

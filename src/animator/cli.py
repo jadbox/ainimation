@@ -10,6 +10,7 @@ from pathlib import Path
 import requests
 
 from animator.config import (
+    DEFAULT_ASPECT_RATIO,
     DEFAULT_DURATION_SECONDS,
     DEFAULT_MINIMAX_VIDEO_MODEL,
     DEFAULT_OPENROUTER_VIDEO_MODEL,
@@ -19,7 +20,6 @@ from animator.config import (
     DEFAULT_VIDEO_PROVIDER,
     FULL_VIDEO_NAME,
     VIDEO_PROVIDERS,
-    get_aspect_ratio,
 )
 from animator.media import (
     combine_parts,
@@ -259,6 +259,7 @@ def run(args: argparse.Namespace) -> int:
 
         for segment in pending:
             movie_info = get_movie_info()
+            aspect_ratio = (movie_info.orientation or DEFAULT_ASPECT_RATIO).strip() or DEFAULT_ASPECT_RATIO
             part_script_path = prompt_path(scene_dir, segment.index)
             logger.info(
                 "=== Generating movie=%s film=%s scene=%s part=%d (final part "
@@ -316,7 +317,7 @@ def run(args: argparse.Namespace) -> int:
                 closing_frame=closing_frame,
                 duration=args.duration,
                 resolution=DEFAULT_RESOLUTION,
-                aspect_ratio=get_aspect_ratio(),
+                aspect_ratio=aspect_ratio,
             )
             video_bytes = provider_obj.generate(request, args.timeout)
             destination = part_path(scene_dir, segment)

@@ -22,7 +22,7 @@ This project automates the multi-stage visual development and animation generati
 All movie-specific information — art style, character rosters, scene definitions, and hard direction rules — is defined externally, per film, under `films/<film>/`. The tools themselves carry no film-specific style or aesthetic:
 
 * **`films/<film>/movie.yml`**: Machine-readable configuration for one film. Contains:
-  * **Movie metadata**: Title, adaptation description, style description, style summary, and camera rules.
+  * **Movie metadata**: Title, adaptation description, style description, style summary, camera rules, and orientation (output aspect ratio, e.g. `orientation: "16:9"`; defaults to `16:9`). All video providers render at this aspect ratio.
   * **Hard direction rules**: List of strict visual/lighting/animation mandates passed into system instructions.
   * **Characters**: List of characters (`name`, `species`, `identity`, `appearance`, `voice`, `avoid`).
   * **Scenes**: List of scene locations (`name`, `slug`, `logline`, `backgrounds`).

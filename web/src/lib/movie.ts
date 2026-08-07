@@ -164,3 +164,39 @@ export function blueprintCommand(target: { character?: string; scene?: string })
 export function hasAnimation(name: string): boolean {
   return fs.existsSync(path.join(ANIMATIONS_DIR, name, "full.mp4"));
 }
+
+export interface SegmentVideo {
+  part: number;
+  video: string;
+  thumb: string | null;
+}
+
+export interface SceneVideos {
+  full: { thumb: string | null } | null;
+  segments: SegmentVideo[];
+}
+
+function pickThumb(files: Set<string>, base: string): string | null {
+  if (files.has(`${base}-end.jpg`)) return `${base}-end.jpg`;
+  if (files.has(`${base}.jpg`)) return `${base}.jpg`;
+  return null;
+}
+
+export function sceneVideos(name: string): SceneVideos {
+  const dir = path.join(ANIMATIONS_DIR, name);
+  const empty: SceneVideos = { full: null, segments: [] };
+  if (!fs.existsSync(dir)) return empty;
+  const files = new Set(fs.readdirSync(dir));
+  const segments: SegmentVideo[] = [];
+  for (const part of [0, 1, 2]) {
+    const video = `part-${part}.mp4`;
+    if (!files.has(video)) continue;
+    segments.push({ part, video, thumb: pickThumb(files, `part-${part}`) });
+  }
+  const full = files.has("full.mp4") ? { thumb: pickThumb(files, "part-0") } : null;
+  return { full, segments };
+}
+
+export function animationFileUrl(name: string, file: string): string {
+  return `/api/animation/${name}/${file}`;
+}

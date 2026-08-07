@@ -1,0 +1,108 @@
+---
+import Layout from "../../layouts/Base.astro";
+import { animationFileUrl, loadMovie, sceneVideos } from "../../lib/movie";
+
+export const prerender = false;
+
+const slug = Astro.params.slug ?? "";
+const partMatch = slug.match(/^(.+)_part_(\d+)$/);
+const sceneName = partMatch ? partMatch[1] : slug;
+const part = partMatch ? Number(partMatch[2]) : null;
+
+const movie = loadMovie();
+const story = movie.story.find((s) => s.name === sceneName);
+if (!story) {
+  return Astro.redirect("/");
+}
+
+const videos = sceneVideos(sceneName);
+const current =
+  part === null
+    ? videos.full && { file: "full.mp4", thumb: videos.full.thumb, label: "Full scene" }
+    : videos.segments.find((s) => s.part === part) && {
+        file: `part-${part}.mp4`,
+        thumb: videos.segments.find((s) => s.part === part)!.thumb,
+        label: `Part ${part}`,
+      };
+
+if (!current) {
+  return Astro.redirect("/");
+}
+
+const videoUrl = animationFileUrl(sceneName, current.file);
+const posterUrl = current.thumb ? animationFileUrl(sceneName, current.thumb) : undefined;
+
+const related = [
+  ...(videos.full
+    ? [{ href: `/video/${sceneName}`, label: "Full", thumb: videos.full.thumb, active: part === null }]
+    : []),
+  ...videos.segments.map((s) => ({
+    href: `/video/${sceneName}_part_${s.part}`,
+    label: `Part ${s.part}`,
+    thumb: s.thumb,
+    active: part === s.part,
+  })),
+];
+---
+
+<Layout title={`${story.title} · ${current.label}`}>
+  <nav class="mb-4">
+    <a
+      href="/"
+      class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-muted ring-1 ring-line hover:text-amber-soft hover:ring-amber-key/40 transition-colors"
+    >
+      &larr; Back
+    </a>
+  </nav>
+
+  <div class="mb-6">
+    <h1 class="font-display text-3xl text-amber-soft">{story.title}</h1>
+    <p class="mt-1 font-mono text-sm text-muted">
+      {sceneName} · {current.label.toLowerCase()} · out/animations/{sceneName}/{current.file}
+    </p>
+  </div>
+
+  <figure class="overflow-hidden rounded-xl border border-line bg-panel shadow-lg shadow-black/30">
+    <video controls class="w-full" src={videoUrl} poster={posterUrl}></video>
+  </figure>
+
+  {related.length > 1 && (
+    <section class="mt-6">
+      <h2 class="mb-2 text-xs font-medium uppercase tracking-wider text-muted">All videos</h2>
+      <div class="flex flex-wrap gap-3">
+        {related.map((r) => (
+          <a
+            href={r.href}
+            class:list={[
+              "group block w-40 overflow-hidden rounded-lg ring-1 transition",
+              r.active
+                ? "ring-amber-key/60"
+                : "ring-line hover:ring-amber-key/40",
+            ]}
+            title={r.label}
+          >
+            {r.thumb ? (
+              <img
+                src={animationFileUrl(sceneName, r.thumb)}
+                alt={`${story.title} ${r.label}`}
+                class="aspect-video w-full object-cover"
+              />
+            ) : (
+              <div class="flex aspect-video w-full items-center justify-center bg-ink/60 text-xs text-muted">
+                no thumb
+              </div>
+            )}
+            <span
+              class:list={[
+                "block px-2 py-1 text-[10px] uppercase tracking-wide",
+                r.active ? "bg-amber-key/15 text-amber-soft" : "bg-panel-2 text-muted group-hover:text-amber-soft",
+              ]}
+            >
+              {r.label}
+            </span>
+          </a>
+        ))}
+      </div>
+    </section>
+  )}
+</Layout>

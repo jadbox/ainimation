@@ -2,12 +2,14 @@
 import Layout from "../layouts/Base.astro";
 import CLITerminal from "../components/CLITerminal.astro";
 import {
+  animationFileUrl,
   animatorCommand,
   backgroundBlueprintDir,
   blueprintInfo,
   hasAnimation,
   hasBlueprint,
   loadMovie,
+  sceneVideos,
   scriptStatus,
   slugify,
 } from "../lib/movie";
@@ -30,6 +32,7 @@ const rows = movie.story.map((story, index) => {
     blueprints,
     blueprintsDone: blueprints.filter((b) => b.ready).length,
     animated: hasAnimation(story.name),
+    videos: sceneVideos(story.name),
     scene: movie.scenes.find((s) => s.slug === story.scene),
     location: sceneNameBySlug.get(story.scene) ?? story.scene,
     command: animatorCommand(story.name),
@@ -62,6 +65,7 @@ const rows = movie.story.map((story, index) => {
           <th class="px-4 py-3 font-medium">Characters</th>
           <th class="px-4 py-3 font-medium">Scripts</th>
           <th class="px-4 py-3 font-medium">Blueprints</th>
+          <th class="px-4 py-3 font-medium">Videos</th>
           <th class="px-4 py-3 font-medium text-right">Actions</th>
         </tr>
       </thead>
@@ -171,6 +175,52 @@ const rows = movie.story.map((story, index) => {
                 <div class="mt-1 text-xs text-muted">
                   {row.blueprintsDone}/{row.blueprints.length}
                 </div>
+              </td>
+              <td class="px-4 py-3">
+                {row.videos.full === null && row.videos.segments.length === 0 ? (
+                  <span class="text-xs text-muted/70">none</span>
+                ) : (
+                  <div class="flex items-center gap-2">
+                    {row.videos.full && (
+                      <a
+                        href={`/video/${row.story.name}`}
+                        title={`Full scene · out/animations/${row.story.name}/full.mp4`}
+                        class="relative block w-20 overflow-hidden rounded-md ring-1 ring-line transition hover:ring-amber-key/50"
+                      >
+                        {row.videos.full.thumb ? (
+                          <img
+                            src={animationFileUrl(row.story.name, row.videos.full.thumb)}
+                            alt={`Full scene ${row.story.name}`}
+                            class="aspect-video w-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <span class="flex aspect-video w-full items-center justify-center bg-ink/60 text-[9px] text-muted">full</span>
+                        )}
+                        <span class="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[8px] uppercase tracking-wide text-amber-soft">full</span>
+                      </a>
+                    )}
+                    {row.videos.segments.map((seg) => (
+                      <a
+                        href={`/video/${row.story.name}_part_${seg.part}`}
+                        title={`Part ${seg.part} · out/animations/${row.story.name}/${seg.video}`}
+                        class="relative block w-20 overflow-hidden rounded-md ring-1 ring-line transition hover:ring-amber-key/50"
+                      >
+                        {seg.thumb ? (
+                          <img
+                            src={animationFileUrl(row.story.name, seg.thumb)}
+                            alt={`Part ${seg.part} ${row.story.name}`}
+                            class="aspect-video w-full object-cover"
+                            loading="lazy"
+                          />
+                        ) : (
+                          <span class="flex aspect-video w-full items-center justify-center bg-ink/60 text-[9px] text-muted">p{seg.part}</span>
+                        )}
+                        <span class="absolute bottom-0 right-0 rounded-tl bg-black/70 px-1 text-[8px] text-teal-shadow">p{seg.part}</span>
+                      </a>
+                    ))}
+                  </div>
+                )}
               </td>
               <td class="px-4 py-3">
                 <div class="flex flex-col items-end gap-1.5">

@@ -3,3 +3,7 @@ __pycache__/
 *.py[cod]
 mrages/
 out/*
+
+web/node_modules/
+web/dist/
+web/.astro/

@@ -1,0 +1,154 @@
+---
+import { marked } from "marked";
+import Layout from "../../layouts/Base.astro";
+import {
+  animatorCommand,
+  loadMovie,
+  readScript,
+} from "../../lib/movie";
+
+export const prerender = false;
+
+const name = Astro.params.name ?? "";
+const movie = loadMovie();
+const story = movie.story.find((s) => s.name === name);
+
+if (!story) {
+  return Astro.redirect("/");
+}
+
+const location = movie.scenes.find((s) => s.slug === story.scene);
+const scripts = [0, 1, 2].map((part) => readScript(name, part));
+const missing = scripts.map((s, i) => (s === null ? i : -1)).filter((i) => i >= 0);
+const command = animatorCommand(name);
+
+marked.setOptions({ gfm: true, breaks: false });
+
+const rendered = scripts.map((s) => (s === null ? null : marked.parse(s)));
+const timeRanges = ["0:00–0:10", "0:10–0:20", "0:20–0:30"];
+---
+
+<Layout title={story.title}>
+  <nav class="mb-4 text-sm text-muted">
+    <a href="/" class="hover:text-amber-soft transition-colors">&larr; All scenes</a>
+  </nav>
+
+  <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <h1 class="font-display text-3xl text-amber-soft">{story.title}</h1>
+      <p class="mt-1 font-mono text-sm text-muted">{story.name}</p>
+      <div class="mt-3 flex flex-wrap items-center gap-2 text-xs">
+        {location && (
+          <span class="rounded-full bg-panel-2 px-2.5 py-1 text-slate-300 ring-1 ring-line">
+            {location.name}
+          </span>
+        )}
+        {story.characters.map((c) => (
+          <span class="rounded-full bg-teal-shadow/10 px-2.5 py-1 text-teal-shadow ring-1 ring-teal-shadow/25">
+            {c}
+          </span>
+        ))}
+      </div>
+    </div>
+    <button
+      type="button"
+      id="copy-cmd"
+      data-command={command}
+      class="rounded-md px-3 py-2 text-xs font-mono text-teal-shadow ring-1 ring-teal-shadow/30 hover:bg-teal-shadow/10 transition-colors"
+      title={command}
+    >
+      copy animator cmd
+    </button>
+  </div>
+
+  {
+    missing.length > 0 && (
+      <div class="mb-6 rounded-lg border border-amber-key/40 bg-amber-key/10 px-4 py-3 text-sm text-amber-soft">
+        Part {missing.map((m) => m + 1).join(" and ")}{" "}
+        {missing.length > 1 ? "are" : "is"} missing. Generate{" "}
+        {missing.length > 1 ? "them" : "it"} from the{" "}
+        <a href="/" class="underline hover:text-amber-key">
+          scenes table
+        </a>{" "}
+        or run <code class="text-teal-shadow">uv run scriptgen --name {story.name}</code>.
+      </div>
+    )
+  }
+
+  <div class="grid gap-6 lg:grid-cols-[220px_1fr]">
+    <aside class="lg:sticky lg:top-24 lg:self-start">
+      <h2 class="mb-2 text-xs font-medium uppercase tracking-wider text-muted">Index</h2>
+      <ol class="space-y-1 text-sm">
+        {scripts.map((s, i) => (
+          <li>
+            <a
+              href={s === null ? undefined : `#part-${i}`}
+              class:list={[
+                "block rounded-md px-3 py-2 transition-colors",
+                s === null
+                  ? "cursor-default text-muted/60"
+                  : "text-slate-300 hover:bg-panel-2 hover:text-amber-soft",
+              ]}
+            >
+              <span class="block text-xs text-muted">
+                Part {i} · {timeRanges[i]}
+              </span>
+              {s === null ? <em>missing</em> : <span>Segment {i} script</span>}
+            </a>
+          </li>
+        ))}
+      </ol>
+      <div class="mt-4 border-t border-line pt-4 text-xs text-muted leading-relaxed">
+        Each part is a 10-second segment prompt document consumed by{" "}
+        <code class="text-teal-shadow">animator</code>.
+      </div>
+    </aside>
+
+    <div class="space-y-8">
+      {scripts.map((s, i) => (
+        <section
+          id={`part-${i}`}
+          class="scroll-mt-24 rounded-xl border border-line bg-panel shadow-lg shadow-black/30"
+        >
+          <header class="flex items-center justify-between border-b border-line px-5 py-3">
+            <h2 class="font-display text-lg text-amber-soft">
+              Part {i} <span class="ml-2 text-xs font-normal text-muted">{timeRanges[i]}</span>
+            </h2>
+            <span class="font-mono text-xs text-muted">
+              {story.name}_part{i}.md
+            </span>
+          </header>
+          {s === null ? (
+            <p class="px-5 py-6 text-sm text-muted italic">
+              Script not generated yet.
+            </p>
+          ) : (
+            <div class="script-body px-5 py-4 text-sm text-slate-300" set:html={rendered[i]} />
+          )}
+        </section>
+      ))}
+    </div>
+  </div>
+</Layout>
+
+<script>
+  const btn = document.getElementById("copy-cmd") as HTMLButtonElement | null;
+  btn?.addEventListener("click", async () => {
+    const text = btn.dataset.command ?? "";
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+    const original = btn.textContent;
+    btn.textContent = "copied!";
+    setTimeout(() => (btn.textContent = original), 1200);
+  });
+</script>

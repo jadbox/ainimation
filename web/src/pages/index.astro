@@ -1,0 +1,382 @@
+---
+import Layout from "../layouts/Base.astro";
+import {
+  animatorCommand,
+  backgroundBlueprintDir,
+  blueprintInfo,
+  hasAnimation,
+  hasBlueprint,
+  loadMovie,
+  scriptStatus,
+  slugify,
+} from "../lib/movie";
+
+const movie = loadMovie();
+const sceneNameBySlug = new Map(movie.scenes.map((s) => [s.slug, s.name]));
+
+const rows = movie.story.map((story, index) => {
+  const parts = scriptStatus(story.name);
+  const blueprintSubjects = [...story.characters, story.scene];
+  const blueprints = blueprintSubjects.map((subject) => ({
+    subject,
+    ready: hasBlueprint(subject),
+  }));
+  return {
+    index,
+    story,
+    parts,
+    partsDone: parts.filter(Boolean).length,
+    blueprints,
+    blueprintsDone: blueprints.filter((b) => b.ready).length,
+    animated: hasAnimation(story.name),
+    scene: movie.scenes.find((s) => s.slug === story.scene),
+    location: sceneNameBySlug.get(story.scene) ?? story.scene,
+    command: animatorCommand(story.name),
+  };
+});
+---
+
+<Layout title="Scenes">
+  <div class="mb-6 flex flex-wrap items-end justify-between gap-3">
+    <div>
+      <h1 class="font-display text-2xl text-amber-soft">Story Scenes</h1>
+      <p class="mt-1 text-sm text-muted">
+        {movie.story.length} scene(s) from <code class="text-teal-shadow">movie.yml</code> ·
+        scripts live in <code class="text-teal-shadow">out/scripts/</code>
+      </p>
+    </div>
+    <p class="text-xs text-muted max-w-md">
+      Generate scripts with <code class="text-teal-shadow">scriptgen</code>, then copy the
+      <code class="text-teal-shadow">animator</code> command to run video generation in your terminal.
+    </p>
+  </div>
+
+  <div class="overflow-x-auto rounded-xl border border-line bg-panel shadow-lg shadow-black/30">
+    <table class="w-full min-w-[720px] text-sm">
+      <thead>
+        <tr class="border-b border-line text-left text-xs uppercase tracking-wider text-muted">
+          <th class="px-4 py-3 font-medium w-10">#</th>
+          <th class="px-4 py-3 font-medium">Scene</th>
+          <th class="px-4 py-3 font-medium">Location</th>
+          <th class="px-4 py-3 font-medium">Characters</th>
+          <th class="px-4 py-3 font-medium">Scripts</th>
+          <th class="px-4 py-3 font-medium">Blueprints</th>
+          <th class="px-4 py-3 font-medium text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          rows.map((row) => (
+            <tr
+              class="border-b border-line/60 last:border-b-0 hover:bg-panel-2/60 transition-colors"
+              data-scene={row.story.name}
+            >
+              <td class="px-4 py-3 text-muted">{row.index}</td>
+              <td class="px-4 py-3">
+                <div class="flex items-center gap-2">
+                  <span class="font-display text-base text-slate-100">{row.story.title}</span>
+                  {row.animated && (
+                    <span
+                      class="rounded-full bg-teal-shadow/10 px-2 py-0.5 text-[10px] uppercase tracking-wide text-teal-shadow ring-1 ring-teal-shadow/30"
+                      title={`out/animations/${row.story.name}/full.mp4 exists`}
+                    >
+                      video
+                    </span>
+                  )}
+                </div>
+                <div class="font-mono text-xs text-muted">{row.story.name}</div>
+              </td>
+              <td class="px-4 py-3">
+                <div class="text-slate-300">{row.location}</div>
+                {(() => {
+                  const scene = row.scene;
+                  if (!scene) return null;
+                  return (
+                    <div class="mt-1 flex flex-wrap gap-1">
+                      {scene.backgrounds.map((bg) => {
+                        const ready =
+                          blueprintInfo(backgroundBlueprintDir(scene.slug, bg.key)).latest !== null;
+                        return (
+                          <a
+                            href={`/blueprint/${slugify(scene.slug)}/${slugify(bg.key)}`}
+                            title={`out/blueprint/${slugify(scene.slug)}/${slugify(bg.key)}`}
+                            class:list={[
+                              "rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide ring-1 transition-colors",
+                              ready
+                                ? "text-teal-shadow ring-teal-shadow/30 hover:bg-teal-shadow/10"
+                                : "text-muted ring-line hover:text-amber-soft hover:ring-amber-key/40",
+                            ]}
+                          >
+                            {ready ? "view design" : "create design"}
+                          </a>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex flex-wrap gap-2">
+                  {row.story.characters.map((c) => (
+                    <span class="flex items-center gap-1.5">
+                      <span class="rounded-full bg-teal-shadow/10 px-2 py-0.5 text-xs text-teal-shadow ring-1 ring-teal-shadow/25">
+                        {c}
+                      </span>
+                      <a
+                        href={`/blueprint/${slugify(c)}`}
+                        title={`out/blueprint/${slugify(c)}`}
+                        class:list={[
+                          "rounded-full px-2 py-0.5 text-[10px] uppercase tracking-wide ring-1 transition-colors",
+                          hasBlueprint(c)
+                            ? "text-teal-shadow ring-teal-shadow/30 hover:bg-teal-shadow/10"
+                            : "text-muted ring-line hover:text-amber-soft hover:ring-amber-key/40",
+                        ]}
+                      >
+                        {hasBlueprint(c) ? "view design" : "create design"}
+                      </a>
+                    </span>
+                  ))}
+                </div>
+              </td>
+              <td class="px-4 py-3" data-status>
+                {row.partsDone === 3 ? (
+                  <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-300 ring-1 ring-emerald-400/30">
+                    <span class="h-1.5 w-1.5 rounded-full bg-emerald-400" /> 3/3 ready
+                  </span>
+                ) : row.partsDone > 0 ? (
+                  <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-key/10 px-2.5 py-1 text-xs text-amber-soft ring-1 ring-amber-key/30">
+                    <span class="h-1.5 w-1.5 rounded-full bg-amber-key" /> {row.partsDone}/3 parts
+                  </span>
+                ) : (
+                  <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-500/10 px-2.5 py-1 text-xs text-muted ring-1 ring-slate-400/20">
+                    <span class="h-1.5 w-1.5 rounded-full bg-slate-500" /> none
+                  </span>
+                )}
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex flex-wrap gap-1" title={row.blueprints.map((b) => `${b.subject}: ${b.ready ? "ready" : "missing"}`).join("\n")}>
+                  {row.blueprints.map((b) => (
+                    <span
+                      class:list={[
+                        "h-2.5 w-2.5 rounded-full ring-1",
+                        b.ready
+                          ? "bg-emerald-400/80 ring-emerald-300/50"
+                          : "bg-slate-600/60 ring-slate-500/40",
+                      ]}
+                      title={`${b.subject}: ${b.ready ? "ready" : "missing"}`}
+                    />
+                  ))}
+                </div>
+                <div class="mt-1 text-xs text-muted">
+                  {row.blueprintsDone}/{row.blueprints.length}
+                </div>
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex flex-col items-end gap-1.5">
+                  <div class="flex items-center justify-end gap-2">
+                  {row.partsDone === 3 ? (
+                    <a
+                      href={`/scene/${row.story.name}`}
+                      class="rounded-md bg-amber-key/15 px-3 py-1.5 text-xs font-medium text-amber-soft ring-1 ring-amber-key/40 hover:bg-amber-key/25 transition-colors"
+                    >
+                      View scripts
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      data-action="generate"
+                      data-name={row.story.name}
+                      data-force={row.partsDone > 0 ? "true" : "false"}
+                      title={row.partsDone > 0 ? "scriptgen rewrites all three parts (--force)" : "Run uv run scriptgen --name " + row.story.name}
+                      class="rounded-md bg-amber-key/15 px-3 py-1.5 text-xs font-medium text-amber-soft ring-1 ring-amber-key/40 hover:bg-amber-key/25 transition-colors"
+                    >
+                      {row.partsDone > 0 ? "Regenerate scripts" : "Create scripts"}
+                    </button>
+                  )}
+                  {row.partsDone === 3 && (
+                    <button
+                      type="button"
+                      data-action="regenerate"
+                      data-name={row.story.name}
+                      title="Regenerate all three scripts (--force)"
+                      class="rounded-md px-2 py-1.5 text-xs text-muted ring-1 ring-line hover:text-amber-soft hover:ring-amber-key/40 transition-colors"
+                    >
+                      Regen
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    data-action="copy"
+                    data-command={row.command}
+                    title={row.command}
+                    class="rounded-md px-3 py-1.5 text-xs font-mono text-teal-shadow ring-1 ring-teal-shadow/30 hover:bg-teal-shadow/10 transition-colors"
+                  >
+                    copy animator cmd
+                  </button>
+                  </div>
+                  {row.partsDone === 3 && row.blueprintsDone === row.blueprints.length && (
+                    <span
+                      class="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[10px] uppercase tracking-wide text-emerald-300 ring-1 ring-emerald-400/30"
+                      title="All scripts and blueprints are ready"
+                    >
+                      ready
+                    </span>
+                  )}
+                </div>
+              </td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <div
+    id="run-modal"
+    class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Script generation output"
+  >
+    <div class="flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border border-line bg-panel shadow-2xl">
+      <div class="flex items-center justify-between border-b border-line px-5 py-3">
+        <h2 class="font-display text-amber-soft">
+          Running <span id="run-title" class="font-mono text-sm text-teal-shadow"></span>
+        </h2>
+        <div class="flex items-center gap-2">
+          <span id="run-state" class="text-xs text-muted">starting…</span>
+          <button
+            type="button"
+            id="run-cancel"
+            class="rounded-md px-3 py-1 text-xs text-rose-300 ring-1 ring-rose-400/40 hover:bg-rose-500/10 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            id="run-close"
+            class="hidden rounded-md bg-amber-key/15 px-3 py-1 text-xs text-amber-soft ring-1 ring-amber-key/40 hover:bg-amber-key/25 transition-colors"
+          >
+            Close
+          </button>
+        </div>
+      </div>
+      <pre
+        id="run-log"
+        class="flex-1 overflow-auto whitespace-pre-wrap break-words bg-ink/80 px-5 py-4 font-mono text-xs leading-relaxed text-slate-300"
+      ></pre>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  const modal = document.getElementById("run-modal") as HTMLDivElement;
+  const logEl = document.getElementById("run-log") as HTMLPreElement;
+  const titleEl = document.getElementById("run-title") as HTMLSpanElement;
+  const stateEl = document.getElementById("run-state") as HTMLSpanElement;
+  const cancelBtn = document.getElementById("run-cancel") as HTMLButtonElement;
+  const closeBtn = document.getElementById("run-close") as HTMLButtonElement;
+  let aborter: AbortController | null = null;
+
+  function openModal(command: string) {
+    titleEl.textContent = command;
+    logEl.textContent = "";
+    stateEl.textContent = "starting…";
+    cancelBtn.classList.remove("hidden");
+    closeBtn.classList.add("hidden");
+    modal.classList.remove("hidden");
+    modal.classList.add("flex");
+  }
+
+  function closeModal() {
+    modal.classList.add("hidden");
+    modal.classList.remove("flex");
+  }
+
+  async function copyText(text: string, button: HTMLButtonElement) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+    const original = button.textContent;
+    button.textContent = "copied!";
+    button.classList.add("bg-teal-shadow/20");
+    setTimeout(() => {
+      button.textContent = original;
+      button.classList.remove("bg-teal-shadow/20");
+    }, 1200);
+  }
+
+  async function runScriptgen(name: string, force: boolean) {
+    const command = `uv run scriptgen --name ${name}${force ? " --force" : ""}`;
+    openModal(command);
+    aborter = new AbortController();
+    let succeeded = false;
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, force }),
+        signal: aborter.signal,
+      });
+      if (!res.ok || !res.body) {
+        const detail = await res.text().catch(() => "");
+        logEl.textContent += `\n[http ${res.status}] ${detail}\n`;
+        stateEl.textContent = "failed";
+        return;
+      }
+      stateEl.textContent = "running…";
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        logEl.textContent += decoder.decode(value, { stream: true });
+        logEl.scrollTop = logEl.scrollHeight;
+        const exitMatch = logEl.textContent.match(/\[exit:(\d+)\]\s*$/);
+        if (exitMatch) succeeded = exitMatch[1] === "0";
+      }
+      stateEl.textContent = succeeded ? "done" : "failed";
+    } catch (err) {
+      if ((err as Error).name === "AbortError") {
+        stateEl.textContent = "cancelled";
+      } else {
+        logEl.textContent += `\n[error] ${(err as Error).message}\n`;
+        stateEl.textContent = "failed";
+      }
+    } finally {
+      cancelBtn.classList.add("hidden");
+      closeBtn.classList.remove("hidden");
+      if (succeeded) {
+        setTimeout(() => location.reload(), 600);
+      }
+    }
+  }
+
+  document.addEventListener("click", (event) => {
+    const target = (event.target as HTMLElement).closest<HTMLButtonElement>("[data-action]");
+    if (!target) return;
+    const action = target.dataset.action;
+    if (action === "copy" && target.dataset.command) {
+      void copyText(target.dataset.command, target);
+    } else if (action === "generate" && target.dataset.name) {
+      void runScriptgen(target.dataset.name, target.dataset.force === "true");
+    } else if (action === "regenerate" && target.dataset.name) {
+      void runScriptgen(target.dataset.name, true);
+    }
+  });
+
+  cancelBtn.addEventListener("click", () => aborter?.abort());
+  closeBtn.addEventListener("click", closeModal);
+  modal.addEventListener("click", (event) => {
+    if (event.target === modal && !closeBtn.classList.contains("hidden")) closeModal();
+  });
+</script>

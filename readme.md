@@ -126,19 +126,23 @@ Expands an abridged story scene from the `story:` section of the film's `movie.y
   # List the story scenes available for --name
   uv run scriptgen
 
-  # Expand a story scene into segment prompt documents (writes part 0, 1, and 2)
-  uv run scriptgen --name <story_scene_name>
+   # Expand a story scene into three 10-second prompt documents (the default)
+   uv run scriptgen --name <story_scene_name>
+
+   # Expand a story scene into five 10-second prompt documents
+   uv run scriptgen --name <story_scene_name> --parts 5
   ```
 
 * **Key Options**:
   * `--film SLUG`: Film folder under `films/<slug>/` to use (default: first film found, or `$FILM`).
-  * `--name NAME`: Story scene name from the `story:` section of the film's `movie.yml` (written to `films/<film>/out/scripts/<name>_part0.md`, etc.). Omit to list all available story scenes.
+   * `--name NAME`: Story scene name from the `story:` section of the film's `movie.yml` (written to `films/<film>/out/scripts/<name>_part0.md`, etc.). Omit to list all available story scenes.
+   * `--parts N`: Number of 10-second scene parts to generate (1-10, default: 3).
   * `--model MODEL`: OpenRouter model slug used to expand the scene (default: `qwen/qwen3.8-max`). The shortcut `gemini` maps to `google/gemini-3.6-flash` on OpenRouter. Requires `OPENROUTER_API_KEY`.
   * `-v` / `--verbose`: Stream the LLM output from OpenRouter (reasoning/thinking plus final content) as it is generated.
   * `--output PATH`: Custom output file or directory base path.
   * `--force`: Overwrite existing scripts if they already exist.
 
-* **Sequential Per-Part Generation**: the three 10-second segments are generated one at a time in order. Part 0 also establishes the shared sections (title, logline, characters, setting & light). Each later part is prompted with the previous segment's saved content embedded as a `<REFERENCE>` block so blocking, composition, and lighting continue seamlessly. Reasoning effort for the default model is set to `medium` to limit excessive "thinking" time.
+* **Sequential Per-Part Generation**: the selected number of 10-second segments are generated one at a time in order. Part 0 also establishes the shared sections (title, logline, characters, setting & light). Each later part is prompted with the previous segment's saved content embedded as a `<REFERENCE>` block so blocking, composition, and lighting continue seamlessly. Reasoning effort for the default model is set to `medium` to limit excessive "thinking" time.
 
 * **Length Validation & Retry**: each saved segment file (static template + segment body) must stay at or below 6000 characters. If any part is over the limit, `scriptgen` re-runs that part's prompt with a reduction instruction (embedding the previous generation and the exact number of characters to cut) up to 3 times before writing.
 
@@ -168,6 +172,9 @@ Generates animated 720p 24fps video clips for each segment prompt in `films/<fil
   # Force regeneration of segment 1
   uv run animator --scene <story_scene_name> --parts 1 --force
 
+  # Generate a part with explicitly supplied opening and closing frames
+  uv run animator --scene <story_scene_name> --parts 1 --frame_start path/to/start.jpg --frame_end path/to/end.jpg
+
   # Re-combine existing part clips without making API calls
   uv run animator --scene <story_scene_name> --compose-only
   ```
@@ -178,6 +185,8 @@ Generates animated 720p 24fps video clips for each segment prompt in `films/<fil
   * `--parts N`: Generate only segment index `N` (0-indexed). Default: generate all missing segments.
   * `--force`: Regenerate parts even if clip already exists.
   * `--compose-only`: Skip API calls and combine existing `part-*.mp4` clips into `full.mp4`.
+   * `--frame_start PATH` / `--frame-start PATH`: Use an image as the mandatory opening frame for every generated part, overriding automatically discovered prior-part continuity frames.
+   * `--frame_end PATH` / `--frame-end PATH`: Use an image as the mandatory closing frame for every generated part, overriding automatically discovered next-part continuity frames.
   * `--provider NAME`: Video generation provider (`google`, `openrouter` or `minimax`; `gemini` is an alias for `google`). Default: `google` (Gemini Omni Flash). The `openrouter` provider uses `OPENROUTER_API_KEY` and defaults to `minimax/hailuo-3` at `768p`. The `minimax` provider uses `MINIMAX_API_KEY` and defaults to `MiniMax-H3` at `768P`.
   * `--video-model MODEL`: Video generation model ID (default: `gemini-omni-flash-preview` for `google`; OpenRouter e.g. `minimax/hailuo-3`; MiniMax e.g. `MiniMax-H3`).
   * `--duration SECONDS`: Duration per segment (default: 10).

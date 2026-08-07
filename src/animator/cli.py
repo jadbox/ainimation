@@ -146,6 +146,14 @@ def ensure_background_plate(
 
 def run(args: argparse.Namespace) -> int:
     """Execute the animation generation or composition pipeline."""
+    frame_start_value = getattr(args, "frame_start", None)
+    frame_end_value = getattr(args, "frame_end", None)
+    frame_start = Path(frame_start_value) if frame_start_value else None
+    frame_end = Path(frame_end_value) if frame_end_value else None
+    for option, frame_path in (("--frame-start", frame_start), ("--frame-end", frame_end)):
+        if frame_path is not None and not frame_path.is_file():
+            raise ValueError(f"{option} must point to an existing image file: {frame_path}")
+
     default_scripts_dir = film_scripts_dir(get_film())
     scripts_dir = Path(args.scripts_dir) if args.scripts_dir else default_scripts_dir
     part_scripts = find_scene_part_scripts(scripts_dir, args.scene)
@@ -249,8 +257,20 @@ def run(args: argparse.Namespace) -> int:
                 segment.index,
                 len(segments) - 1,
             )
-            continuity_frame = previous_frame(scene_dir, segment)
-            closing_frame = next_frame(scene_dir, segment)
+            continuity_frame = frame_start or previous_frame(scene_dir, segment)
+            closing_frame = frame_end or next_frame(scene_dir, segment)
+            if frame_start is not None:
+                logger.info(
+                    "Using --frame-start override for segment %d: %s",
+                    segment.index,
+                    frame_start,
+                )
+            if frame_end is not None:
+                logger.info(
+                    "Using --frame-end override for segment %d: %s",
+                    segment.index,
+                    frame_end,
+                )
             background_plate = None
             if (
                 scene_slug
@@ -406,6 +426,28 @@ def main() -> None:
         help=(
             "Skip all generation: only combine the existing part-*.mp4 clips "
             "into full.mp4 with crossfade transitions (no API key needed)."
+        ),
+    )
+    parser.add_argument(
+        "--frame-start",
+        "--frame_start",
+        dest="frame_start",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Image to use as the mandatory opening frame for every generated part. "
+            "Overrides the automatically discovered previous-part end frame."
+        ),
+    )
+    parser.add_argument(
+        "--frame-end",
+        "--frame_end",
+        dest="frame_end",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Image to use as the mandatory closing frame for every generated part. "
+            "Overrides the automatically discovered next-part start frame."
         ),
     )
     parser.add_argument(

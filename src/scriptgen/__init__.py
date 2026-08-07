@@ -10,22 +10,28 @@ from __future__ import annotations
 from scriptgen.cli import main, run
 from scriptgen.config import (
     DEFAULT_MODEL,
+    DEFAULT_PARTS,
     GEMINI_OPENROUTER_MODEL,
+    MAX_PARTS,
     MAX_RETRIES,
     MAX_SCRIPT_CHARS,
-    SEGMENT_SPANS,
+    MIN_PARTS,
     resolve_openrouter_model,
+    segment_span,
 )
 from scriptgen.format import format_segment_base_prompt
 
 __all__ = [
     "DEFAULT_MODEL",
+    "DEFAULT_PARTS",
     "GEMINI_OPENROUTER_MODEL",
     "MAX_RETRIES",
+    "MAX_PARTS",
     "MAX_SCRIPT_CHARS",
-    "SEGMENT_SPANS",
+    "MIN_PARTS",
     "format_segment_base_prompt",
     "main",
     "resolve_openrouter_model",
+    "segment_span",
     "run",
 ]

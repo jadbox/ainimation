@@ -20,6 +20,10 @@ body {
   min-height: 100vh;
 }
 
+button {
+  cursor: pointer;
+}
+
 .script-body :is(h1, h2, h3, h4) {
   font-family: var(--font-display);
   color: var(--color-amber-soft);

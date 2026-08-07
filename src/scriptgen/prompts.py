@@ -9,10 +9,10 @@ from movie_config import (
     get_movie_info,
     list_character_names,
 )
-from scriptgen.config import MAX_SCRIPT_CHARS, MAX_SCRIPT_PROMPT_CHARS, SEGMENT_SPANS
+from scriptgen.config import MAX_SCRIPT_CHARS, MAX_SCRIPT_PROMPT_CHARS, segment_span
 
 
-def build_system_instruction() -> str:
+def build_system_instruction(part_count: int) -> str:
     movie_info = get_movie_info()
     roster_names = list_character_names()
     roster = ", ".join(roster_names)
@@ -24,9 +24,15 @@ def build_system_instruction() -> str:
         + (f" <VOICE>{spec.voice}</VOICE>" if spec.voice else "")
         for spec in CHARACTERS.values()
     )
+    total_seconds = part_count * 10
+    segment_headers = "\n\n".join(
+        f"## Segment {index} ({segment_span(index)})\n"
+        "(detailed chronological moment paragraphs separated ONLY by double line breaks — each paragraph opens with a timecoded beat — NO ### headers or sub-headings within the segment)"
+        for index in range(part_count)
+    )
     return f"""You are a world-class animation director and production designer specializing in {movie_info.style}. You are designing a scene for {movie_info.adaptation}.
 
-Expand the user's abridged story beat into a detailed, production-ready scene design document tailored for exactly 30 seconds of screen time, structured as THREE 10-second segments. The document must cover character blocking (where each character stands or moves to in every beat), camera location, camera movement, scene animations, sounds, and music. Every detail matters — nothing in the document may be generic or interchangeable.
+Expand the user's abridged story beat into a detailed, production-ready scene design document tailored for exactly {total_seconds} seconds of screen time, structured as {part_count} 10-second segments. The document must cover character blocking (where each character stands or moves to in every beat), camera location, camera movement, scene animations, sounds, and music. Every detail matters — nothing in the document may be generic or interchangeable.
 
 HARD DIRECTION RULES (from the project style bible — every choice must obey them):
 {rules}
@@ -36,10 +42,7 @@ CHARACTER ROSTER (use only these characters, spelled exactly as listed in ALL CA
 
 DRAMATIC ARCHITECTURE (required — this is what makes the scene a powerful short film, not a moving postcard):
 - Identify the scene's DRAMATIC QUESTION (e.g., "Will {sample_speaker2} give her the cure?") and state it in the Logline section.
-- Structure the three segments as a miniature three-act arc:
-  * Segment 0 = ARRIVAL & WANT: the protagonist enters the space; we feel what they need before anyone speaks.
-  * Segment 1 = CONFRONTATION & TURN: the obstacle or revelation; the scene's emotional register pivots here (fear -> hope, hope -> dread, distance -> intimacy).
-  * Segment 2 = RESOLUTION & HOOK: the dramatic question is answered through action (a gift, a decision, a warning), and the final held image points toward the next story movement.
+- Structure the parts as a miniature dramatic arc: the first establishes arrival and want, the middle parts develop confrontation and turn, and the final part resolves the dramatic question or creates a hook into the next story movement.
 - Give the scene ONE key story object (e.g., a glowing medicine vial) that embodies its meaning; the camera and lighting must treat it as sacred when it appears.
 - Design ONE unforgettable story image — the single frame a viewer would remember — and build a held beat around it.
 - WORK ALL THE ELEMENTS AT THE TURN: when the emotion pivots, the camera distance, lighting temperature/pool size, sound bed, and music must all shift together to tell the story wordlessly.
@@ -91,7 +94,7 @@ DIALOGUE CRAFT & LITERARY ELEGANCE (required — dialogue must be simple, though
 - CHARACTER-SPECIFIC VOCABULARY & SUBTEXT:
 {char_voices}
 - SUBTEXT OVER EXPOSITION: Lines must convey feeling and stakes through subtext rather than blunt facts, using ONLY what the beat provides (e.g. instead of "Will you help my son or not?", write "His breath rattles like dry leaves, sir... I have no one else to ask.").
-- MINIMAL & ESSENTIAL: Keep dialogue to 2-4 short, impactful lines total across the entire 30-second scene. Every spoken word must carry immense narrative and emotional weight.
+- MINIMAL & ESSENTIAL: Keep dialogue to only the short, impactful lines essential across the entire scene. Every spoken word must carry immense narrative and emotional weight.
 
 OUTPUT FORMAT — return Markdown with EXACTLY these section headers, in this order:
 # <evocative scene title>
@@ -100,21 +103,14 @@ OUTPUT FORMAT — return Markdown with EXACTLY these section headers, in this or
 ## Characters in Scene
 (one bullet per character, using the exact roster names in ALL CAPS with voice directives in <VOICE> tags, e.g. "- {sample_speaker1} <VOICE>voice description...</VOICE>")
 ## Setting & Light
-(the shared stage, kept brief: the environment and its key props with their depth planes — foreground occluders, midground furniture, background walls — the scene's ONE story object if any, the single dominant practical light source, and the baseline warm-vs-cool palette — everything here is constant across all three segments)
-## Segment 0 (0:00-0:10)
-(detailed chronological moment paragraphs separated ONLY by double line breaks — each paragraph opens with a [0:00-0:03]-style timecoded beat — NO ### headers or sub-headings within the segment. The camera remains one single continuous cut with consistent framing)
+(the shared stage, kept brief: the environment and its key props with their depth planes — foreground occluders, midground furniture, background walls — the scene's ONE story object if any, the single dominant practical light source, and the baseline warm-vs-cool palette — everything here is constant across all parts)
+{segment_headers}
 
-## Segment 1 (0:10-0:20)
-(detailed chronological moment paragraphs separated ONLY by double line breaks — each paragraph opens with a [0:10-0:13]-style timecoded beat — NO ### headers or sub-headings within the segment)
-
-## Segment 2 (0:20-0:30)
-(detailed chronological moment paragraphs separated ONLY by double line breaks — each paragraph opens with a [0:20-0:23]-style timecoded beat — NO ### headers or sub-headings within the segment)
-
-SEGMENT RULES — the three Segment sections are the shooting plan and must:
+SEGMENT RULES — the {part_count} Segment sections are the shooting plan and must:
 - Use the exact headers shown above (`## Segment 0 (0:00-0:10)`, etc.) so tooling can parse the 10-second boundaries.
 - MAXIMUM CONCISION (required): Write the most economical version possible — every sentence must earn its place, every detail must be filmable and non-redundant, and no moment may be repeated or padded. Keep each Segment section's body as short as it can be while still obeying all the rules above. HARD CHARACTER LIMIT: each Segment section body MUST stay at or under {MAX_SCRIPT_PROMPT_CHARS} characters — the final saved prompt file (fixed style/camera header + shared sections + segment body) cannot exceed {MAX_SCRIPT_CHARS} characters, and anything over is rejected and regenerated at your expense.
 - Be FULLY SELF-CONTAINED: every production detail lives inside a Segment's paragraphs. Tooling extracts each Segment individually (with only the Logline and Setting & Light attached) to prompt a video model, so a Segment must NEVER reference information defined in another Segment or in a section that no longer exists.
-- Chain into the three-act arc described above; each Segment must state in its opening paragraph the exact pose/composition it begins on (matching the previous Segment's final frame) so the generated clips can be concatenated seamlessly.
+- Chain into the dramatic arc described above; each Segment must state in its opening paragraph the exact pose/composition it begins on (matching the previous Segment's final frame) so the generated clips can be concatenated seamlessly.
 
 Be specific and cinematic. Every visual choice must be filmable under the direction rules above, and every element must serve the story."""
 
@@ -146,9 +142,9 @@ def build_scene_context(story: StorySceneSpec, scene: SceneSpec) -> str:
     )
 
 
-def build_part0_prompt(story: StorySceneSpec, scene: SceneSpec) -> str:
+def build_part0_prompt(story: StorySceneSpec, scene: SceneSpec, part_count: int) -> str:
     """Prompt for segment 0, which also establishes the shared scene sections."""
-    span = SEGMENT_SPANS[0]
+    span = segment_span(0)
     return (
         build_scene_context(story, scene)
         + "\n\nExpand this abridged story beat into a production-ready scene design "
@@ -159,7 +155,7 @@ def build_part0_prompt(story: StorySceneSpec, scene: SceneSpec) -> str:
         "## Setting & Light\n"
         f"## Segment 0 ({span})\n"
         "<segment 0 chronological shooting plan body>\n\n"
-        f"Write Segment 0 ONLY. Segments 1 and 2 are generated separately and will "
+        "Write Segment 0 ONLY. Later parts are generated separately and will "
         f"reference this output, so keep the shared sections self-contained and "
         "maximally concise. Obey every direction rule. HARD LIMIT: the Segment 0 "
         f"body must stay at or under {MAX_SCRIPT_PROMPT_CHARS} characters."
@@ -176,7 +172,7 @@ def build_next_part_prompt(
     characters: list[str],
 ) -> str:
     """Prompt for a later segment, chaining the previous segment as a reference."""
-    span = SEGMENT_SPANS.get(part_index, "")
+    span = segment_span(part_index)
     shared = (
         f"Logline: {logline}\n"
         f"Characters in scene: {', '.join(characters)}\n"

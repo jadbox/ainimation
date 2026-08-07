@@ -22,8 +22,16 @@ MAX_SCRIPT_CHARS = 6000
 MAX_SCRIPT_PROMPT_CHARS = MAX_SCRIPT_CHARS - 2000
 MAX_RETRIES = 3
 
-# Known 10-second segment time spans, indexed by part number.
-SEGMENT_SPANS = {0: "0:00-0:10", 1: "0:10-0:20", 2: "0:20-0:30"}
+DEFAULT_PARTS = 3
+MIN_PARTS = 1
+MAX_PARTS = 10
+
+
+def segment_span(index: int) -> str:
+    """Return the 10-second story-time span for a zero-indexed scene part."""
+    start = index * 10
+    end = start + 10
+    return f"{start // 60}:{start % 60:02d}-{end // 60}:{end % 60:02d}"
 
 
 def resolve_openrouter_model(model: str) -> str:

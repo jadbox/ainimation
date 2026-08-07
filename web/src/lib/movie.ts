@@ -126,7 +126,20 @@ export function scriptPath(film: string, name: string, part: number): string {
 }
 
 export function scriptStatus(film: string, name: string): boolean[] {
-  return [0, 1, 2].map((part) => fs.existsSync(scriptPath(film, name, part)));
+  const parts = scriptPartIndices(film, name);
+  return parts.map((part) => fs.existsSync(scriptPath(film, name, part)));
+}
+
+export function scriptPartIndices(film: string, name: string): number[] {
+  const dir = scriptsDir(film);
+  if (!fs.existsSync(dir)) return [0, 1, 2];
+  const pattern = new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}_part(\\d+)\\.md$`, "i");
+  const parts = fs.readdirSync(dir)
+    .map((file) => file.match(pattern))
+    .filter((match): match is RegExpMatchArray => match !== null)
+    .map((match) => Number(match[1]))
+    .sort((a, b) => a - b);
+  return parts.length > 0 ? parts : [0, 1, 2];
 }
 
 export function readScript(film: string, name: string, part: number): string | null {
@@ -139,8 +152,8 @@ export function animatorCommand(film: string, name: string): string {
   return `uv run animator --film ${film} --scene ${name}`;
 }
 
-export function scriptgenCommand(film: string, name: string, force = false): string {
-  return `uv run scriptgen --film ${film} --name ${name}${force ? " --force" : ""}`;
+export function scriptgenCommand(film: string, name: string, force = false, parts = 3): string {
+  return `uv run scriptgen --film ${film} --name ${name} --parts ${parts}${force ? " --force" : ""}`;
 }
 
 export function isValidStoryName(film: string, name: string): boolean {

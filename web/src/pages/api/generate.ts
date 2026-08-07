@@ -4,7 +4,7 @@ import { PROJECT_ROOT, isValidFilm, isValidStoryName, scriptgenCommand } from ".
 export const prerender = false;
 
 export async function POST({ request }: { request: Request }) {
-  let body: { film?: string; name?: string; force?: boolean };
+  let body: { film?: string; name?: string; force?: boolean; parts?: number };
   try {
     body = await request.json();
   } catch {
@@ -17,6 +17,7 @@ export async function POST({ request }: { request: Request }) {
   const film = typeof body.film === "string" ? body.film.trim() : "";
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const force = Boolean(body.force);
+  const parts = typeof body.parts === "number" ? body.parts : Number.NaN;
 
   if (!film || !isValidFilm(film)) {
     return new Response(JSON.stringify({ error: `Unknown film: "${film}"` }), {
@@ -31,8 +32,14 @@ export async function POST({ request }: { request: Request }) {
       { status: 400, headers: { "Content-Type": "application/json" } },
     );
   }
+  if (!Number.isInteger(parts) || parts < 1 || parts > 10) {
+    return new Response(JSON.stringify({ error: "Parts must be an integer from 1 through 10." }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 
-  const args = ["run", "scriptgen", "--film", film, "--name", name];
+  const args = ["run", "scriptgen", "--film", film, "--name", name, "--parts", String(parts)];
   if (force) args.push("--force");
 
   const encoder = new TextEncoder();
@@ -47,7 +54,7 @@ export async function POST({ request }: { request: Request }) {
       const push = (chunk: Buffer | string) =>
         controller.enqueue(encoder.encode(chunk.toString()));
 
-      push(`$ ${scriptgenCommand(film, name, force)}\n`);
+      push(`$ ${scriptgenCommand(film, name, force, parts)}\n`);
       push(`(cwd: ${PROJECT_ROOT})\n\n`);
 
       child.stdout.on("data", push);

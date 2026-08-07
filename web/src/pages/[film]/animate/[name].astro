@@ -1,0 +1,242 @@
+---
+import fs from "node:fs";
+import path from "node:path";
+import Layout from "../../../layouts/Base.astro";
+import {
+  animationsDir,
+  backgroundBlueprintDir,
+  blueprintImageUrl,
+  blueprintInfo,
+  isValidFilm,
+  loadMovie,
+  readScript,
+  scriptPartIndices,
+  slugify,
+  subjectBlueprintDir,
+} from "../../../lib/movie";
+
+export const prerender = false;
+
+const film = Astro.params.film ?? "";
+const name = Astro.params.name ?? "";
+if (!isValidFilm(film)) {
+  return Astro.redirect("/");
+}
+
+const movie = loadMovie(film);
+const storyIndex = movie.story.findIndex((scene) => scene.name === name);
+if (storyIndex < 0) {
+  return Astro.redirect(`/${film}`);
+}
+
+const story = movie.story[storyIndex];
+const location = movie.scenes.find((scene) => scene.slug === story.scene);
+const parts = scriptPartIndices(film, name);
+const scripts = parts.map((part) => readScript(film, name, part));
+const timeRange = (part: number) => `${Math.floor(part * 10 / 60)}:${String(part * 10 % 60).padStart(2, "0")}-${Math.floor((part + 1) * 10 / 60)}:${String((part + 1) * 10 % 60).padStart(2, "0")}`;
+const command = (part: number, startFrame?: string, endFrame?: string) =>
+  `uv run animator --film ${film} --scene ${name} --parts ${part}` +
+  (startFrame ? ` --frame_start ${startFrame}` : "") +
+  (endFrame ? ` --frame_end ${endFrame}` : "");
+
+const characterReferences = story.characters.map((character) => {
+  const dir = subjectBlueprintDir(film, character);
+  const image = blueprintInfo(dir).latest;
+  return {
+    character,
+    image: image ? blueprintImageUrl(film, slugify(character), image) : null,
+    path: image ? `films/${film}/out/blueprint/${slugify(character)}/${image}` : null,
+  };
+});
+
+const backgroundReferences = (location?.backgrounds ?? []).map((background) => {
+  const dir = backgroundBlueprintDir(film, location!.slug, background.key);
+  const image = blueprintInfo(dir).latest;
+  const relativeDir = `${slugify(location!.slug)}/${slugify(background.key)}`;
+  return {
+    key: background.key,
+    image: image ? blueprintImageUrl(film, relativeDir, image) : null,
+    path: image ? `films/${film}/out/blueprint/${relativeDir}/${image}` : null,
+  };
+});
+
+const previousStory = movie.story[storyIndex - 1];
+const nextStory = movie.story[storyIndex + 1];
+const previousPart = previousStory ? scriptPartIndices(film, previousStory.name).at(-1) : undefined;
+const nextPart = nextStory ? scriptPartIndices(film, nextStory.name).at(0) : undefined;
+const previousFrame = previousStory
+  ? `films/${film}/out/animations/${previousStory.name}/part-${previousPart}-end.jpg`
+  : null;
+const nextFrame = nextStory
+  ? `films/${film}/out/animations/${nextStory.name}/part-${nextPart}-start.jpg`
+  : null;
+const previousFrameExists = previousFrame
+  ? fs.existsSync(path.join(animationsDir(film), previousStory!.name, `part-${previousPart}-end.jpg`))
+  : false;
+const nextFrameExists = nextFrame
+  ? fs.existsSync(path.join(animationsDir(film), nextStory!.name, `part-${nextPart}-start.jpg`))
+  : false;
+---
+
+<Layout film={film} title={`Animate ${story.title}`}>
+  <nav class="mb-4 text-sm text-muted">
+    <a href={`/${film}`} class="hover:text-amber-soft transition-colors">&larr; All scenes</a>
+    <span class="mx-2 text-line">/</span>
+    <a href={`/${film}/scene/${name}`} class="hover:text-amber-soft transition-colors">View scripts</a>
+  </nav>
+
+  <div class="mb-7 flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <p class="text-xs uppercase tracking-[0.2em] text-teal-shadow">Generate scene</p>
+      <h1 class="mt-1 font-display text-3xl text-amber-soft">{story.title}</h1>
+      <p class="mt-1 font-mono text-sm text-muted">{name}</p>
+    </div>
+    <p class="max-w-sm text-sm leading-relaxed text-muted">
+      Copy one part command at a time. The animator continues ordinary neighboring-part continuity
+      unless a selected cross-scene frame override is included.
+    </p>
+  </div>
+
+  <section class="mb-7 rounded-xl border border-line bg-panel/80 p-5 shadow-lg shadow-black/20">
+    <div class="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+      <h2 class="font-display text-xl text-amber-soft">Reference deck</h2>
+      <span class="font-mono text-xs text-muted">latest blueprint attempts used by animator</span>
+    </div>
+    <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+      <div>
+        <h3 class="mb-2 text-xs font-medium uppercase tracking-wider text-muted">Characters</h3>
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {characterReferences.map((reference) => (
+            <figure class="overflow-hidden rounded-lg border border-line bg-ink/40">
+              {reference.image ? (
+                <img src={reference.image} alt={`${reference.character} reference`} class="aspect-video w-full object-cover" loading="lazy" />
+              ) : (
+                <div class="flex aspect-video items-center justify-center px-3 text-center text-xs text-muted">No reference image</div>
+              )}
+              <figcaption class="border-t border-line px-2.5 py-2">
+                <span class="block truncate text-xs text-slate-200">{reference.character}</span>
+                {reference.path && <span class="mt-0.5 block truncate font-mono text-[10px] text-muted" title={reference.path}>ready</span>}
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      </div>
+      <div>
+        <h3 class="mb-2 text-xs font-medium uppercase tracking-wider text-muted">Backgrounds</h3>
+        <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {backgroundReferences.length > 0 ? backgroundReferences.map((reference) => (
+            <figure class="overflow-hidden rounded-lg border border-line bg-ink/40">
+              {reference.image ? (
+                <img src={reference.image} alt={`${reference.key} background reference`} class="aspect-video w-full object-cover" loading="lazy" />
+              ) : (
+                <div class="flex aspect-video items-center justify-center px-3 text-center text-xs text-muted">No background image</div>
+              )}
+              <figcaption class="border-t border-line px-2.5 py-2">
+                <span class="block truncate text-xs text-slate-200">{reference.key}</span>
+                {reference.path && <span class="mt-0.5 block truncate font-mono text-[10px] text-muted" title={reference.path}>ready</span>}
+              </figcaption>
+            </figure>
+          )) : (
+            <p class="col-span-full rounded-lg border border-dashed border-line px-3 py-5 text-sm text-muted">No configured background references.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="space-y-4">
+    {scripts.map((script, index) => {
+      const part = parts[index];
+      const canUsePreviousFrame = index === 0 && previousFrameExists && previousFrame;
+      const canUseNextFrame = index === parts.length - 1 && nextFrameExists && nextFrame;
+      const baseCommand = command(part);
+      return (
+        <section class="rounded-xl border border-line bg-panel shadow-lg shadow-black/20">
+          <header class="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
+            <div>
+              <h2 class="font-display text-xl text-amber-soft">Part {part}</h2>
+              <p class="mt-0.5 text-xs text-muted">{timeRange(part)} · <code>scripts/{name}_part{part}.md</code></p>
+            </div>
+            {script ? (
+              <button
+                type="button"
+                data-copy-part
+                data-command={baseCommand}
+                data-start-frame={canUsePreviousFrame ? previousFrame : undefined}
+                data-end-frame={canUseNextFrame ? nextFrame : undefined}
+                data-part={part}
+                class="rounded-md bg-teal-shadow/10 px-3 py-2 text-xs font-mono text-teal-shadow ring-1 ring-teal-shadow/30 transition-colors hover:bg-teal-shadow/20"
+              >
+                copy part command
+              </button>
+            ) : (
+              <span class="rounded-full bg-amber-key/10 px-2.5 py-1 text-xs text-amber-soft ring-1 ring-amber-key/30">script missing</span>
+            )}
+          </header>
+          <div class="space-y-3 px-5 py-4">
+            {canUsePreviousFrame && (
+              <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-teal-shadow/25 bg-teal-shadow/5 px-3 py-3 text-sm text-slate-300">
+                <input type="checkbox" data-frame-option={`part-${part}-start`} class="mt-0.5 accent-[#7fd4d4]" />
+                <span>
+                  <span class="block font-medium text-teal-shadow">Match the previous scene's closing frame</span>
+                  <span class="mt-1 block font-mono text-xs text-muted">--frame_start {previousFrame}</span>
+                </span>
+              </label>
+            )}
+            {canUseNextFrame && (
+              <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-teal-shadow/25 bg-teal-shadow/5 px-3 py-3 text-sm text-slate-300">
+                <input type="checkbox" data-frame-option={`part-${part}-end`} class="mt-0.5 accent-[#7fd4d4]" />
+                <span>
+                  <span class="block font-medium text-teal-shadow">Match the next scene's opening frame</span>
+                  <span class="mt-1 block font-mono text-xs text-muted">--frame_end {nextFrame}</span>
+                </span>
+              </label>
+            )}
+            <details class="group rounded-lg border border-line bg-ink/25">
+              <summary class="cursor-pointer px-3 py-2.5 text-sm text-slate-300 marker:text-amber-key">View part script</summary>
+              {script ? (
+                <pre class="max-h-[34rem] overflow-auto border-t border-line p-4 font-mono text-xs leading-relaxed text-slate-300 whitespace-pre-wrap">{script}</pre>
+              ) : (
+                <p class="border-t border-line p-4 text-sm italic text-muted">Generate this scene's scripts before animating.</p>
+              )}
+            </details>
+          </div>
+        </section>
+      );
+    })}
+  </div>
+</Layout>
+
+<script>
+  async function copyText(text: string, button: HTMLButtonElement) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+    }
+    const original = button.textContent;
+    button.textContent = "copied!";
+    setTimeout(() => (button.textContent = original), 1200);
+  }
+
+  document.querySelectorAll<HTMLButtonElement>("[data-copy-part]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const part = button.dataset.part;
+      const start = document.querySelector<HTMLInputElement>(`[data-frame-option="part-${part}-start"]`);
+      const end = document.querySelector<HTMLInputElement>(`[data-frame-option="part-${part}-end"]`);
+      const command = [
+        button.dataset.command,
+        start?.checked && button.dataset.startFrame ? `--frame_start ${button.dataset.startFrame}` : "",
+        end?.checked && button.dataset.endFrame ? `--frame_end ${button.dataset.endFrame}` : "",
+      ].filter(Boolean).join(" ");
+      void copyText(command, button);
+    });
+  });
+</script>

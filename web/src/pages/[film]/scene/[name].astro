@@ -6,6 +6,7 @@ import {
   isValidFilm,
   loadMovie,
   readScript,
+  scriptPartIndices,
 } from "../../../lib/movie";
 
 export const prerender = false;
@@ -24,14 +25,15 @@ if (!story) {
 }
 
 const location = movie.scenes.find((s) => s.slug === story.scene);
-const scripts = [0, 1, 2].map((part) => readScript(film, name, part));
-const missing = scripts.map((s, i) => (s === null ? i : -1)).filter((i) => i >= 0);
+const parts = scriptPartIndices(film, name);
+const scripts = parts.map((part) => readScript(film, name, part));
+const missing = scripts.map((s, i) => (s === null ? parts[i] : -1)).filter((i) => i >= 0);
 const command = animatorCommand(film, name);
 
 marked.setOptions({ gfm: true, breaks: false });
 
 const rendered = scripts.map((s) => (s === null ? null : marked.parse(s)));
-const timeRanges = ["0:00–0:10", "0:10–0:20", "0:20–0:30"];
+const timeRange = (part: number) => `${Math.floor(part * 10 / 60)}:${String(part * 10 % 60).padStart(2, "0")}–${Math.floor((part + 1) * 10 / 60)}:${String((part + 1) * 10 % 60).padStart(2, "0")}`;
 ---
 
 <Layout film={film} title={story.title}>
@@ -88,7 +90,7 @@ const timeRanges = ["0:00–0:10", "0:10–0:20", "0:20–0:30"];
         {scripts.map((s, i) => (
           <li>
             <a
-              href={s === null ? undefined : `#part-${i}`}
+               href={s === null ? undefined : `#part-${parts[i]}`}
               class:list={[
                 "block rounded-md px-3 py-2 transition-colors",
                 s === null
@@ -97,9 +99,9 @@ const timeRanges = ["0:00–0:10", "0:10–0:20", "0:20–0:30"];
               ]}
             >
               <span class="block text-xs text-muted">
-                Part {i} · {timeRanges[i]}
+               Part {parts[i]} · {timeRange(parts[i])}
               </span>
-              {s === null ? <em>missing</em> : <span>Segment {i} script</span>}
+               {s === null ? <em>missing</em> : <span>Segment {parts[i]} script</span>}
             </a>
           </li>
         ))}
@@ -113,15 +115,15 @@ const timeRanges = ["0:00–0:10", "0:10–0:20", "0:20–0:30"];
     <div class="space-y-8">
       {scripts.map((s, i) => (
         <section
-          id={`part-${i}`}
+           id={`part-${parts[i]}`}
           class="scroll-mt-24 rounded-xl border border-line bg-panel shadow-lg shadow-black/30"
         >
           <header class="flex items-center justify-between border-b border-line px-5 py-3">
             <h2 class="font-display text-lg text-amber-soft">
-              Part {i} <span class="ml-2 text-xs font-normal text-muted">{timeRanges[i]}</span>
+               Part {parts[i]} <span class="ml-2 text-xs font-normal text-muted">{timeRange(parts[i])}</span>
             </h2>
             <span class="font-mono text-xs text-muted">
-              films/{film}/out/scripts/{story.name}_part{i}.md
+               films/{film}/out/scripts/{story.name}_part{parts[i]}.md
             </span>
           </header>
           {s === null ? (

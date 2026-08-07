@@ -15,7 +15,7 @@ The scene is exported as one prompt file per segment:
 Usage:
     python src/scriptgen.py                         # list available story scenes
     python src/scriptgen.py --name frisby_visits_mr_ages
-    python src/scriptgen.py --name ... --part 0     # write only segment 0
+    python src/scriptgen.py --name ... --parts 5    # write five 10-second parts
 """
 
 from __future__ import annotations

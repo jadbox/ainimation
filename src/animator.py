@@ -21,6 +21,7 @@ present, they are concatenated with crossfade transitions into
 Usage:
     python src/animator.py --scene frisby_meets_greatowl            # all missing parts
     python src/animator.py --scene frisby_meets_greatowl --parts 2  # only the 3rd segment
+    python src/animator.py --scene frisby_meets_greatowl --parts 1 --frame_start path/to/start.jpg --frame_end path/to/end.jpg
 """
 
 from __future__ import annotations

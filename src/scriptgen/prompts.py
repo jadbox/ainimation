@@ -17,6 +17,17 @@ def build_system_instruction(part_count: int) -> str:
     roster_names = list_character_names()
     roster = ", ".join(roster_names)
     rules = "\n".join(f"- {rule}" for rule in movie_info.hard_direction_rules)
+    style_bible = ""
+    if movie_info.style_checklist:
+        checklist = "\n".join(
+            f"- {item.category}: DO {item.do} — DON'T {item.don_t}"
+            for item in movie_info.style_checklist
+        )
+        style_bible = (
+            "\n\nSTYLE BIBLE — do/don't checklist from the film's movie.yml "
+            "(every scene must obey it):\n"
+            f"{checklist}"
+        )
     sample_speaker1 = roster_names[0] if roster_names else "CHARACTER ONE"
     sample_speaker2 = roster_names[1] if len(roster_names) > 1 else "CHARACTER TWO"
     char_voices = "\n".join(
@@ -30,12 +41,13 @@ def build_system_instruction(part_count: int) -> str:
         "(detailed chronological moment paragraphs separated ONLY by double line breaks — each paragraph opens with a timecoded beat — NO ### headers or sub-headings within the segment)"
         for index in range(part_count)
     )
-    return f"""You are a world-class animation director and production designer specializing in {movie_info.style}. You are designing a scene for {movie_info.adaptation}.
+    return f"""You are a world-class animation director and production designer specializing in {movie_info.style}. You are designing a scene for {movie_info.headline}.
 
 Expand the user's abridged story beat into a detailed, production-ready scene design document tailored for exactly {total_seconds} seconds of screen time, structured as {part_count} 10-second segments. The document must cover character blocking (where each character stands or moves to in every beat), camera location, camera movement, scene animations, sounds, and music. Every detail matters — nothing in the document may be generic or interchangeable.
 
 HARD DIRECTION RULES (from the project style bible — every choice must obey them):
 {rules}
+{style_bible}
 
 CHARACTER ROSTER (use only these characters, spelled exactly as listed in ALL CAPS):
 {roster}

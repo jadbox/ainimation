@@ -1,6 +1,6 @@
 # AI Animation Art Pipeline & Production Environment
 
-An automated AI-driven art pipeline and production suite for creating 2D animated feature film content. The codebase is story-agnostic and dynamically driven by configuration settings in `movie.yml` and narrative specifications in `movie.md`. Multiple films are supported: each film lives in its own folder under `films/<film>/` containing its `movie.yml`, `movie.md`, and rendered `out/` assets, and every tool selects the film via `--film <slug>` (or the `FILM` environment variable; default: the first film folder found under `films/`).
+An automated AI-driven art pipeline and production suite for creating 2D animated feature film content. The codebase is story-agnostic and dynamically driven by configuration in `movie.yml` — the single per-film source of truth for story, characters, scenes, and the full style bible. Multiple films are supported: each film lives in its own folder under `films/<film>/` containing its `movie.yml` and rendered `out/` assets, and every tool selects the film via `--film <slug>` (or the `FILM` environment variable; default: the first film folder found under `films/`). See [`guides/movie_yml.md`](./guides/movie_yml.md) for the `movie.yml` schema reference.
 
 ---
 
@@ -19,18 +19,18 @@ This project automates the multi-stage visual development and animation generati
 
 ## 2. Configuring Movie & Style Specifications
 
-All movie-specific information — art style, character rosters, scene definitions, and hard direction rules — is defined externally, per film, under `films/<film>/`. The tools themselves carry no film-specific style or aesthetic:
+All movie-specific information — art style, character rosters, scene definitions, story beats, and the full style bible — is defined externally, per film, under `films/<film>/`. The tools themselves carry no film-specific style or aesthetic. The schema is documented in [`guides/movie_yml.md`](./guides/movie_yml.md).
 
-* **`films/<film>/movie.yml`**: Machine-readable configuration for one film. Contains:
-  * **Movie metadata**: Title, adaptation description, style description, style summary, camera rules, and orientation (output aspect ratio, e.g. `orientation: "16:9"`; defaults to `16:9`). All video providers render at this aspect ratio.
+* **`films/<film>/movie.yml`**: The single machine-readable configuration file for one film, loaded by `src/movie_config.py`. Contains:
+  * **Movie metadata & style direction**: Title, headline, a prompt-ready `style` (the named reference fused with the look: linework, shading, light/palette, vignette, grain), camera rules, orientation, an optional do/don't `style_checklist`, and an optional `prompt_template`. Keep it lean — the full prose style bible is not read by the pipeline; archive it in `movie.depricated.md` if desired.
   * **Hard direction rules**: List of strict visual/lighting/animation mandates passed into system instructions.
   * **Characters**: List of characters (`name`, `species`, `identity`, `appearance`, `voice`, `avoid`).
   * **Scenes**: List of scene locations (`name`, `slug`, `logline`, `backgrounds`).
   * **Story**: Abridged story beats (`name`, `title`, `scene`, `characters`, `emotions`, `actions`, `looks`) that `scriptgen` expands into full scene design documents. `scene` references a scene location slug; `characters` reference roster names; `looks` records where the characters are looking and their facial expressions.
-* **`films/<film>/movie.md`**: Human-readable style bible for the film containing comprehensive artistic guidelines, color scripting, animation mechanics, optical FX passes, camera director checklists, and prompt templates. All references to a particular film's source material, art style, and directorial influences belong here.
+* **`films/<film>/movie.depricated.md`**: Optional archived copy of a legacy human-readable style bible, kept for reference only. It is **not** read by any tool — all direction must live in `movie.yml`.
 * **`films/<film>/out/`**: Rendered assets for the film (`scripts/`, `blueprint/`, `animations/`).
 
-All CLI tools take `--film <slug>` (or honor the `FILM` environment variable) to pick which film folder to read and write; the default is the first film folder found under `films/`. To add a new movie, create `films/<slug>/` with its own `movie.yml` and `movie.md`. To adapt an existing film's style, edit its `movie.yml` (and `movie.md`). The Python code dynamically loads the selected film's `movie.yml` via `src/movie_config.py` without requiring code changes.
+All CLI tools take `--film <slug>` (or honor the `FILM` environment variable) to pick which film folder to read and write; the default is the first film folder found under `films/`. To add a new movie, create `films/<slug>/` with its own `movie.yml`. To adapt an existing film's style, edit its `movie.yml`. The Python code dynamically loads the selected film's `movie.yml` via `src/movie_config.py` without requiring code changes.
 
 ---
 
@@ -67,7 +67,7 @@ All CLI tools take `--film <slug>` (or honor the `FILM` environment variable) to
 ### Example End-to-End Pipeline
 
 ```bash
-# 1. Edit films/<film>/movie.md and films/<film>/movie.yml to set up the story, characters, and scenes
+# 1. Edit films/<film>/movie.yml to set up the story, characters, scenes, and style bible
 
 # 2. Generate a character style guide or a scene's background plates
 uv run generate-blueprint --film <film> --character "<Character Name>"   # character blueprint
@@ -235,7 +235,7 @@ A local Astro + Tailwind web UI over the pipeline tools — no authentication, i
 ## 5. Automated AI Pipeline Architecture
 
 ```
-[ films/<film>/movie.yml / movie.md ]
+[ films/<film>/movie.yml ]
           │
           ▼
 [ scriptgen ] ──► Generates Segment Prompts (films/<film>/out/scripts/<scene>_part<N>.md)

@@ -37,9 +37,8 @@ export interface StoryScene {
 export interface MovieConfig {
   movie: {
     title: string;
-    adaptation: string;
+    headline: string;
     style: string;
-    style_summary: string;
     camera_rules: string;
     hard_direction_rules: string[];
   };

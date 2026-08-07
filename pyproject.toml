@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "animation-pipeline"
 version = "0.1.0"
-description = "Film-agnostic art pipeline for generating character blueprints, scene background plates, scene scripts, and animated clips from per-film movie.yml/movie.md configuration."
+description = "Film-agnostic art pipeline for generating character blueprints, scene background plates, scene scripts, and animated clips from per-film movie.yml configuration."
 requires-python = ">=3.11"
 dependencies = [
     "google-genai>=1.0.0",

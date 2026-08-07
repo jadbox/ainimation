@@ -1,15 +1,43 @@
 movie:
   title: "The Rats of NIMH"
-  adaptation: "a short film adaptation of The Rats of NIMH"
-  style: "Don Bluth's iconic 1980s dark fantasy feature animation style (e.g., The Secret of NIMH, 1982)"
-  style_summary: >-
-    hand-painted 2D cel animation clip in the style of a 1982 Don Bluth feature (The Secret of NIMH):
-    hand-inked tapered lines, 2-tone cel shading, painterly gouache backgrounds,
-    warm amber key light against deep teal/indigo shadow, 360-degree rim lighting,
-    heavy vignette, soft-focus dark foreground occlusion on 20-30% of the frame
-    borders, film grain.
+  headline: "a short film adaptation of The Rats of NIMH"
+  style: >-
+    Don Bluth's iconic 1980s dark fantasy feature animation style (e.g., The Secret of NIMH, 1982):
+    hand-painted 2D cel animation with hand-inked tapered lines, 2-tone cel shading,
+    painterly gouache backgrounds, warm amber key light against deep teal/indigo
+    shadow, 360-degree rim lighting, heavy vignette, soft-focus dark foreground
+    occlusion on 20-30% of the frame borders, film grain.
   camera_rules: "Keep the camera at rodent eye-level (2-12 inches high) around a single dominant practical light source."
   orientation: "16:9"
+  style_checklist:
+    - category: "Line Art"
+      do: "Tapered ink lines, soft dark brown/colored outlines, sketchy energy"
+      don_t: "Vector-clean outlines, pure black hard outlines"
+    - category: "Characters"
+      do: "Tufted spiky fur, giant glossy eyes with 2-3 highlights, one ragged garment, dynamic C/S-curves"
+      don_t: "Smooth untextured fur, full modern outfits, clean hems, rigid stiff poses"
+    - category: "Lighting & Staging"
+      do: "Single practical source, warm vs cool chiaroscuro, 360-degree rim lighting, 20-30% foreground occlusion"
+      don_t: "Uniform overall lighting, flat shadows, lack of depth occlusion, center-only lighting"
+    - category: "Movement"
+      do: "Animating on ones for action, follow-through drag on ears/tails, held emotional poses with micro-blinks"
+      don_t: "Static robotic movement, uniform linear movement, lack of anticipation/recoil"
+    - category: "Camera & Optics"
+      do: "Low macro angles, multiplane parallax (4-5 layers), foreground blur, impact camera shake"
+      don_t: "High flat camera angles, single-plane flat scrolling, digital sharpness"
+    - category: "Environments"
+      do: "Cluttered found-object sets, deep vignettes, gouache texture, organic curved shapes"
+      don_t: "Modern props, clean symmetrical rooms, plastic smooth finishes"
+  prompt_template: >-
+    1982 Don Bluth traditional cel animation still, hand-inked tapered line art,
+    painterly gouache background on textured paper, [anthropomorphic mouse/rat
+    character: oversized ears, tufted spiky fur, giant glossy eyes with 2-3 stacked
+    highlights, single ragged garment, dynamic pose], low macro camera angle,
+    out-of-focus dark foreground roots framing shot, tiny figure in a cluttered den
+    built from giant found objects, single dominant [lantern/amulet] light source,
+    warm amber vs deep teal chiaroscuro, 360-degree golden rim lighting, magical
+    inner glow with soft bloom and sparkle, volumetric dust motes, heavy vignette,
+    film grain, cozy Gothic fairy-tale mood.
   hard_direction_rules:
     - "Camera height stays at rodent eye-level (2-12 inches above ground) unless a shot is deliberately a predator POV. Environments dominate ~70% of frame volume; characters occupy the lower third."
     - "Every shot orbits a single identifiable practical light source (candle, lantern, amulet glow, moonlight shaft). 60-70% of the frame sits in deep shadow."

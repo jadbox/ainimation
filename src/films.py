@@ -1,7 +1,8 @@
 """Multi-film project layout helpers.
 
 Each film lives in its own folder under ``films/<film>/`` containing its
-``movie.yml``, ``movie.md``, and rendered ``out/`` assets. All pipeline tools
+``movie.yml`` (the single source of truth for story, style, characters, and
+scenes) and rendered ``out/`` assets. All pipeline tools
 accept a ``--film`` flag (or the ``FILM`` environment variable) to select
 which film to work on; the default is the first film under ``films/``.
 """

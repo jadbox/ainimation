@@ -128,8 +128,9 @@ class TestPromptTagging(unittest.TestCase):
         )
         prompt = build_initial_prompt(spec)
         self.assertIn("MRS BRISBY", prompt)
-        self.assertIn("stacked white catchlight highlights", prompt)
-        self.assertIn("tapered dark-brown linework", prompt)
+        self.assertIn("Follow the film's style checklist", prompt)
+        self.assertIn("soft dark brown/colored outlines", prompt)
+        self.assertIn("giant glossy eyes with 2-3 highlights", prompt)
 
 
 if __name__ == "__main__":

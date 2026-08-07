@@ -22,16 +22,26 @@ def standardize_name(name: str) -> str:
 
 
 @dataclass(frozen=True)
+class StyleChecklistItem:
+    """A single do/don't style-checklist entry from the film's style bible."""
+
+    category: str
+    do: str
+    don_t: str
+
+
+@dataclass(frozen=True)
 class MovieInfo:
     """Movie and visual style metadata."""
 
     title: str
-    adaptation: str
+    headline: str
     style: str
-    style_summary: str
     camera_rules: str
     hard_direction_rules: tuple[str, ...]
     orientation: str = DEFAULT_ORIENTATION
+    style_checklist: tuple[StyleChecklistItem, ...] = ()
+    prompt_template: str = ""
 
 
 @dataclass(frozen=True)
@@ -106,12 +116,20 @@ def load_movie_config(
     movie_raw = raw.get("movie", {})
     movie_info = MovieInfo(
         title=movie_raw.get("title", ""),
-        adaptation=movie_raw.get("adaptation", ""),
+        headline=movie_raw.get("headline", ""),
         style=movie_raw.get("style", ""),
-        style_summary=movie_raw.get("style_summary", ""),
         camera_rules=movie_raw.get("camera_rules", ""),
         hard_direction_rules=tuple(movie_raw.get("hard_direction_rules", [])),
         orientation=movie_raw.get("orientation", DEFAULT_ORIENTATION),
+        style_checklist=tuple(
+            StyleChecklistItem(
+                category=item.get("category", ""),
+                do=item.get("do", ""),
+                don_t=item.get("don_t", ""),
+            )
+            for item in movie_raw.get("style_checklist", [])
+        ),
+        prompt_template=movie_raw.get("prompt_template", ""),
     )
 
     characters: dict[str, CharacterSpec] = {}

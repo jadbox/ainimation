@@ -35,7 +35,7 @@ def format_segment_base_prompt(
         else ""
     )
 
-    return f"""One unbroken continuous shot — NO cuts, jump cuts, or angle changes; smooth camera motion only. Style: {movie_info.style_summary}
+    return f"""One unbroken continuous shot — NO cuts, jump cuts, or angle changes; smooth camera motion only. Style: {movie_info.style}
 
 Scene: "{scene_name}" — {logline or 'see script below.'}
 

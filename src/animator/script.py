@@ -8,7 +8,6 @@ from pathlib import Path
 
 from blueprint_generator import slug
 from blueprint_generator.utils.characters import CHARACTERS
-from movie_config import standardize_name
 
 from animator.models import SceneSegment
 
@@ -54,7 +53,6 @@ def find_scene_part_scripts(scripts_dir: Path, scene_name: str) -> list[tuple[in
 
 def parse_scene_characters(script_text: str) -> list[str]:
     """Extract roster character names from prompt or script text."""
-    roster = {normalize_name(spec.name): spec.name for spec in CHARACTERS.values()}
     found: list[str] = []
 
     match = re.search(r"Characters appearing:\s*([^.\n]+)", script_text, flags=re.IGNORECASE)

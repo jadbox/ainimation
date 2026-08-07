@@ -11,3 +11,6 @@ web/dist/
 web/.astro/
 films/_*
 screeenshots/
+
+*.depricated
+*.tmp

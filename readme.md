@@ -12,6 +12,7 @@ This project automates the multi-stage visual development and animation generati
 2. **Scene Background Plates**: Generates clean, character-free 16:9 production background plates for cel compositing.
 3. **30-Second Scene Scripts**: Expands abridged story beats from the `story:` section of `movie.yml` into structured 30-second scene design documents divided into three 10-second segments.
 4. **Animated Clips (Pluggable Video Provider)**: Generates 720p 24fps video clips per segment with first/last-frame continuity locking (Google Gemini Omni Flash by default, OpenRouter MiniMax H3 at 768p, or the MiniMax API directly with MiniMax H3 at 768P), exports each clip's first and last frames as `part-<N>-start.jpg` / `part-<N>-end.jpg`, then concatenates the clips into full scene videos with seamless crossfade transitions.
+5. **Film Assembly**: The web console can merge available scene `full.mp4` files in story order into `films/<film>/out/animations/film.mpeg` and export a midpoint `film-thumb.jpg`.
 5. **Web Console**: A local browser UI over the pipeline (scene tables, script generation, blueprint viewing, animator command copy) — see section 4.D.
 
 ---

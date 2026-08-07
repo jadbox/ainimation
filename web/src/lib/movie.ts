@@ -226,6 +226,20 @@ export function hasAnimation(film: string, name: string): boolean {
   return fs.existsSync(path.join(animationsDir(film), name, "full.mp4"));
 }
 
+export interface FilmVideo {
+  file: string;
+  thumb: string;
+}
+
+export function filmVideo(film: string): FilmVideo | null {
+  const dir = animationsDir(film);
+  const file = "film.mpeg";
+  const thumb = "film-thumb.jpg";
+  return fs.existsSync(path.join(dir, file)) && fs.existsSync(path.join(dir, thumb))
+    ? { file, thumb }
+    : null;
+}
+
 export interface SegmentVideo {
   part: number;
   video: string;
@@ -249,17 +263,21 @@ export function sceneVideos(film: string, name: string): SceneVideos {
   if (!fs.existsSync(dir)) return empty;
   const files = new Set(fs.readdirSync(dir));
   const segments: SegmentVideo[] = [];
-  for (const part of [0, 1, 2]) {
-    const video = `part-${part}.mp4`;
-    if (!files.has(video)) continue;
-    segments.push({ part, video, thumb: pickThumb(files, `part-${part}`) });
+  for (const file of files) {
+    const match = file.match(/^part-(\d+)\.mp4$/);
+    if (match) segments.push({ part: Number(match[1]), video: file, thumb: pickThumb(files, `part-${match[1]}`) });
   }
+  segments.sort((a, b) => a.part - b.part);
   const full = files.has("full.mp4") ? { thumb: pickThumb(files, "part-0") } : null;
   return { full, segments };
 }
 
 export function animationFileUrl(film: string, name: string, file: string): string {
   return `/api/animation/${film}/${name}/${file}`;
+}
+
+export function filmAnimationFileUrl(film: string, file: string): string {
+  return `/api/animation/${film}/${file}`;
 }
 
 export function blueprintImageUrl(film: string, relDir: string, file: string): string {

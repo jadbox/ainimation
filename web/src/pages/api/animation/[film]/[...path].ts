@@ -7,6 +7,7 @@ export const prerender = false;
 
 const MIME: Record<string, string> = {
   ".mp4": "video/mp4",
+  ".mpeg": "video/mpeg",
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".png": "image/png",

@@ -3,6 +3,8 @@ import Layout from "../../layouts/Base.astro";
 import CLITerminal from "../../components/CLITerminal.astro";
 import {
   animationFileUrl,
+  filmAnimationFileUrl,
+  filmVideo,
   hasAnimation,
   hasBlueprint,
   isValidFilm,
@@ -20,6 +22,7 @@ if (!isValidFilm(film)) {
 }
 
 const movie = loadMovie(film);
+const mergedFilm = filmVideo(film);
 const sceneNameBySlug = new Map(movie.scenes.map((s) => [s.slug, s.name]));
 
 const rows = movie.story.map((story, index) => {
@@ -278,6 +281,27 @@ const rows = movie.story.map((story, index) => {
     </table>
   </div>
 
+  <section class="mt-6 flex flex-wrap items-start gap-4 rounded-xl border border-line bg-panel/70 p-4 shadow-lg shadow-black/20">
+    <div class="flex-1">
+      <h2 class="font-display text-lg text-amber-soft">Full film</h2>
+      <p class="mt-1 text-sm text-muted">Combine available scene <code>full.mp4</code> files in story order and extract a midpoint thumbnail.</p>
+    </div>
+    <button
+      type="button"
+      data-action="merge-film"
+      data-film={film}
+      class="rounded-md bg-amber-key/15 px-3 py-2 text-xs font-medium text-amber-soft ring-1 ring-amber-key/40 hover:bg-amber-key/25 transition-colors"
+    >
+      Merge all full scenes
+    </button>
+    {mergedFilm && (
+      <a href={`/${film}/video/`} class="block w-40 overflow-hidden rounded-lg ring-1 ring-line transition hover:ring-amber-key/50" title="Watch full film">
+        <img src={filmAnimationFileUrl(film, mergedFilm.thumb)} alt={`${movie.movie.title} full film`} class="aspect-video w-full object-cover" />
+        <span class="block bg-panel-2 px-2 py-1 text-[10px] uppercase tracking-wide text-amber-soft">View film</span>
+      </a>
+    )}
+  </section>
+
   <CLITerminal />
 </Layout>
 
@@ -299,6 +323,9 @@ const rows = movie.story.map((story, index) => {
     const parts = Number(target.closest("details")?.querySelector<HTMLSelectElement>("[data-parts-select]")?.value ?? 3);
     if (action === "generate" && target.dataset.name && target.dataset.film) {
       runScriptgen(target.dataset.film, target.dataset.name, target.dataset.force === "true", parts);
+    } else if (action === "merge-film" && target.dataset.film) {
+      const command = `uv run python src/merge_film.py --film ${target.dataset.film}`;
+      openCLITerminal({ url: "/api/merge-film", body: { film: target.dataset.film }, command });
     }
   });
 </script>

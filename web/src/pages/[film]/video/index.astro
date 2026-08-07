@@ -1,0 +1,65 @@
+---
+import Layout from "../../../layouts/Base.astro";
+import {
+  animationFileUrl,
+  filmAnimationFileUrl,
+  filmVideo,
+  isValidFilm,
+  loadMovie,
+  sceneVideos,
+} from "../../../lib/movie";
+
+export const prerender = false;
+
+const film = Astro.params.film ?? "";
+if (!isValidFilm(film)) {
+  return Astro.redirect("/");
+}
+const movie = loadMovie(film);
+const mergedFilm = filmVideo(film);
+if (!mergedFilm) {
+  return Astro.redirect(`/${film}`);
+}
+const scenes = movie.story.flatMap((story) => {
+  const full = sceneVideos(film, story.name).full;
+  return full ? [{ story, thumb: full.thumb }] : [];
+});
+---
+
+<Layout film={film} title="Full Film">
+  <nav class="mb-4">
+    <a href={`/${film}`} class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-muted ring-1 ring-line hover:text-amber-soft hover:ring-amber-key/40 transition-colors">
+      &larr; Back to scenes
+    </a>
+  </nav>
+
+  <div class="mb-6">
+    <p class="text-xs uppercase tracking-[0.2em] text-teal-shadow">Complete film</p>
+    <h1 class="mt-1 font-display text-3xl text-amber-soft">{movie.movie.title}</h1>
+    <p class="mt-1 font-mono text-sm text-muted">films/{film}/out/animations/{mergedFilm.file}</p>
+  </div>
+
+  <figure class="overflow-hidden rounded-xl border border-line bg-panel shadow-lg shadow-black/30">
+    <video controls class="w-full" src={filmAnimationFileUrl(film, mergedFilm.file)} poster={filmAnimationFileUrl(film, mergedFilm.thumb)}></video>
+  </figure>
+
+  <section class="mt-7">
+    <h2 class="mb-3 text-xs font-medium uppercase tracking-wider text-muted">Scene full videos</h2>
+    {scenes.length > 0 ? (
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {scenes.map(({ story, thumb }) => (
+          <a href={`/${film}/video/${story.name}`} class="group overflow-hidden rounded-lg border border-line bg-panel transition hover:border-amber-key/50">
+            {thumb ? (
+              <img src={animationFileUrl(film, story.name, thumb)} alt={`${story.title} full scene`} class="aspect-video w-full object-cover" />
+            ) : (
+              <div class="flex aspect-video items-center justify-center bg-ink/60 text-sm text-muted">No thumbnail</div>
+            )}
+            <span class="block px-3 py-2 font-display text-base text-slate-200 group-hover:text-amber-soft">{story.title}</span>
+          </a>
+        ))}
+      </div>
+    ) : (
+      <p class="rounded-lg border border-dashed border-line px-4 py-5 text-sm text-muted">No scene full videos are available.</p>
+    )}
+  </section>
+</Layout>

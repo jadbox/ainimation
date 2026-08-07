@@ -86,6 +86,7 @@ def run(args: argparse.Namespace) -> int:
             story=story,
             scene=scene,
             scene_name=scene_name,
+            part_count=args.parts,
             shared=shared,
             prev_body=prev_body,
             header=header,
@@ -154,6 +155,7 @@ def _generate_part(
     story,
     scene,
     scene_name: str,
+    part_count: int,
     shared: tuple[str, str, list[str]] | None,
     prev_body: str | None,
     header: str,
@@ -171,7 +173,7 @@ def _generate_part(
     """
     assert idx == 0 or shared is not None
     prompt = (
-        build_part0_prompt(story, scene, args.parts)
+        build_part0_prompt(story, scene, part_count)
         if idx == 0
         else build_next_part_prompt(story, scene, idx, prev_body, *shared)
     )

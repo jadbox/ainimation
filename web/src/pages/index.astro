@@ -1,5 +1,6 @@
 ---
 import Layout from "../layouts/Base.astro";
+import CLITerminal from "../components/CLITerminal.astro";
 import {
   animatorCommand,
   backgroundBlueprintDir,
@@ -231,67 +232,11 @@ const rows = movie.story.map((story, index) => {
     </table>
   </div>
 
-  <div
-    id="run-modal"
-    class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
-    role="dialog"
-    aria-modal="true"
-    aria-label="Script generation output"
-  >
-    <div class="flex max-h-[85vh] w-full max-w-3xl flex-col rounded-xl border border-line bg-panel shadow-2xl">
-      <div class="flex items-center justify-between border-b border-line px-5 py-3">
-        <h2 class="font-display text-amber-soft">
-          Running <span id="run-title" class="font-mono text-sm text-teal-shadow"></span>
-        </h2>
-        <div class="flex items-center gap-2">
-          <span id="run-state" class="text-xs text-muted">starting…</span>
-          <button
-            type="button"
-            id="run-cancel"
-            class="rounded-md px-3 py-1 text-xs text-rose-300 ring-1 ring-rose-400/40 hover:bg-rose-500/10 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            id="run-close"
-            class="hidden rounded-md bg-amber-key/15 px-3 py-1 text-xs text-amber-soft ring-1 ring-amber-key/40 hover:bg-amber-key/25 transition-colors"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-      <pre
-        id="run-log"
-        class="flex-1 overflow-auto whitespace-pre-wrap break-words bg-ink/80 px-5 py-4 font-mono text-xs leading-relaxed text-slate-300"
-      ></pre>
-    </div>
-  </div>
+  <CLITerminal />
 </Layout>
 
 <script>
-  const modal = document.getElementById("run-modal") as HTMLDivElement;
-  const logEl = document.getElementById("run-log") as HTMLPreElement;
-  const titleEl = document.getElementById("run-title") as HTMLSpanElement;
-  const stateEl = document.getElementById("run-state") as HTMLSpanElement;
-  const cancelBtn = document.getElementById("run-cancel") as HTMLButtonElement;
-  const closeBtn = document.getElementById("run-close") as HTMLButtonElement;
-  let aborter: AbortController | null = null;
-
-  function openModal(command: string) {
-    titleEl.textContent = command;
-    logEl.textContent = "";
-    stateEl.textContent = "starting…";
-    cancelBtn.classList.remove("hidden");
-    closeBtn.classList.add("hidden");
-    modal.classList.remove("hidden");
-    modal.classList.add("flex");
-  }
-
-  function closeModal() {
-    modal.classList.add("hidden");
-    modal.classList.remove("flex");
-  }
+  import { openCLITerminal } from "../components/cli-terminal";
 
   async function copyText(text: string, button: HTMLButtonElement) {
     try {
@@ -315,50 +260,12 @@ const rows = movie.story.map((story, index) => {
     }, 1200);
   }
 
-  async function runScriptgen(name: string, force: boolean) {
-    const command = `uv run scriptgen --name ${name}${force ? " --force" : ""}`;
-    openModal(command);
-    aborter = new AbortController();
-    let succeeded = false;
-    try {
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, force }),
-        signal: aborter.signal,
-      });
-      if (!res.ok || !res.body) {
-        const detail = await res.text().catch(() => "");
-        logEl.textContent += `\n[http ${res.status}] ${detail}\n`;
-        stateEl.textContent = "failed";
-        return;
-      }
-      stateEl.textContent = "running…";
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        logEl.textContent += decoder.decode(value, { stream: true });
-        logEl.scrollTop = logEl.scrollHeight;
-        const exitMatch = logEl.textContent.match(/\[exit:(\d+)\]\s*$/);
-        if (exitMatch) succeeded = exitMatch[1] === "0";
-      }
-      stateEl.textContent = succeeded ? "done" : "failed";
-    } catch (err) {
-      if ((err as Error).name === "AbortError") {
-        stateEl.textContent = "cancelled";
-      } else {
-        logEl.textContent += `\n[error] ${(err as Error).message}\n`;
-        stateEl.textContent = "failed";
-      }
-    } finally {
-      cancelBtn.classList.add("hidden");
-      closeBtn.classList.remove("hidden");
-      if (succeeded) {
-        setTimeout(() => location.reload(), 600);
-      }
-    }
+  function runScriptgen(name: string, force: boolean) {
+    openCLITerminal({
+      url: "/api/generate",
+      body: { name, force },
+      command: `uv run scriptgen --name ${name}${force ? " --force" : ""}`,
+    });
   }
 
   document.addEventListener("click", (event) => {
@@ -368,15 +275,9 @@ const rows = movie.story.map((story, index) => {
     if (action === "copy" && target.dataset.command) {
       void copyText(target.dataset.command, target);
     } else if (action === "generate" && target.dataset.name) {
-      void runScriptgen(target.dataset.name, target.dataset.force === "true");
+      runScriptgen(target.dataset.name, target.dataset.force === "true");
     } else if (action === "regenerate" && target.dataset.name) {
-      void runScriptgen(target.dataset.name, true);
+      runScriptgen(target.dataset.name, true);
     }
-  });
-
-  cancelBtn.addEventListener("click", () => aborter?.abort());
-  closeBtn.addEventListener("click", closeModal);
-  modal.addEventListener("click", (event) => {
-    if (event.target === modal && !closeBtn.classList.contains("hidden")) closeModal();
   });
 </script>

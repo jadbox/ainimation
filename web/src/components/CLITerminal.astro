@@ -1,0 +1,80 @@
+---
+// Reusable CLI terminal modal. Include once on any page that triggers CLI
+// runs, then call openCLITerminal({ url, body, command }) from a page script.
+---
+
+<div
+  id="cli-terminal"
+  class="fixed inset-0 z-50 hidden items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+  role="dialog"
+  aria-modal="true"
+  aria-label="CLI command output"
+>
+  <div class="flex max-h-[85vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-line bg-panel shadow-2xl">
+    <div class="flex items-center gap-2 border-b border-line bg-ink/70 px-4 py-2.5">
+      <span class="h-3 w-3 rounded-full bg-rose-400/70" aria-hidden="true"></span>
+      <span class="h-3 w-3 rounded-full bg-amber-key/70" aria-hidden="true"></span>
+      <span class="h-3 w-3 rounded-full bg-emerald-400/70" aria-hidden="true"></span>
+      <span id="cli-terminal-title" class="ml-2 flex-1 truncate font-mono text-xs text-teal-shadow"></span>
+      <span id="cli-terminal-state" class="shrink-0 text-xs text-muted">idle</span>
+    </div>
+    <pre
+      id="cli-terminal-log"
+      class="flex-1 overflow-auto whitespace-pre-wrap break-words bg-ink/90 px-5 py-4 font-mono text-xs leading-relaxed text-emerald-200/80"
+    ></pre>
+    <div class="flex items-center justify-end gap-2 border-t border-line px-4 py-3">
+      <button
+        type="button"
+        id="cli-terminal-copy"
+        title="Copy the command to your clipboard"
+        class="rounded-md px-3 py-1.5 text-xs font-mono text-teal-shadow ring-1 ring-teal-shadow/30 hover:bg-teal-shadow/10 transition-colors"
+      >
+        Copy command
+      </button>
+      <button
+        type="button"
+        id="cli-terminal-run"
+        title="Execute the command in the browser"
+        class="rounded-md bg-emerald-500/15 px-3 py-1.5 text-xs font-medium text-emerald-300 ring-1 ring-emerald-400/40 hover:bg-emerald-500/25 transition-colors"
+      >
+        Run command
+      </button>
+      <button
+        type="button"
+        id="cli-terminal-cancel"
+        title="Send SIGTERM to the running process"
+        class="hidden rounded-md px-3 py-1.5 text-xs text-rose-300 ring-1 ring-rose-400/40 hover:bg-rose-500/10 transition-colors"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        id="cli-terminal-rerun"
+        title="Rerun the last CLI command"
+        class="hidden rounded-md px-3 py-1.5 text-xs text-teal-shadow ring-1 ring-teal-shadow/30 hover:bg-teal-shadow/10 transition-colors"
+      >
+        Rerun
+      </button>
+      <button
+        type="button"
+        id="cli-terminal-close"
+        class="rounded-md bg-amber-key/15 px-3 py-1.5 text-xs text-amber-soft ring-1 ring-amber-key/40 hover:bg-amber-key/25 transition-colors"
+      >
+        Close
+      </button>
+      <button
+        type="button"
+        id="cli-terminal-home"
+        title="Return to the scene list"
+        class="rounded-md px-3 py-1.5 text-xs text-muted ring-1 ring-line hover:text-amber-soft hover:ring-amber-key/40 transition-colors"
+      >
+        Home
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { initCLITerminal } from "./cli-terminal";
+  initCLITerminal();
+</script>

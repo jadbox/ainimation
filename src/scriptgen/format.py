@@ -48,7 +48,7 @@ MANDATES:
 - Midground pieces occlude characters behind them; interacting characters share one depth plane in 3/4 or profile view.
 - Characters look at each other/scripted objects — NEVER into lens; keep 3/4 or profile eyelines.
 - Only the declared speaker moves mouth/lips; all others keep mouths CLOSED, react with body language.
-- Every character stays alive with continuous secondary motion (breathing, weight shifts, ear/whisker twitches); never freeze or stand rigid.
+- Every character stays alive with continuous secondary motion (breathing, weight shifts, twitches); never freeze or stand rigid.
 - No teleporting, position pops, fades, or duplicate/ghost characters.
 - All location/facing changes use continuous physical locomotion (step, walk, turn, pivot, climb).
 

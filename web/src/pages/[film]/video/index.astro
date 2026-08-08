@@ -40,7 +40,7 @@ const scenes = movie.story.flatMap((story) => {
   </div>
 
   <figure class="overflow-hidden rounded-xl border border-line bg-panel shadow-lg shadow-black/30">
-    <video controls class="w-full" src={filmAnimationFileUrl(film, mergedFilm.file)} poster={filmAnimationFileUrl(film, mergedFilm.thumb)}></video>
+    <video controls class="w-full max-h-[1366px] object-contain" src={filmAnimationFileUrl(film, mergedFilm.file)} poster={filmAnimationFileUrl(film, mergedFilm.thumb)}></video>
   </figure>
 
   <section class="mt-7">

@@ -68,7 +68,7 @@ const related = [
   </div>
 
   <figure class="overflow-hidden rounded-xl border border-line bg-panel shadow-lg shadow-black/30">
-    <video controls class="w-full" src={videoUrl} poster={posterUrl}></video>
+    <video controls class="w-full max-h-[1366px] object-contain" src={videoUrl} poster={posterUrl}></video>
   </figure>
 
   {related.length > 1 && (

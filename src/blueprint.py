@@ -53,8 +53,8 @@ def run_subject(
 ) -> int:
     """Run the generate/review loop for one blueprint subject.
 
-    Returns 0 when the reviewer accepts an image, 2 when the iteration cap is
-    reached without acceptance.
+    Every iteration except the final one is reviewed by the reviewer LLM; the
+    final generation is saved as-is without a review. Returns 0.
     """
     output = subject.output_dir
     output.mkdir(parents=True, exist_ok=True)
@@ -68,7 +68,7 @@ def run_subject(
         if existing_prompt_path.is_file()
         else ""
     )
-    if existing_prompt:
+    if existing_prompt and not args.new:
         current_prompt = existing_prompt
         logger.info(
             "Loaded existing %s as the initial prompt (%d chars)",
@@ -76,8 +76,12 @@ def run_subject(
             len(current_prompt),
         )
     else:
+        if args.new:
+            logger.info(
+                "--new: ignoring %s; starting from a fresh initial prompt", existing_prompt_path
+            )
         current_prompt = subject.initial_prompt
-        logger.info("No existing prompt.txt found; built initial prompt from the subject spec")
+        logger.info("Built fresh initial prompt from the subject spec (%d chars)", len(current_prompt))
     last_used_prompt = current_prompt
     attempts: list[Attempt] = []
     history: list[tuple[Attempt, bytes]] = []
@@ -101,35 +105,46 @@ def run_subject(
         save_jpeg(image_data, attempt_image)
         logger.info("Saved attempt image: %s (%d bytes)", attempt_image, len(image_data))
 
-        logger.info(
-            "Running reviewer LLM (model=%s) on iteration %d ...", args.review_model, number
-        )
-        review = review_image(
-            client=client,
-            openrouter_key=openrouter_key,
-            model=args.review_model,
-            system_instruction=subject.review_instruction,
-            prompt=current_prompt,
-            image_data=image_data,
-            history=history,
-        )
-        logger.info("Reviewer response for iteration %d: %s", number, json.dumps(review, indent=2))
-        score_value = review.get("score")
-        score = score_value if isinstance(score_value, int) else None
-        accepted = review.get("accepted") is True
-        learning = str(review.get("learning") or "No specific lesson supplied.").strip()
-        feedback = str(review.get("feedback") or "No specific feedback supplied.").strip()
-        revised_prompt = review.get("revised_prompt")
-        if accepted:
-            prompt_change = "None; the reviewer accepted this image."
-        elif isinstance(revised_prompt, str) and revised_prompt.strip():
-            current_prompt = revised_prompt.strip()
-            prompt_change = "Replaced with the reviewer's complete revised prompt."
+        final_iteration = number == args.max_iterations
+        if final_iteration:
+            logger.info("Final iteration; skipping reviewer review.")
+            score = None
+            accepted = True
+            learning = "No review performed on the final generation."
+            feedback = ""
+            prompt_change = "No review; this is the final generation attempt."
         else:
-            current_prompt = fallback_revision(current_prompt, feedback)
-            prompt_change = (
-                "Appended the review feedback because no replacement prompt was supplied."
+            logger.info(
+                "Running reviewer LLM (model=%s) on iteration %d ...", args.review_model, number
             )
+            review = review_image(
+                client=client,
+                openrouter_key=openrouter_key,
+                model=args.review_model,
+                system_instruction=subject.review_instruction,
+                prompt=current_prompt,
+                image_data=image_data,
+                history=history,
+            )
+            logger.info(
+                "Reviewer response for iteration %d: %s", number, json.dumps(review, indent=2)
+            )
+            score_value = review.get("score")
+            score = score_value if isinstance(score_value, int) else None
+            accepted = review.get("accepted") is True
+            learning = str(review.get("learning") or "No specific lesson supplied.").strip()
+            feedback = str(review.get("feedback") or "No specific feedback supplied.").strip()
+            revised_prompt = review.get("revised_prompt")
+            if accepted:
+                prompt_change = "None; the reviewer accepted this image."
+            elif isinstance(revised_prompt, str) and revised_prompt.strip():
+                current_prompt = revised_prompt.strip()
+                prompt_change = "Replaced with the reviewer's complete revised prompt."
+            else:
+                current_prompt = fallback_revision(current_prompt, feedback)
+                prompt_change = (
+                    "Appended the review feedback because no replacement prompt was supplied."
+                )
 
         attempt_record = Attempt(
             number=number,
@@ -270,6 +285,12 @@ def main() -> None:
         type=int,
         default=MAX_ITERATIONS,
         help=f"Maximum generation/review attempts per subject, 1-{MAX_ITERATIONS} (default: {MAX_ITERATIONS}).",
+    )
+    parser.add_argument(
+        "--new",
+        action="store_true",
+        help="Ignore the previous run's prompt.txt and start from a fresh initial prompt, "
+        "so no prior attempt influences this generation.",
     )
 
     args = parser.parse_args()

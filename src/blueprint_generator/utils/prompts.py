@@ -51,7 +51,7 @@ paper texture, gradient, vignette, scenic setting, floor plane, border, margin,
 frame, prop, or foreground occlusion. Use neutral, even studio lighting with at
 most a subtle contact shadow directly below each figure.
 
-{display_name} is {character.identity}: {character.appearance}. Keep true animal anatomy visible beneath garments.
+{display_name} is a {character.species} — {character.identity}: {character.appearance}. Keep true animal anatomy visible beneath garments.
 {checklist_block}
 This is a formal character turnaround sheet, not a cinematic scene, illustration,
 collage, or pose montage. The film's rendering medium and linework apply to the

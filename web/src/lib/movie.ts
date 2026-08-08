@@ -280,10 +280,12 @@ export function isValidSceneSlug(film: string, slug: string): boolean {
 export function blueprintCommand(
   film: string,
   target: { character?: string; scene?: string },
+  fresh = false,
 ): string {
+  const flag = fresh ? " --new" : "";
   return target.character
-    ? `uv run generate-blueprint --film ${film} --character "${target.character}"`
-    : `uv run generate-blueprint --film ${film} --scene ${target.scene}`;
+    ? `uv run generate-blueprint --film ${film} --character "${target.character}"${flag}`
+    : `uv run generate-blueprint --film ${film} --scene ${target.scene}${flag}`;
 }
 
 export function hasAnimation(film: string, name: string): boolean {

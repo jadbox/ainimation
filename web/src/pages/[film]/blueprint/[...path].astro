@@ -137,16 +137,26 @@ const command = view.kind === "subject" ? blueprintCommand(film, view.target) : 
           <p class="mt-1 font-mono text-sm text-muted">{view.subtitle}</p>
         </div>
         <div class="flex flex-col items-end gap-1.5">
-          <button
-            type="button"
-            id="generate-btn"
-            data-film={film}
-            data-target={JSON.stringify(view.target)}
-            title={command}
-            class="rounded-md bg-amber-key/15 px-4 py-2 text-xs font-medium text-amber-soft ring-1 ring-amber-key/40 hover:bg-amber-key/25 transition-colors"
-          >
-            {mainImage ? "Regenerate design" : "Generate design"}
-          </button>
+          <div class="flex items-center gap-3">
+            <label
+              for="ignore-prev"
+              class="flex cursor-pointer select-none items-center gap-1.5 text-[10px] text-muted"
+              title="Start from a fresh initial prompt, ignoring the previous generation"
+            >
+              <input type="checkbox" id="ignore-prev" class="h-3 w-3 accent-amber-key" />
+              ignore previous img
+            </label>
+            <button
+              type="button"
+              id="generate-btn"
+              data-film={film}
+              data-target={JSON.stringify(view.target)}
+              title={command}
+              class="rounded-md bg-amber-key/15 px-4 py-2 text-xs font-medium text-amber-soft ring-1 ring-amber-key/40 hover:bg-amber-key/25 transition-colors"
+            >
+              {mainImage ? "Regenerate design" : "Generate design"}
+            </button>
+          </div>
           {view.note && <span class="max-w-56 text-right text-[10px] text-muted">{view.note}</span>}
         </div>
       </div>
@@ -226,10 +236,16 @@ const command = view.kind === "subject" ? blueprintCommand(film, view.target) : 
         character?: string;
         scene?: string;
       };
+      const fresh = (document.getElementById("ignore-prev") as HTMLInputElement | null)?.checked ?? false;
+      const flag = fresh ? " --new" : "";
       const command = target.character
-        ? `uv run generate-blueprint --film ${film} --character "${target.character}"`
-        : `uv run generate-blueprint --film ${film} --scene ${target.scene}`;
-      openCLITerminal({ url: "/api/generate-blueprint", body: { film, ...target }, command });
+        ? `uv run generate-blueprint --film ${film} --character "${target.character}"${flag}`
+        : `uv run generate-blueprint --film ${film} --scene ${target.scene}${flag}`;
+      openCLITerminal({
+        url: "/api/generate-blueprint",
+        body: fresh ? { film, ...target, new: true } : { film, ...target },
+        command,
+      });
     } catch {
       /* invalid target; ignore */
     }

@@ -10,7 +10,7 @@ import {
 export const prerender = false;
 
 export async function POST({ request }: { request: Request }) {
-  let body: { film?: string; character?: string; scene?: string };
+  let body: { film?: string; character?: string; scene?: string; new?: boolean };
   try {
     body = await request.json();
   } catch {
@@ -23,6 +23,7 @@ export async function POST({ request }: { request: Request }) {
   const film = typeof body.film === "string" ? body.film.trim() : "";
   const character = typeof body.character === "string" ? body.character.trim() : "";
   const scene = typeof body.scene === "string" ? body.scene.trim() : "";
+  const fresh = body.new === true;
 
   if (!film || !isValidFilm(film)) {
     return new Response(JSON.stringify({ error: `Unknown film: "${film}"` }), {
@@ -35,15 +36,18 @@ export async function POST({ request }: { request: Request }) {
   let command: string;
   if (character && isValidCharacter(film, character)) {
     args = ["run", "generate-blueprint", "--film", film, "--character", character];
-    command = blueprintCommand(film, { character });
+    command = blueprintCommand(film, { character }, fresh);
   } else if (scene && isValidSceneSlug(film, scene)) {
     args = ["run", "generate-blueprint", "--film", film, "--scene", scene];
-    command = blueprintCommand(film, { scene });
+    command = blueprintCommand(film, { scene }, fresh);
   } else {
     return new Response(
       JSON.stringify({ error: `Unknown blueprint subject: "${character || scene}"` }),
       { status: 400, headers: { "Content-Type": "application/json" } },
     );
+  }
+  if (fresh) {
+    args.push("--new");
   }
 
   const encoder = new TextEncoder();

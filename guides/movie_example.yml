@@ -1,0 +1,39 @@
+movie:
+  title: "Example Film"
+  headline: "a short example film"
+  style: "classic hand-drawn 2D animation: ink lines, cel shading, warm key light, cool shadows, film grain"
+  camera_rules: "Keep the camera at eye level around a single dominant light source."
+  orientation: "16:9"
+  hard_direction_rules:
+    - "Every shot orbits a single dominant light source."
+
+characters:
+  - name: "Hero"
+    species: "rabbit"
+    identity: "the story's brave protagonist"
+    appearance: "brown fur, long ears, eager eyes, worn scarf"
+    voice: "warm, determined"
+    avoid: "extra limbs, text, watermarks"
+
+scenes:
+  - name: "Forest Clearing"
+    slug: "forest-clearing"
+    logline: "a sunlit clearing the hero must cross"
+    backgrounds:
+      - key: "clearing-wide"
+        description: "a grassy clearing framed by towering trees"
+        lighting: "one warm shaft of sunlight"
+        mood: "hopeful"
+
+story:
+  - name: "hero_crosses_clearing"
+    title: "Crossing the Clearing"
+    scene: "forest-clearing"
+    characters:
+      - "Hero"
+    emotions:
+      - "hope"
+    actions:
+      - "Hero walks across the clearing"
+    looks:
+      - "Hero looks ahead toward the far trees"

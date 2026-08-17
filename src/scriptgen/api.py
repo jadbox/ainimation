@@ -54,6 +54,10 @@ def generate_document(
             raise RuntimeError(
                 f"OpenRouter API error ({response.status_code}): {response.text}"
             )
+        # OpenRouter's SSE responses often omit a charset, which makes requests
+        # fall back to latin-1 and mojibake every UTF-8 character (em dashes,
+        # degree signs) in the generated script. Force UTF-8.
+        response.encoding = "utf-8"
         return _read_stream(response).strip()
 
     response = requests.post(
@@ -63,6 +67,7 @@ def generate_document(
         raise RuntimeError(
             f"OpenRouter API error ({response.status_code}): {response.text}"
         )
+    response.encoding = "utf-8"
     data = response.json()
     try:
         content = data["choices"][0]["message"]["content"]

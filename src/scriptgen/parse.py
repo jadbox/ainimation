@@ -99,12 +99,16 @@ def part_file_path(base_path: Path, idx: int) -> Path:
 
 
 def extract_segment_body(part_content: str) -> str:
-    """Extract the segment body from a saved part file (text after the SCENE SCRIPT marker)."""
+    """Extract the segment body from a saved part file.
+
+    The body is everything from the first MiniMax core field label
+    (``integrated_multimodal_description:``) to the end of the file.
+    """
     lines = part_content.splitlines()
     body_start = None
     for i, line in enumerate(lines):
-        if line.strip().startswith("=== SCENE SCRIPT"):
-            body_start = i + 1
+        if line.strip().startswith("integrated_multimodal_description:"):
+            body_start = i
             break
     if body_start is None:
         return part_content.strip()
@@ -120,7 +124,7 @@ def parse_part_file(content: str) -> tuple[str, str, list[str], str]:
 
     setting = ""
     match = re.search(
-        r"^=== SHARED SETTING & LIGHT[^\n]*\n(.*?)^=== SCENE SCRIPT",
+        r"^=== SHARED SETTING & LIGHT[^\n]*\n(.*?)^integrated_multimodal_description:",
         content,
         flags=re.MULTILINE | re.DOTALL,
     )
@@ -134,7 +138,10 @@ def parse_part_file(content: str) -> tuple[str, str, list[str], str]:
         flags=re.MULTILINE,
     )
     if match:
-        for chunk in match.group(1).split(","):
+        # Strip <VOICE>...</VOICE> tags before splitting on commas — voice
+        # descriptions contain commas that are not character separators.
+        cleaned = re.sub(r"<VOICE>.*?</VOICE>", "", match.group(1), flags=re.IGNORECASE)
+        for chunk in cleaned.split(","):
             name = standardize_name(chunk)
             if name:
                 characters.append(name)

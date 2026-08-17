@@ -30,8 +30,15 @@ logger = logging.getLogger("animator.api")
 
 
 def build_gemini_input_items(request: VideoRequest) -> list[dict[str, Any]]:
-    """Encode a :class:`VideoRequest` into Gemini's input item dicts."""
+    """Encode a :class:`VideoRequest` into Gemini's input item dicts.
+
+    Reference images are numbered ``<IMAGE_REF_N>`` in the same order the
+    animator's prompt builder assigns them (characters, then background
+    plate, then continuity frame, then closing frame) so that the alignment
+    instructions prepended to the prompt reference the correct image.
+    """
     items: list[dict[str, Any]] = [{"type": "text", "text": request.prompt}]
+    next_idx = 0
     for index, ref in enumerate(request.character_references):
         items.append(
             {
@@ -46,8 +53,9 @@ def build_gemini_input_items(request: VideoRequest) -> list[dict[str, Any]]:
                 "mime_type": ref.mime_type,
             }
         )
+        next_idx = index + 1
     if request.background_reference is not None:
-        bg_idx = len(request.character_references)
+        bg_idx = next_idx
         items.append(
             {
                 "type": "text",
@@ -64,11 +72,16 @@ def build_gemini_input_items(request: VideoRequest) -> list[dict[str, Any]]:
                 "mime_type": request.background_reference.mime_type,
             }
         )
+        next_idx = bg_idx + 1
     if request.continuity_frame is not None:
+        cont_idx = next_idx
         items.append(
             {
                 "type": "text",
-                "text": f"Mandatory opening frame <FIRST_FRAME>: {CONTINUITY_MESSAGE}",
+                "text": (
+                    f"Mandatory opening frame <IMAGE_REF_{cont_idx}> "
+                    f"(<FIRST_FRAME>): {CONTINUITY_MESSAGE}"
+                ),
             }
         )
         items.append(
@@ -78,11 +91,16 @@ def build_gemini_input_items(request: VideoRequest) -> list[dict[str, Any]]:
                 "mime_type": request.continuity_frame.mime_type,
             }
         )
+        next_idx = cont_idx + 1
     if request.closing_frame is not None:
+        close_idx = next_idx
         items.append(
             {
                 "type": "text",
-                "text": f"Mandatory closing frame <LAST_FRAME>: {CLOSING_MESSAGE}",
+                "text": (
+                    f"Mandatory closing frame <IMAGE_REF_{close_idx}> "
+                    f"(<LAST_FRAME>): {CLOSING_MESSAGE}"
+                ),
             }
         )
         items.append(

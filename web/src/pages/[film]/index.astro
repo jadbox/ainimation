@@ -149,7 +149,8 @@ const rows = movie.story.map((story, index) => {
               </td>
               <td class="px-4 py-3" data-status>
                 <a href={`/${film}/scene/${row.story.name}`} class="">
-                  {row.partsDone === row.parts.length ? (
+                  {row.parts.length > 0 &&
+                  row.partsDone === row.parts.length ? (
                     <span class="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-300 ring-1 ring-emerald-400/30">
                       <span class="h-1.5 w-1.5 rounded-full bg-emerald-400" />{" "}
                       {row.partsDone}/{row.parts.length} ready

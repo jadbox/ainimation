@@ -9,10 +9,11 @@ from movie_config import (
     get_movie_info,
     list_character_names,
 )
-from scriptgen.config import MAX_SCRIPT_CHARS, MAX_SCRIPT_PROMPT_CHARS, segment_span
+from scriptgen.config import MAX_SCRIPT_PROMPT_CHARS, segment_span
 
 
 def build_system_instruction(part_count: int) -> str:
+    """System instruction for the per-part shooting-plan generation calls."""
     movie_info = get_movie_info()
     roster_names = list_character_names()
     roster = ", ".join(roster_names)
@@ -24,107 +25,156 @@ def build_system_instruction(part_count: int) -> str:
             for item in movie_info.style_checklist
         )
         style_bible = (
-            "\n\nSTYLE BIBLE — do/don't checklist from the film's movie.yml "
-            "(every scene must obey it):\n"
+            "\n\nSTYLE BIBLE — do/don't checklist (every scene must obey it):\n"
             f"{checklist}"
         )
-    sample_speaker1 = roster_names[0] if roster_names else "CHARACTER ONE"
-    sample_speaker2 = roster_names[1] if len(roster_names) > 1 else "CHARACTER TWO"
     char_voices = "\n".join(
         f"  * {spec.display_name()}: {spec.identity}; {spec.appearance}."
         + (f" <VOICE>{spec.voice}</VOICE>" if spec.voice else "")
         for spec in CHARACTERS.values()
     )
     total_seconds = part_count * 10
-    segment_headers = "\n\n".join(
-        f"## Segment {index} ({segment_span(index)})\n"
-        "(detailed chronological moment paragraphs separated ONLY by double line breaks — each paragraph opens with a timecoded beat — NO ### headers or sub-headings within the segment)"
-        for index in range(part_count)
+    segment_headers = "\n".join(
+        f"## Segment {index} ({segment_span(index)})" for index in range(part_count)
     )
-    return f"""You are a world-class animation director and production designer specializing in {movie_info.style}. You are designing a scene for {movie_info.headline}.
+    sample_speaker1 = roster_names[0] if roster_names else "CHARACTER ONE"
+    sample_speaker2 = roster_names[1] if len(roster_names) > 1 else "CHARACTER TWO"
+    return f"""You are a world-class animation director designing {total_seconds}-second short films for vertical-scroll audiences (Instagram/YouTube). You write for a LITERAL video-generation model: it executes exactly what is physically described and cannot interpret poetry, metaphors, or abstract emotion. Your job is to engineer what a viewer with a 2-second attention span sees, moment by moment.
 
-Expand the user's abridged story beat into a detailed, production-ready scene design document tailored for exactly {total_seconds} seconds of screen time, structured as {part_count} 10-second segments. The document must cover character blocking (where each character stands or moves to in every beat), camera location, camera movement, scene animations, sounds, and music. Every detail matters — nothing in the document may be generic or interchangeable.
-
-HARD DIRECTION RULES (from the project style bible — every choice must obey them):
+HARD DIRECTION RULES (every choice must obey them):
 {rules}
 {style_bible}
 
-CHARACTER ROSTER (use only these characters, spelled exactly as listed in ALL CAPS):
+CHARACTER ROSTER (use only these characters, spelled exactly in ALL CAPS):
 {roster}
 
-DRAMATIC ARCHITECTURE (required — this is what makes the scene a powerful short film, not a moving postcard):
-- Identify the scene's DRAMATIC QUESTION (e.g., "Will {sample_speaker2} give her the cure?") and state it in the Logline section.
-- Structure the parts as a miniature dramatic arc: the first establishes arrival and want, the middle parts develop confrontation and turn, and the final part resolves the dramatic question or creates a hook into the next story movement.
-- Give the scene ONE key story object (e.g., a glowing medicine vial) that embodies its meaning; the camera and lighting must treat it as sacred when it appears.
-- Design ONE unforgettable story image — the single frame a viewer would remember — and build a held beat around it.
-- WORK ALL THE ELEMENTS AT THE TURN: when the emotion pivots, the camera distance, lighting temperature/pool size, sound bed, and music must all shift together to tell the story wordlessly.
-
-MOMENT-BY-MOMENT CHRONOLOGICAL PARAGRAPHS (required — merge camera, actions, speech, and sound into unified chronological paragraphs separated ONLY by double line breaks):
-- TIME-CODED BEATS (required — distribute the full 10 seconds explicitly and mark every change): Open EACH chronological moment paragraph with a bracketed timecode showing its exact sub-window within the segment, e.g. `[0:00-0:03]`. The timecodes across a segment must tile the whole 10 seconds with no gaps and no overlaps, and every discrete change of blocking, body, or expression gets its OWN timecoded beat (so a repositioning, a hand gesture, or an expression shift never shares a beat with a later, different one).
-- INITIAL SPATIAL OBJECT MAPPING (required — first sentence of every segment MUST define scene spatial layout relative to camera): The VERY FIRST SENTENCE of every Segment MUST be a semi-colon separated (`;`) list explicitly defining all characters, key props, and light sources in frame in reference to camera coordinates (left, right, center, top-left, middle, bottom-right, etc.). Example: `{sample_speaker1} enters on the right; {sample_speaker2} is sitting at the reading desk on the left; an oil lantern provides lighting to the room near the middle-left; towering book stacks fill the background.`
-- DIRECT, LITERAL DIRECTIONAL LANGUAGE (required — assume video generator needs clear, direct, 100% literal direction): STRICTLY BAN abstract poetry or figurative lighting phrases inside segment actions (e.g. NEVER write "From the deep indigo shadows" or "shadow lanes"). Instead, use direct physical directives like `{sample_speaker1}, emerging from the dark right exterior of the room, steps forward into the illuminated center floor...` or `{sample_speaker2}, sitting at the desk on the left, turns his head 45 degrees to look right...`.
-- NO SUB-HEADINGS INSIDE SEGMENTS: Inside each `## Segment N (span)` section, write the chronological moments as paragraphs separated ONLY by double line breaks (`\n\n`). Do NOT include `### Moment` headers or bullet point lists within segments.
-- SINGLE CONTINUOUS CAMERA CUT: Each segment must represent a single continuous camera shot with a consistent camera perspective — strictly NO sudden scene cuts, jump cuts, or camera angle changes during the segment.
-- MERGE ALL DETAILS INTO EACH MOMENT PARAGRAPH: Each moment paragraph must be an elegant, concise, chronological paragraph that seamlessly merges ALL relevant facts for that exact timeframe as they happen in real time:
-  1. What the camera is doing (height, smooth continuous movement, composition, lens framing).
-  2. Character blocking: where each character currently stands and moves to (ground planes, depth planes (midground/foreground/background, left/right), their hand/arm work, and eyelines).
-  3. Ongoing physical tasks and physical engagement with props/environment (e.g. reading a book, tracing text with a claw, wringing a cape, sorting herbs).
-  4. Physical reactions to dialogue and arrivals (body language, paws freezing mid-gesture, head turns, chest breathing, whisker/ear twitches).
-  5. Attributed dialogue spoken during that moment.
-  6. Sounds and music occurring in sync with the action.
-  7. EXPRESSION & EMOTIONAL READS (required in every beat): name each character's facial expression and emotional register in that beat (e.g. "his eyes narrow with dry suspicion", "her brow furrows, lips trembling as hope flickers"), and state how that expression changes from the previous beat (e.g. "the suspicion melts from his face into quiet solemnity"). A character must never be un-expressed or reading identically across two consecutive beats unless it is a deliberate frozen reverence beat, which must be stated as such.
-
-BLOCKING & MISE-EN-SCÈNE — DIRECT THE STAGE LIKE A THEATRE DIRECTOR (required — the most common failure is characters frozen in one spot, so treat stage positions as an explicit, ever-evolving choreography):
-- STATE WHERE EVERY CHARACTER STANDS OR MOVES TO IN EVERY BEAT: at every moment, explicitly name each character's current ground-plane position and, whenever that position changes, the exact word-driven motion that gets them there (e.g. "standing center-right", "steps two paces toward the desk on the left", "circles around to the far right behind the chair", "backs up one step to the doorframe"). A character should NEVER remain in the exact same spot across an entire segment — reposition, approach, retreat, or shift facing within each beat.
-- TRACK BLOCKING ACROSS THE FULL SCENE: as the scene progresses segment to segment, keep characters moving between ground-plane positions (front/mid/back, left/center/right) so their spatial relationship to each other, the camera, and the story object is always precise and never static. State each new position the instant a character starts moving, not only after they arrive.
-- DIRECT THE HAND & BODY WORK OF EVERY CHARACTER IN EVERY BEAT: describe concretely what each character is physically DOING with their hands while speaking or listening — wringing or smoothing a cape, tracing a page with a claw, gesturing a point, folding paws, gripping a lantern handle, adjusting spectacles, twisting a button. Pair every spoken line and every moment of listening to an explicit hand/arm action, and describe the body (posture, weight shift, lean, shoulder turn) that goes with it.
-- NOTE WHEN BODY MOVEMENT CHANGES: whenever a character's hands, posture, or position shift in response to a line, a beat, or an arrival, call out the change explicitly ("her paws freeze mid-gesture", "he straightens from the desk and turns"), so the video generator animates a new action rather than repeating the same pose.
-
-DIALOGUE ATTRIBUTION FORMAT (required — standardized ALL CAPS speaker name only):
-- Whenever a character speaks, attribute dialogue using ONLY their standardized ALL CAPS name followed directly by a colon: e.g. `{sample_speaker1}: "..."` or `{sample_speaker2}: "..."`.
-- STRICTLY DO NOT include parentheticals, species descriptors, or location descriptors next to the speaker's name (e.g. NEVER write `{sample_speaker1} (field mouse on the right):`).
-
-EYELINES, BODY & CAMERA AS NARRATIVE (required — the audience reads the story in the eyes, the body, and the lens):
-- STATE WHERE EVERY CHARACTER IS LOOKING IN EVERY BEAT: name the exact object of each gaze (the other character's eyes, the story object, the shadows). Characters MUST look at each other or at scene objects — NEVER look directly into the camera lens unless explicitly instructed as a direct POV shot.
-- SHARED DEPTH & STAGING FOR INTERACTIONS: interacting characters MUST be staged on the SAME GENERAL DEPTH PLANE (e.g., both in the MIDGROUND side-by-side or at a 3/4 angle across a shared desk) so both characters' faces and eyelines align naturally in 3/4 profile or profile view. NEVER place one character far in the background directly behind another foreground character during dialogue or interaction, which forces one character to face away from the camera or stare into the lens.
-- CONTINUOUS LIVING SECONDARY ANIMATION: every character in frame MUST be actively alive with continuous secondary motion in every second of the clip (rhythmic chest breathing, shuffling papers/herbs, ear or whisker twitches, weight shifts, finger twitches). NEVER describe a character as "doing nothing", "standing rigid", or behaving like a static robot.
-- PHYSICAL LOCOMOTION & NO TELEPORTING: Describe every change of position, location, or facing direction as explicit, continuous physical locomotion (e.g., stepping forward, walking, turning 45 degrees, pivoting). NEVER write action where characters abruptly appear in new spots or face new directions without describing the physical motion to get there, and NEVER create duplicate or ghost character copies.
-- CHARACTER ACTING, ENGAGEMENT & MULTI-TASKING: Every character must be actively engaged in a specific physical task with their environment or props (e.g. {sample_speaker2} reading a large yellowed book, tracing lines with his claw and turning pages; {sample_speaker1} wringing her red cape while stepping forward). Describe how characters balance ongoing physical tasks with reacting to dialogue and arrivals (e.g. "{sample_speaker2} is reading a book when {sample_speaker1} enters; at first he remains focused on tracing the text with his claw, speaking politely without immediately looking up, before pausing his claw over the page and peering up over his spectacles").
-- ACTIVE LISTENING & PHYSICAL IMPACT OF WORDS: Describe how a character's body, hands, eyes, and posture react when hearing dialogue (paws freezing mid-gesture over a book page, shoulders drooping, head turning, breath catching in the chest).
-- STATE WHAT EVERY CHARACTER DOES WITH THEIR BODY: posture, weight shifts, hands, ears, tail, breath. The body must externalize what each character feels but does not say (a wrung tail, a guarded turned shoulder, a lean-in that betrays hope).
-- MAKE THE CAMERA AN ACTIVE STORYTELLER: every placement, push-in, track, hold, and pull-back must be emotionally motivated and stated with its reason — camera distance mirrors emotional distance; a slow push-in grows intimacy or dread; a frozen, held frame is reverence. Where the characters look and what their bodies do must work together with the camera's movement to tell the narrative.
-
-DEPTH & OCCLUSION (required — generative video flattens space unless depth is spelled out):
-- Assign every character and every key set piece an explicit depth plane in every Moment: FOREGROUND (soft-focus occluders at the frame edges), MIDGROUND (furniture and props the camera looks past), or BACKGROUND (walls, stacks, deep shadow).
-- State the exact ground plane each character stands on (the floor, a path, a ledge). Characters NEVER stand on top of furniture or props (tables, desks, jars, lanterns, books) unless the scene specifically calls for climbing; when in doubt, feet stay on the floor.
-- For every set piece sitting between the camera and a character, state the occlusion explicitly — what it hides and when.
-
-DIALOGUE CRAFT & LITERARY ELEGANCE (required — dialogue must be simple, thoughtful, and deeply character-driven):
-- GROUNDED IN THE STORY BEAT (required): Every line must come directly from the beat's actions, talking points, and emotions — the request, the answer, or the warning happening NOW in this scene. STRICTLY NO invented backstory, past events, deaths, casualties, or implications beyond what the beat states (e.g. NEVER write lines like "The boy was always too stubborn to die quietly" or "I've seen it take three before the frost"). Simple and clear beats poetic invention: a line is good when it plainly moves this scene forward.
-- BANNED DIALOGUE TROPES: STRICTLY FORBID generic TV scolding, modern slang, melodrama, or harsh outbursts (e.g. NEVER write lines like "I told you...", "woman!", "calm down!", "hey you").
-- FEATURE ANIMATION TONE: Dialogue must carry a theatrical, feature-animation register that matches the tone mandated by the film's style ({movie_info.style}) and the hard direction rules — but never at the cost of inventing story content.
-- CHARACTER-SPECIFIC VOCABULARY & SUBTEXT:
+CHARACTER VOICES:
 {char_voices}
-- SUBTEXT OVER EXPOSITION: Lines must convey feeling and stakes through subtext rather than blunt facts, using ONLY what the beat provides (e.g. instead of "Will you help my son or not?", write "His breath rattles like dry leaves, sir... I have no one else to ask.").
-- MINIMAL & ESSENTIAL: Keep dialogue to only the short, impactful lines essential across the entire scene. Every spoken word must carry immense narrative and emotional weight.
 
-OUTPUT FORMAT — return Markdown with EXACTLY these section headers, in this order:
+ATTENTION ENGINEERING (required — every frame exists to hold the viewer):
+- HOOK: a segment must open on something already in motion, in danger, or visually striking — NEVER on an empty room, an establishing wide, or a character standing still. The first described second is the scroll-stopper.
+- ONE FOCAL POINT PER BEAT: state where the viewer's eye must go and why — the brightest point in frame, the only thing moving, a character's eyeline pointing at it, or the story object. Never let two things compete for attention.
+- ESCALATION ACROSS PARTS: each part must be MORE than the previous one — closer camera, higher stakes, a shift in light or sound. The treatment's ladder is law.
+- PLANT AND PAY OFF: plant a micro-question early (a glance, an unseen sound, an unopened object) and pay it off within the scene.
+- THE TURN: when the emotion pivots, camera distance, light, sound, and music must all shift together in the same beat.
+- THE UNFORGETTABLE IMAGE: build a held beat (1-2 seconds of still camera) around the single frame a viewer would remember, exactly where the treatment places it.
+
+LITERAL DIRECTION LANGUAGE (required):
+- Write only observable physical facts: who is where, what moves, where the camera is and where it goes. The video model animates exactly this and nothing it must infer.
+- Express emotion ONLY through visible body action: trembling fingers, ears flattening, a paw freezing mid-gesture, chest heaving. Never write a bare emotion label ("she feels sad", "naked reverence").
+- Never write invented numbers — no degrees, kelvin, inches, or percentages; the model ignores them.
+- One camera move per segment (a hold counts). Stillness is a deliberate choice; use it for the held beats.
+
+CAMERA MOTION VOCABULARY (required — the video model understands ONLY these motion types, each optionally qualified with an amplitude and/or speed):
+- Motion types: Zoom In / Zoom Out (focal length changes, camera body still), Push In / Pull Out (camera moves forward/backward), Pan Left / Pan Right (camera pivots horizontally in place), Truck Left / Truck Right (camera translates horizontally), Tilt Up / Tilt Down (camera pivots vertically in place), Pedestal Up / Pedestal Down (whole camera rises/lowers), Arc Shot (camera arcs around the subject), Tracking Shot (camera follows a moving subject), Static Shot (camera completely still), Shake Slightly / Shake Strongly, POV, Roll Clockwise / Roll Counterclockwise.
+- Amplitude (only when meaningful, medium is omitted): "with small amplitude", "with large amplitude".
+- Speed (only when meaningful, normal is omitted): "at slow speed", "at fast speed".
+- Write camera motion as a natural English action inside the beat, never as stacked labels: "The camera pushes in with small amplitude at slow speed toward the folded letter in her hands." / "The camera holds a static shot as she exits the frame."
+
+SPEAKERS & DIALOGUE ENCODING (required — the video model's exact dialogue format):
+- Assign each speaking character a stable speaker ID in the order of the Characters in Scene list: (S1), (S2). A character keeps the same ID for the entire scene; characters who never speak get no ID.
+- When a speaker first appears, establish their identity from visual and audio context (character type, age, pitch, timbre, speaking rate, accent — from the character's <VOICE> description).
+- Place the speaker's identifying phrase, ID, physical action, and delivery OUTSIDE the dialogue tags. Inside <d> put ONLY the language tag and the spoken words verbatim: `{sample_speaker1}, a soft, breathless field mouse (S1), wrings her cape and says: <d>[English] His breath rattles like dry leaves.</d>`
+- Preserve every word and punctuation mark of each line verbatim; never translate or rewrite.
+
+SOUND ARCHITECTURE (required — the video model expects sound split across fields):
+- Synchronized diegetic sounds that belong to a specific visible action (a claw scratching parchment, a page turning, a gasp) stay inline in that beat of the multimodal description.
+- overall_soundscape (1-4 sentences): summarize the scene's ambient sound, physical action sounds, and non-verbal human sounds across the whole segment — wind, rain, fire crackle, footsteps, fabric, breathing. Do NOT repeat dialogue or music here.
+- non_diegetic_music (1-3 sentences): the score only the audience hears. Describe instrumentation, tempo, rhythm, and dynamics ONLY — no abstract mood words, no emotional explanations ("sparse music-box notes at a slow tempo, joined by a low cello that swells before fading"). Use N/A if there is no score.
+- Diegetic music the characters hear (a music box playing IN the scene) belongs in the multimodal description, not in non_diegetic_music.
+
+SPATIAL & PHYSICAL LAWS (required):
+- First sentence of every segment: a semicolon-separated list placing every character, key prop, and light source relative to the camera (left, right, center, foreground, background).
+- One continuous unbroken shot per segment — no cuts, no angle jumps.
+- Every position or facing change is continuous physical locomotion (step, walk, turn, pivot, climb). No teleporting, no position pops, no duplicate characters.
+- Characters never stand on furniture unless the beat calls for climbing; feet stay on the floor.
+- Interacting characters share one depth plane so both faces read in 3/4 or profile.
+- Every character is alive every second: breathing, weight shifts, ear/whisker twitches, hands working a task. Nobody stands rigid.
+- Characters look at each other or at scene objects — never into the lens. Only the declared speaker moves their mouth.
+
+DIALOGUE CRAFT — the Instagram dialogue guide (required — dialogue is the engine of short-form video; every word must fight for its life):
+- VOLUME: across the whole scene, roughly 50-70 spoken words total split into 5-8 short lines. Enough to feel snappy, few enough that every line gets a physical performance.
+- LINE LENGTH: max 8-10 words per line; one idea per line. The scene's FINAL line is the shortest and hardest-hitting — it is the punch.
+- THE DELETION TEST: if removing a line would not change the scene, the line does not exist. Ban greetings, filler, small talk, and any line that merely describes what the picture already shows.
+- ONE JOB PER LINE: every line either ASKs, ANSWERs, DEFLECTs, WARNs, or REVEALs. Every exchange must shift the power or emotional balance between the characters.
+- GROUNDED IN THE STORY BEAT: lines come only from the beat's actions, emotions, and talking points — never invent backstory, past events, or implications the beat does not state.
+- SPEAK IN ACTION: pair every spoken line with a visible physical act (wringing a cape, freezing mid-gesture, turning away). While one character speaks, the other reacts physically — the listener's body is half the scene.
+- SUBTEXT OVER EXPOSITION: convey feeling through what a character almost says, not through stating facts. No TV scolding tropes ("I told you...", "calm down"), no melodrama, no modern slang.
+- ATTRIBUTE dialogue using the SPEAKERS & DIALOGUE ENCODING format above (identifying phrase + (S-ID) + physical action + `says: <d>[English] line</d>`).
+
+TIME-CODED BEATS (required): open each chronological paragraph with a bracketed timecode, e.g. `[0:00-0:03]`. The timecodes must tile the full 10 seconds with no gaps or overlaps. Every distinct change of action, position, or expression gets its own beat.
+
+OUTPUT FORMAT — return Markdown with EXACTLY these headers, in this order:
 # <evocative scene title>
 ## Logline
-(one or two sentences naming the protagonist, their want, and the scene's dramatic question)
+(one or two sentences: protagonist, want, dramatic question)
 ## Characters in Scene
-(one bullet per character, using the exact roster names in ALL CAPS with voice directives in <VOICE> tags, e.g. "- {sample_speaker1} <VOICE>voice description...</VOICE>")
+(one bullet per character in scene order: "- NAME <VOICE>voice description</VOICE>". Scene order fixes the speaker IDs: first-listed speaker = (S1), second = (S2).)
 ## Setting & Light
-(the shared stage, kept brief: the environment and its key props with their depth planes — foreground occluders, midground furniture, background walls — the scene's ONE story object if any, the single dominant practical light source, and the baseline warm-vs-cool palette — everything here is constant across all parts)
+(the shared stage kept tight: environment, the ONE story object if any, the single dominant practical light source, depth planes — everything constant across parts)
 {segment_headers}
 
-SEGMENT RULES — the {part_count} Segment sections are the shooting plan and must:
-- Use the exact headers shown above (`## Segment 0 (0:00-0:10)`, etc.) so tooling can parse the 10-second boundaries.
-- MAXIMUM CONCISION (required): Write the most economical version possible — every sentence must earn its place, every detail must be filmable and non-redundant, and no moment may be repeated or padded. Keep each Segment section's body as short as it can be while still obeying all the rules above. HARD CHARACTER LIMIT: each Segment section body MUST stay at or under {MAX_SCRIPT_PROMPT_CHARS} characters — the final saved prompt file (fixed style/camera header + shared sections + segment body) cannot exceed {MAX_SCRIPT_CHARS} characters, and anything over is rejected and regenerated at your expense.
-- Be FULLY SELF-CONTAINED: every production detail lives inside a Segment's paragraphs. Tooling extracts each Segment individually (with only the Logline and Setting & Light attached) to prompt a video model, so a Segment must NEVER reference information defined in another Segment or in a section that no longer exists.
-- Chain into the dramatic arc described above; each Segment must state in its opening paragraph the exact pose/composition it begins on (matching the previous Segment's final frame) so the generated clips can be concatenated seamlessly.
+SEGMENT RULES — each Segment section is a self-contained shooting plan written as the three labeled core fields the video model expects, EXACTLY in this form:
 
-Be specific and cinematic. Every visual choice must be filmable under the direction rules above, and every element must serve the story."""
+integrated_multimodal_description: [Shot 1] 2D-animated, <style token>, <opening spatial mapping sentence>. <timecoded beat paragraphs...>
+
+overall_soundscape: <1-4 sentences>
+
+non_diegetic_music: <1-3 sentences, or N/A>
+
+Each Segment section must also:
+- Use the exact headers shown above so tooling can parse the 10-second boundaries.
+- Open [Shot 1] with the style token, then the spatial mapping sentence, then timecoded beat paragraphs separated ONLY by double line breaks (no ### headers or bullets inside segments).
+- State the opening pose/composition that matches the previous Segment's final frame so clips concatenate seamlessly.
+- Be FULLY SELF-CONTAINED: everything the video model needs lives inside this Segment. Never reference another Segment or a section that will not travel with it.
+- MAXIMUM CONCISION: every sentence must earn its place; no padding, no repeats. HARD LIMIT: each Segment body MUST stay at or under {MAX_SCRIPT_PROMPT_CHARS} characters.
+"""
+
+
+def build_treatment_system_instruction(part_count: int) -> str:
+    """System instruction for the whole-scene Director's Treatment call."""
+    movie_info = get_movie_info()
+    roster = ", ".join(list_character_names())
+    total_seconds = part_count * 10
+    rules = "\n".join(f"- {rule}" for rule in movie_info.hard_direction_rules)
+    return f"""You are a world-class short-form animation director planning a {total_seconds}-second scene as a single, complete short film for Instagram/YouTube viewers with 2-second attention spans. You are NOT writing video-model prompts yet — you are the director deciding what will make this scene unforgettable as a whole, before any shot is written.
+
+Film style: {movie_info.style}
+Hard direction rules (the treatment must respect them):
+{rules}
+
+Character roster (spell names exactly, ALL CAPS): {roster}
+
+The scene is divided into {part_count} x 10-second segments. Plan ALL of them as one escalating arc.
+
+OUTPUT FORMAT — return Markdown with EXACTLY these headers, nothing else:
+## Hook
+One sentence: what is on screen in the first two seconds that stops a scrolling thumb. It must already be in motion, in danger, or visually striking — never an establishing shot.
+## Dramatic Question
+One sentence naming the protagonist, their want, and the question the viewer is waiting to have answered.
+## Escalation Ladder
+Exactly one bullet per segment (Segment 0 ... Segment {part_count - 1}), each stating what THIS segment raises beyond the previous one — a new stake, a closer camera, a light or sound shift, an emotional turn. The ladder must end at the payoff.
+## The Turn
+One sentence: the exact moment the emotion pivots and what shifts in camera, light, and sound together.
+## Unforgettable Image
+One sentence describing the single held frame a viewer would remember, and in which segment it lands.
+## Dialogue Spine
+The scene's essential lines as a numbered list, 5-8 lines of at most 10 words each, each with its ALL CAPS speaker and its job (ASK / ANSWER / DEFLECT / WARN / REVEAL). Final line is the shortest and hardest — the punch.
+## Final Held Frame
+One sentence: the last image the scene lands on.
+
+Keep the ENTIRE treatment at or under 600 characters total. Be decisive — one choice per slot, no alternatives, no hedging."""
+
+
+def build_treatment_prompt(story: StorySceneSpec, scene: SceneSpec, part_count: int) -> str:
+    """User prompt for the Director's Treatment call."""
+    return (
+        build_scene_context(story, scene)
+        + "\n\nPlan this entire scene as one short film. Output ONLY the treatment "
+        "structure (Hook, Dramatic Question, Escalation Ladder, The Turn, "
+        f"Unforgettable Image, Dialogue Spine, Final Held Frame) for "
+        f"{part_count} x 10-second segments."
+    )
 
 
 def build_scene_context(story: StorySceneSpec, scene: SceneSpec) -> str:
@@ -154,21 +204,31 @@ def build_scene_context(story: StorySceneSpec, scene: SceneSpec) -> str:
     )
 
 
-def build_part0_prompt(story: StorySceneSpec, scene: SceneSpec, part_count: int) -> str:
+def build_part0_prompt(
+    story: StorySceneSpec,
+    scene: SceneSpec,
+    part_count: int,
+    treatment: str,
+) -> str:
     """Prompt for segment 0, which also establishes the shared scene sections."""
     span = segment_span(0)
     return (
         build_scene_context(story, scene)
-        + "\n\nExpand this abridged story beat into a production-ready scene design "
+        + "\n\nDIRECTOR'S TREATMENT (the whole-scene plan you must execute — "
+        "Segment 0 must land its Hook, and every beat must serve the ladder):\n"
+        f"{treatment}\n\n"
+        "Expand this abridged story beat into a production-ready scene design "
         "and output ONLY this structure, in this order:\n"
         "# <evocative scene title>\n"
         "## Logline\n"
         "## Characters in Scene\n"
         "## Setting & Light\n"
         f"## Segment 0 ({span})\n"
-        "<segment 0 chronological shooting plan body>\n\n"
+        "<segment 0 body: the three labeled core fields — "
+        "integrated_multimodal_description / overall_soundscape / "
+        "non_diegetic_music>\n\n"
         "Write Segment 0 ONLY. Later parts are generated separately and will "
-        f"reference this output, so keep the shared sections self-contained and "
+        "reference this output, so keep the shared sections self-contained and "
         "maximally concise. Obey every direction rule. HARD LIMIT: the Segment 0 "
         f"body must stay at or under {MAX_SCRIPT_PROMPT_CHARS} characters."
     )
@@ -182,8 +242,9 @@ def build_next_part_prompt(
     logline: str,
     setting: str,
     characters: list[str],
+    treatment: str,
 ) -> str:
-    """Prompt for a later segment, chaining the previous segment as a reference."""
+    """Prompt for a later segment, chaining the previous segment and treatment."""
     span = segment_span(part_index)
     shared = (
         f"Logline: {logline}\n"
@@ -192,19 +253,57 @@ def build_next_part_prompt(
     )
     return (
         build_scene_context(story, scene)
-        + "\n\nESTABLISHED SHARED CONTENT (already set for this scene; keep it "
+        + "\n\nDIRECTOR'S TREATMENT (the whole-scene plan you must execute — "
+        f"Segment {part_index} must raise its rung on the Escalation Ladder and "
+        "serve the Unforgettable Image / Final Held Frame):\n"
+        f"{treatment}\n\n"
+        "ESTABLISHED SHARED CONTENT (already set for this scene; keep it "
         "consistent, do not restate it):\n"
         + shared
         + "\n\n<REFERENCE> (the previous segment's content you already wrote — "
         "continue seamlessly from its final frame; match pose, composition, "
         "blocking, and lighting):\n"
         f"{prev_body}\n</REFERENCE>\n\n"
-        f"Produce ONLY this section, writing segment {part_index}'s chronological "
-        f"shooting plan:\n"
+        f"Produce ONLY this section, writing segment {part_index}'s shooting "
+        "plan as the three labeled core fields:\n"
         f"## Segment {part_index} ({span})\n<segment body>\n\n"
         "Do NOT restate the title, Logline, Characters, or Setting & Light. "
         "Follow all direction rules and MAXIMUM CONCISION. HARD LIMIT: the "
         f"segment body must stay at or under {MAX_SCRIPT_PROMPT_CHARS} characters."
+    )
+
+
+def build_critique_prompt(treatment: str, document: str) -> str:
+    """Prompt for the quality-critique pass over one generated part."""
+    return (
+        "You are a brutally honest short-form video director reviewing a scene "
+        "segment written for a LITERAL video-generation model. Score each axis "
+        "1-10 and give ONE concrete fix per axis scoring below 8. Do NOT rewrite "
+        "the segment.\n\n"
+        "AXES:\n"
+        "- HOOK (does the first second stop a scrolling thumb?)\n"
+        "- ESCALATION (is this segment more than the last, per the treatment ladder?)\n"
+        "- ATTENTION CONTROL (is there one clear focal point per beat?)\n"
+        "- DIALOGUE ECONOMY (every line <=10 words, one job each, no deletable lines?)\n"
+        "- LITERALNESS (only physical facts; no emotion labels, no invented numbers?)\n"
+        "- FILMABILITY (one camera move, continuous locomotion, no teleporting?)\n"
+        "- LENGTH (body at or under the stated character limit?)\n\n"
+        f"DIRECTOR'S TREATMENT:\n{treatment}\n\n"
+        f"SEGMENT UNDER REVIEW:\n{document}\n\n"
+        "Return ONLY:\n"
+        "SCORES: hook=N, escalation=N, attention=N, dialogue=N, literalness=N, filmability=N, length=N\n"
+        "FIXES: numbered list, one line per fix."
+    )
+
+
+def build_polish_prompt(document: str, fixes: str) -> str:
+    """Prompt to apply critique fixes while preserving structure and limits."""
+    return (
+        "Apply the following fixes to the scene segment. Keep the exact section "
+        "structure, the spatial mapping first sentence, timecoded beats, and the "
+        "HARD character limit. Return ONLY the rewritten document.\n\n"
+        f"FIXES:\n{fixes}\n\n"
+        f"DOCUMENT:\n{document}"
     )
 
 

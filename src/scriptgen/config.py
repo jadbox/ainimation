@@ -2,23 +2,28 @@
 
 from __future__ import annotations
 
-# OpenRouter models are identified by a vendor/name slug (e.g. "qwen/qwen3.8-max").
+# OpenRouter models are identified by a vendor/name slug (e.g. "google/gemini-3.7-flash").
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 # Shortcut: "--model gemini" maps to Google's flagship Gemini model on OpenRouter.
-GEMINI_OPENROUTER_MODEL = "google/gemini-3.6-flash"
-DEFAULT_MODEL = "qwen/qwen3.8-max"
+GEMINI_OPENROUTER_MODEL = "google/gemini-3.7-flash"
+DEFAULT_MODEL = "google/gemini-3.7-flash"
 
 # Reasoning effort passed to OpenRouter for reasoning-capable models (the
-# default model). Reduces excessive "thinking" time while keeping quality.
-REASONING_EFFORT = "medium"
+# default model).
+REASONING_EFFORT = "high"
 
-# A saved segment document (static template + generated segment body) must never
-# exceed this many characters; otherwise generation retries with a reduction
-# instruction. This keeps each prompt well under the video model input limits.
+# Budget model (measured in characters):
+#   7,000  absolute maximum the video model will accept for one prompt
+#  -1,000  reserved for what the animator tacks onto the prompt head
+#          (IMAGE_REF tags, FIRST_FRAME/LAST_FRAME headers, continuity and
+#          background-plate instructions)
+#  ------
+#   6,000  hard cap for each saved part file — anything over is rejected
 MAX_SCRIPT_CHARS = 6000
-# The character limit the model is *told* to hit. Kept below MAX_SCRIPT_CHARS
-# because LLMs tend to overshoot, so asking for 5000 reliably lands under the
-# real 6000 budget.
+# The segment-body limit the model is *told* to hit. Models consistently
+# overshoot a stated limit by ~1,000-2,000 characters, so the stated number
+# is set well below the real budget; the render/retry loop measures the true
+# total against MAX_SCRIPT_CHARS regardless.
 MAX_SCRIPT_PROMPT_CHARS = MAX_SCRIPT_CHARS - 2000
 MAX_RETRIES = 3
 

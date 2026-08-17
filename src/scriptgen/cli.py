@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import re
 from pathlib import Path
 
 from films import film_scripts_dir
@@ -23,7 +24,9 @@ from scriptgen.config import (
 )
 from scriptgen.format import format_segment_base_prompt
 from scriptgen.parse import (
+    extract_segment_body,
     parse_characters_in_scene,
+    parse_part_file,
     part_index_from_path,
     parse_section,
     parse_segments_from_document,
@@ -32,12 +35,18 @@ from scriptgen.parse import (
 )
 from scriptgen.prompts import (
     build_condense_prompt,
+    build_critique_prompt,
     build_next_part_prompt,
     build_part0_prompt,
+    build_polish_prompt,
     build_system_instruction,
+    build_treatment_prompt,
+    build_treatment_system_instruction,
 )
 
 logger = logging.getLogger("scriptgen")
+
+CRITIQUE_PASS_THRESHOLD = 8
 
 
 def run(args: argparse.Namespace) -> int:
@@ -56,12 +65,27 @@ def run(args: argparse.Namespace) -> int:
 
     base_path.parent.mkdir(parents=True, exist_ok=True)
 
-    for idx in range(args.parts):
-        part_file = part_file_path(base_path, idx)
-        if part_file.exists() and not args.force:
-            raise RuntimeError(
-                f"{part_file} already exists. Pass --force to overwrite scene scripts."
-            )
+    existing = [
+        idx
+        for idx in range(args.parts)
+        if part_file_path(base_path, idx).exists()
+    ]
+    if existing and args.force:
+        logger.info("--force given: regenerating all %d parts from scratch.", args.parts)
+        existing = []
+    if existing != list(range(len(existing))):
+        raise RuntimeError(
+            "Existing scene segment scripts are not a contiguous run starting "
+            f"at part 0 (found parts {existing}). Delete the scripts or pass "
+            "--force to regenerate from scratch."
+        )
+    start_idx = len(existing)
+    if start_idx == args.parts:
+        print(
+            f"All {args.parts} part script(s) already exist for {scene_name}. "
+            "Pass --force to regenerate them."
+        )
+        return 0
 
     model = resolve_openrouter_model(args.model)
     openrouter_key = os.environ.get("OPENROUTER_API_KEY")
@@ -77,16 +101,35 @@ def run(args: argparse.Namespace) -> int:
         f"{story.name!r} (movie.yml story section) -->\n\n"
     )
 
+    treatment = _generate_treatment(
+        story, scene, args.parts, system_instruction, model, openrouter_key, args.verbose
+    )
+
     shared: tuple[str, str, list[str]] | None = None
     prev_body: str | None = None
 
-    for idx in range(args.parts):
+    if start_idx > 0:
+        logline, setting, characters, prev_body = parse_part_file(
+            part_file_path(base_path, 0).read_text(encoding="utf-8")
+        )
+        shared = (logline, setting, characters or list(story.characters))
+        for idx in range(1, start_idx):
+            prev_body = extract_segment_body(
+                part_file_path(base_path, idx).read_text(encoding="utf-8")
+            )
+        logger.info(
+            "Resuming: parts 0-%d already exist, generating parts %d-%d.",
+            start_idx - 1, start_idx, args.parts - 1,
+        )
+
+    for idx in range(start_idx, args.parts):
         content, prev_body, shared = _generate_part(
             idx,
             story=story,
             scene=scene,
             scene_name=scene_name,
             part_count=args.parts,
+            treatment=treatment,
             shared=shared,
             prev_body=prev_body,
             header=header,
@@ -106,6 +149,29 @@ def run(args: argparse.Namespace) -> int:
             logger.info("Removed obsolete scene segment script: %s", part_file)
 
     return 0
+
+
+def _generate_treatment(
+    story,
+    scene,
+    part_count: int,
+    system_instruction: str,
+    model: str,
+    openrouter_key: str,
+    verbose: bool,
+) -> str:
+    """Generate the whole-scene Director's Treatment that every part executes."""
+    logger.info("=== Generating Director's Treatment for the full scene ===")
+    treatment = generate_document(
+        model,
+        build_treatment_prompt(story, scene, part_count),
+        build_treatment_system_instruction(part_count),
+        openrouter_key,
+        verbose=verbose,
+    )
+    if not treatment:
+        raise RuntimeError("The model returned an empty Director's Treatment.")
+    return treatment
 
 
 def _render_part(scene_name, logline, setting, chars, span, body, header) -> str:
@@ -149,6 +215,34 @@ def _generate(
     return doc
 
 
+def _critique(
+    treatment: str,
+    doc: str,
+    model: str,
+    system_instruction: str,
+    openrouter_key: str,
+    verbose: bool,
+) -> str:
+    """Score the document against the treatment; return fixes for weak axes."""
+    critique = _generate(
+        model,
+        build_critique_prompt(treatment, doc),
+        system_instruction,
+        openrouter_key,
+        verbose,
+    )
+    scores = re.search(r"SCORES:\s*([^\n]+)", critique, flags=re.IGNORECASE)
+    if scores:
+        logger.info("Critique scores: %s", scores.group(1).strip())
+    fixes_match = re.search(r"FIXES:\s*(.*)", critique, flags=re.IGNORECASE | re.DOTALL)
+    fixes = fixes_match.group(1).strip() if fixes_match else ""
+    if scores:
+        nums = [int(n) for n in re.findall(r"=(\d+)", scores.group(1))]
+        if nums and min(nums) >= CRITIQUE_PASS_THRESHOLD:
+            return ""
+    return fixes
+
+
 def _generate_part(
     idx: int,
     *,
@@ -156,6 +250,7 @@ def _generate_part(
     scene,
     scene_name: str,
     part_count: int,
+    treatment: str,
     shared: tuple[str, str, list[str]] | None,
     prev_body: str | None,
     header: str,
@@ -164,20 +259,31 @@ def _generate_part(
     openrouter_key: str,
     verbose: bool,
 ) -> tuple[str, str, tuple[str, str, list[str]]]:
-    """Generate one part, retrying until the rendered file fits the budget.
+    """Generate one part, critiquing once and condensing until it fits.
 
-    The first try and every retry share the same extract/parse/render
-    pipeline; a retry only swaps the user prompt for the minimal condense
-    prompt (previous text, current count, target count, chars to cut).
-    Returns (rendered content, segment body, shared sections).
+    Returns (rendered content, segment body, shared sections). Raises
+    RuntimeError if the part cannot be squeezed under MAX_SCRIPT_CHARS,
+    rather than silently writing an oversized prompt the video model would
+    reject after ~1,000 characters of animator instructions are prepended.
     """
     assert idx == 0 or shared is not None
     prompt = (
-        build_part0_prompt(story, scene, part_count)
+        build_part0_prompt(story, scene, part_count, treatment)
         if idx == 0
-        else build_next_part_prompt(story, scene, idx, prev_body, *shared)
+        else build_next_part_prompt(story, scene, idx, prev_body, *shared, treatment)
     )
     doc = _generate(model, prompt, system_instruction, openrouter_key, verbose)
+
+    fixes = _critique(treatment, doc, model, system_instruction, openrouter_key, verbose)
+    if fixes:
+        logger.info("Applying critique fixes to part %d.", idx)
+        doc = _generate(
+            model,
+            build_polish_prompt(doc, fixes),
+            system_instruction,
+            openrouter_key,
+            verbose,
+        )
 
     for attempt in range(MAX_RETRIES + 1):
         span, body = _extract_segment(idx, doc)
@@ -200,11 +306,11 @@ def _generate_part(
         prompt = build_condense_prompt(doc, len(content), MAX_SCRIPT_PROMPT_CHARS)
         doc = _generate(model, prompt, system_instruction, openrouter_key, verbose)
 
-    logger.warning(
-        "Could not reduce part %d below %d chars; writing as-is.",
-        idx, MAX_SCRIPT_CHARS,
+    raise RuntimeError(
+        f"Part {idx} is still {len(content)} characters after {MAX_RETRIES} "
+        f"condense attempts (limit {MAX_SCRIPT_CHARS}). Aborting without "
+        "writing — rerun or regenerate with --force."
     )
-    return content, body, shared
 
 
 def main() -> None:
@@ -306,6 +412,10 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--force",
         action="store_true",
-        help="Overwrite existing scene scripts.",
+        help=(
+            "Regenerate all parts from scratch, ignoring existing scripts. "
+            "Without --force, existing contiguous parts are kept and generation "
+            "resumes at the next missing part."
+        ),
     )
     return parser

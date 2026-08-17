@@ -1,0 +1,84 @@
+================================================================================
+SCRIPTGEN MULTISHOT PROPOSAL — DEFERRED (Phase 5 of MiniMax alignment plan)
+Date: 2026-08-08
+Status: DEFERRED — revisit only after single-shot output is validated by
+        manual video-generation testing.
+Reference: MiniMax Video Prompt Writing Guide
+        (/mnt/storage/jdunlap/Downloads/docs_VIDEO_PROMPT_WRITING_GUIDE_base_en.txt),
+        sections 4.2 (Shots and Cuts) and Task Overview.
+================================================================================
+
+WHAT THE GUIDE OFFERS
+---------------------
+MiniMax prompts officially support multiple shots inside one generated clip:
+
+  [Shot 1] ... (no timestamp on the first shot)
+  [Shot 2] At 00:05.000, the camera cuts to...
+
+Rules from the guide:
+- Sequential shot numbers; every shot after the first starts with a strictly
+  increasing cut time formatted HH:MM.mmm (e.g. "At 00:03.500"), within the
+  clip duration.
+- Cut verbs: "the camera cuts to", "the shot cuts to", "the shot transitions
+  to", "the shot changes to", "the shot switches to"; cross-dissolve / fade /
+  wipe only when explicitly requested.
+- A cut must introduce NEW information (subject, space, state, viewpoint, or
+  time). If only distance or a slight angle changes, prefer camera motion
+  instead of a cut.
+- Dialogue crossing a cut: <scenetrans> at both connecting points + an explicit
+  "continues seamlessly across the cut" style statement. <cutoff> when speech
+  is truncated by the end of the video.
+- FL2VA (first+last frame references) generally favors a SINGLE shot so the
+  model can interpolate continuously between the frames.
+
+WHY IT IS INTERESTING FOR SHORT-FORM CONTENT
+--------------------------------------------
+- Instagram/YouTube pacing thrives on cuts: punch-ins on dialogue lines,
+  reaction-shot alternation, hard cuts on story-object reveals. Our current
+  output is one continuous 10-second push-in per part, which reads slow next
+  to native IG editing.
+- A 2-3 shot part (e.g. wide action beat -> close-up reaction) could deliver
+  the escalation/turn grammar our treatment plans without waiting for part
+  boundaries.
+
+WHY IT CONFLICTS WITH THE CURRENT PIPELINE (the reason it is deferred)
+----------------------------------------------------------------------
+1. FRAME LOCKING: animator.py chains parts by exporting part-N-end.jpg and
+   feeding it as the mandatory opening frame of part N+1 (I2VA), and on
+   regeneration also locks the closing frame (FL2VA). Multishot makes the
+   "final frame" of a part a cut-dependent composition that is much harder to
+   predict and match — continuity between parts degrades when the last shot's
+   framing is not the thing the script planned to hand off.
+2. TREATMENT ASSUMPTIONS: the Director's Treatment escalation ladder is built
+   on one-shot-per-segment (one camera move per segment, held beats as Static
+   Shots). Multishot requires re-planning how the ladder maps to cuts.
+3. LITERAL MODEL RISK: each added cut is another place for the model to
+   duplicate characters, drop backgrounds, or break style consistency. Single
+   shot is the safe baseline until proven otherwise.
+4. BUDGET: cut choreography + <scenetrans> continuity statements cost
+   characters in a 6,000-char file.
+
+PRECONDITIONS BEFORE REVISITING
+---------------------------------
+- Single-shot outputs with the three-core-field format (integrated_multimodal_
+  description / overall_soundscape / non_diegetic_music) are validated as
+  reliably filmable in manual testing.
+- A test scene is generated with one deliberately multishot part and its
+  cross-part continuity frames are inspected: does part N's final shot land
+  where part N+1's first-frame anchor expects?
+
+IMPLEMENTATION SKETCH (when revisiting)
+---------------------------------------
+- scriptgen/prompts.py: lift the "exactly one shot per segment" rule behind a
+  flag (e.g. --shots N or a per-scene movie.yml field); teach the [Shot 2]
+  At 00:05.000 cut grammar, cut-verb vocabulary, and the "new information"
+  requirement; require the treatment to place cuts on the ladder rungs.
+- scriptgen/prompts.py dialogue rules: add <scenetrans> across-cut continuity
+  statements and <cutoff> handling.
+- scriptgen/format.py: no change expected (the body is already the raw
+  multimodal description).
+- animator/: verify end-frame continuity logic still holds when the final shot
+  is a cut target; consider forcing the LAST shot of every multishot part to
+  be the hand-off composition, stated explicitly ("[Shot N] ends on ...").
+- Tests: new parsing tests for multi-[Shot] bodies; animator continuity tests.
+================================================================================

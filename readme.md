@@ -138,17 +138,21 @@ Expands an abridged story scene from the `story:` section of the film's `movie.y
   * `--film SLUG`: Film folder under `films/<slug>/` to use (default: first film found, or `$FILM`).
    * `--name NAME`: Story scene name from the `story:` section of the film's `movie.yml` (written to `films/<film>/out/scripts/<name>_part0.md`, etc.). Omit to list all available story scenes.
    * `--parts N`: Number of 10-second scene parts to generate (1-10, default: 3).
-  * `--model MODEL`: OpenRouter model slug used to expand the scene (default: `qwen/qwen3.8-max`). The shortcut `gemini` maps to `google/gemini-3.6-flash` on OpenRouter. Requires `OPENROUTER_API_KEY`.
-  * `-v` / `--verbose`: Stream the LLM output from OpenRouter (reasoning/thinking plus final content) as it is generated.
-  * `--output PATH`: Custom output file or directory base path.
-  * `--force`: Overwrite existing scripts if they already exist.
+   * `--model MODEL`: OpenRouter model slug used to expand the scene (default: `google/gemini-3.7-flash`). The shortcut `gemini` maps to `google/gemini-3.7-flash` on OpenRouter. Requires `OPENROUTER_API_KEY`.
+   * `-v` / `--verbose`: Stream the LLM output from OpenRouter (reasoning/thinking plus final content) as it is generated.
+   * `--output PATH`: Custom output file or directory base path.
+   * `--force`: Overwrite existing scripts if they already exist.
 
-* **Sequential Per-Part Generation**: the selected number of 10-second segments are generated one at a time in order. Part 0 also establishes the shared sections (title, logline, characters, setting & light). Each later part is prompted with the previous segment's saved content embedded as a `<REFERENCE>` block so blocking, composition, and lighting continue seamlessly. Reasoning effort for the default model is set to `medium` to limit excessive "thinking" time.
+* **Director's Treatment + Sequential Per-Part Generation**: generation is two-phase. First, a **Director's Treatment** pass plans the *entire* scene as one short film (scroll-stopping hook, dramatic question, per-part escalation ladder, the turn, the unforgettable image, a 5–8 line dialogue spine, and the final held frame). Then the selected number of 10-second segments are generated one at a time in order, each prompted with the treatment so every part serves the whole arc. Part 0 also establishes the shared sections (title, logline, characters, setting & light). Each later part is additionally prompted with the previous segment's saved content embedded as a `<REFERENCE>` block so blocking, composition, and lighting continue seamlessly. Reasoning effort is set to `high` for deep scene planning and critique.
 
-* **Length Validation & Retry**: each saved segment file (static template + segment body) must stay at or below 6000 characters. If any part is over the limit, `scriptgen` re-runs that part's prompt with a reduction instruction (embedding the previous generation and the exact number of characters to cut) up to 3 times before writing.
+* **Quality Critique Pass**: after each part is drafted, a critic call scores it against the treatment (hook strength, escalation, attention control, dialogue economy, literalness, filmability, length); if any axis scores below 8, the part is polished once with the concrete fixes before length validation.
+
+* **Length Validation & Retry**: the video model accepts at most 7,000 characters per prompt, and the animator tacks ~1,000 characters of reference instructions onto the front — so each saved segment file (static template + segment body) must stay at or below 6,000 characters. If any part is over the limit, `scriptgen` re-runs that part's prompt with a reduction instruction (embedding the previous generation and the exact number of characters to cut) up to 3 times; if it still overshoots, generation aborts with an error rather than writing an oversized prompt. The model is told a lower per-segment limit (~4,000) than the real budget because models consistently overshoot stated limits.
+
+* **Dialogue Guide (Instagram pacing)**: the system prompt governs dialogue volume and economy — roughly 50–70 spoken words across a scene split into 5–8 lines, max 8–10 words per line, one job per line (ASK/ANSWER/DEFLECT/WARN/REVEAL), the deletion test, and the final line as the shortest punch.
 
 * **Output Document Structure** (`films/<film>/out/scripts/<name>_part<N>.md`):
-  * Pre-formatted segment video prompts containing style summary, camera rules, depth & staging mandates, characters, logline, shared setting & light, and the segment's moment-by-moment shooting plan.
+  * Pre-formatted segment video prompts following the MiniMax prompt-writing guide: a fixed preamble (style, camera rules, characters, mandates), the shared Setting & Light block, then the three labeled core fields — `integrated_multimodal_description:` (a single `[Shot 1]` timeline with timecoded beats, `(S1)`/`(S2)` speaker IDs and `<d>[English] …</d>` dialogue tags), `overall_soundscape:` (1–4 sentences), and `non_diegetic_music:` (1–3 sentences or `N/A`).
 
 ---
 

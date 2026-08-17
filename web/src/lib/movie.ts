@@ -139,18 +139,17 @@ export function scriptStatus(film: string, name: string): boolean[] {
 
 export function scriptPartIndices(film: string, name: string): number[] {
   const dir = scriptsDir(film);
-  if (!fs.existsSync(dir)) return [0, 1, 2];
+  if (!fs.existsSync(dir)) return [];
   const pattern = new RegExp(
     `^${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}_part(\\d+)\\.md$`,
     "i",
   );
-  const parts = fs
+  return fs
     .readdirSync(dir)
     .map((file) => file.match(pattern))
     .filter((match): match is RegExpMatchArray => match !== null)
     .map((match) => Number(match[1]))
     .sort((a, b) => a - b);
-  return parts.length > 0 ? parts : [0, 1, 2];
 }
 
 export function readScript(

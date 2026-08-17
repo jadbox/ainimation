@@ -60,7 +60,11 @@ class TestPromptTagging(unittest.TestCase):
             has_background_reference=True,
         )
 
-        self.assertTrue(direction_bg.startswith("[# Background scene use references <IMAGE_REF_2>]"))
+        self.assertTrue(
+            direction_bg.startswith(
+                "The environment set of this video matches background reference <IMAGE_REF_2> exactly."
+            )
+        )
         self.assertIn("<IMAGE_REF_0>", direction_bg)
         self.assertIn("<IMAGE_REF_1>", direction_bg)
         self.assertIn("<IMAGE_REF_2>", direction_bg)  # background plate reference tag
@@ -78,7 +82,12 @@ class TestPromptTagging(unittest.TestCase):
             has_continuity=True,
             has_background_reference=False,
         )
-        self.assertTrue(direction_cont.startswith("[# Sources <FIRST_FRAME>IMAGE_REF_2]"))
+        self.assertTrue(
+            direction_cont.startswith(
+                "For the target video, at 0.00 seconds into the target video, "
+                "<IMAGE_REF_2> (from [Shot 1]) is fully referenced."
+            )
+        )
 
     def test_prompt_path(self) -> None:
         p = prompt_path(Path("/tmp/out"), 2)
@@ -94,8 +103,8 @@ class TestPromptTagging(unittest.TestCase):
 
     def test_add_reference_tags_closing_continuity(self) -> None:
         base = (
-            "Match character designs EXACTLY to visual reference images. "
-            "Do NOT use character references as initial frames.\n"
+            "Match designs EXACTLY to reference images; never use references "
+            "as opening frames.\n"
             "MRS BRISBY hurries across the floor."
         )
         tagged = add_reference_tags(
@@ -104,8 +113,9 @@ class TestPromptTagging(unittest.TestCase):
             has_continuity=True,
             has_closing_continuity=True,
         )
-        self.assertIn("[# Sources <FIRST_FRAME>IMAGE_REF_1]", tagged)
-        self.assertIn("[# Sources <LAST_FRAME>IMAGE_REF_2]", tagged)
+        self.assertIn("How the reference pictures align with the target video", tagged)
+        self.assertIn("<IMAGE_REF_1> (from [Shot 1]) aligns with the 0.00-second mark", tagged)
+        self.assertIn("<IMAGE_REF_2> (from [Shot 1]) aligns with the 10.00-second mark", tagged)
 
     def test_add_reference_tags_closing_only_drops_held_pose(self) -> None:
         tagged = add_reference_tags(
@@ -113,9 +123,22 @@ class TestPromptTagging(unittest.TestCase):
             characters=["Mrs. Brisby"],
             has_closing_continuity=True,
         )
-        self.assertIn("[# Sources <LAST_FRAME>IMAGE_REF_1]", tagged)
+        self.assertIn(
+            "<IMAGE_REF_1> (from [Shot 1]) aligns with the 10.00-second mark",
+            tagged,
+        )
         self.assertIn("Begin from starting pose/composition in script.", tagged)
         self.assertNotIn("clean held final pose", tagged)
+
+    def test_dialogue_blocks_are_not_tagged(self) -> None:
+        text = (
+            'MRS BRISBY, a soft field mouse (S1), wrings her cape and says: '
+            '<d>[English] Mr. Ages, please help Timothy!</d>'
+        )
+        tagged = tag_character_mentions(text, ["Mrs. Brisby", "Mr. Ages"])
+        self.assertIn("MRS BRISBY <IMAGE_REF_0>,", tagged)
+        self.assertIn("<d>[English] Mr. Ages, please help Timothy!</d>", tagged)
+        self.assertNotIn("MR AGES <IMAGE_REF_1>", tagged)
 
     def test_build_initial_prompt(self) -> None:
         spec = CharacterSpec(

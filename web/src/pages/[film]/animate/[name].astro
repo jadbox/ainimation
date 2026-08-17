@@ -219,6 +219,22 @@ const nextFrame =
     </div>
   </section>
 
+  {
+    parts.length === 0 && (
+      <div class="mb-4 rounded-xl border border-line bg-panel px-5 py-6 text-center shadow-lg shadow-black/20">
+        <p class="text-sm text-muted">
+          No script parts found.{" "}
+          <a
+            href={`/${film}/scene/${name}`}
+            class="font-medium text-amber-soft underline-offset-2 hover:underline"
+          >
+            Visit Script Page now.
+          </a>
+        </p>
+      </div>
+    )
+  }
+
   <div class="space-y-4">
     {
       scripts.map((script, index) => {

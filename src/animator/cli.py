@@ -304,6 +304,7 @@ def run(args: argparse.Namespace) -> int:
                 has_continuity=continuity_frame is not None,
                 has_background_reference=background_plate is not None,
                 has_closing_continuity=closing_frame is not None,
+                duration=args.duration,
             )
             prompt_file = part_script_path
             prompt_file.write_text(direction, encoding="utf-8")

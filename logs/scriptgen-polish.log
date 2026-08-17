@@ -1,0 +1,274 @@
+================================================================================
+SCRIPTGEN POLISH — CONTEXT LOG
+Date: 2026-08-08
+Scope: src/scriptgen/* (+ readme.md, tests/test_scriptgen_parts.py)
+================================================================================
+
+WHY THIS WORK HAPPENED
+----------------------
+scriptgen's job is to produce a *perfect* per-segment video prompt for literal
+video-generation models (MiniMax H3 et al.), targeting short-form
+Instagram/YouTube content. Review of the existing outputs under
+films/rats/out/scripts and films/_clinicalclarity/out/scripts showed they were
+"okay but dull": technically compliant (timecoded beats, blocking, expressions,
+sound) but reading as moving postcards — slow push-in opens everywhere, no
+scene-wide escalation, no hook, prompt dilution from too many rules, and files
+exceeding the budget (e.g. frisby_visits_mr_ages_part2.md at 6,609 chars,
+silently written).
+
+BUDGET CONTRACT (critical — do not change without understanding)
+----------------------------------------------------------------
+- Video models accept at most 7,000 chars per prompt.
+- The animator (src/animator/prompt.py) tacks ~1,000 chars of reference
+  instructions/tags onto the FRONT of the saved script at generation time
+  (<IMAGE_REF_N> tags, FIRST_FRAME/LAST_FRAME headers, background-plate
+  instructions, begin/end-pose instructions).
+- Therefore the saved part file is hard-capped at MAX_SCRIPT_CHARS = 6000
+  (src/scriptgen/config.py). config.py documents this derivation in comments.
+- MAX_SCRIPT_PROMPT_CHARS = MAX_SCRIPT_CHARS - 2000 is the limit the MODEL IS
+  TOLD per segment body. It is deliberately lower than the real budget because
+  models consistently overshoot stated limits by ~1,000-2,000 chars. The real
+  check is always the rendered full-file length vs MAX_SCRIPT_CHARS in the
+  render/retry loop in cli._generate_part — the told number only biases output.
+- Oversized behavior CHANGED: after MAX_RETRIES (3) condense attempts,
+  cli._generate_part now raises RuntimeError instead of writing an oversized
+  file (the old code logged a warning and wrote anyway).
+
+WHAT WAS BUILT (5 phases, Phase 5 validation removed by request — user tests
+manually)
+----------------------------------------------------------------
+PHASE 1 — Budget enforcement & integrity
+- src/scriptgen/api.py: fixed UTF-8 mojibake bug. OpenRouter SSE responses
+  often omit a charset, so requests fell back to latin-1 and double-encoded
+  every UTF-8 character (em dashes became "â", ° became "Â°") — that garbage
+  flowed into saved scripts and then into video prompts. Fix: set
+  response.encoding = "utf-8" on both streaming and non-streaming responses.
+- src/scriptgen/config.py: budget constants documented per the contract above;
+  values unchanged (6000 / 4000 / 3 retries).
+- src/scriptgen/format.py: slimmed the saved-file template (this template is
+  repeated in EVERY part file, so it competes with the shooting plan for
+  budget). Dropped the redundant depth/eyeline MANDATES bullets (those rules
+  live in the generation system instruction and the animator re-adds its own);
+  kept the 3 anti-failure mandates (no teleporting; only declared speaker moves
+  mouth; continuous secondary motion). KEPT the parse anchors other code
+  depends on: "Characters appearing:" (animator/script.py
+  parse_scene_characters), "=== SHARED SETTING & LIGHT" and "=== SCENE SCRIPT"
+  markers (scriptgen/parse.py parse_part_file). NOTE: "Characters appearing:"
+  and the "Match designs..." sentence are on SEPARATE LINES — merging them
+  breaks parse_part_file's line-anchored regex (this was caught and fixed
+  during build).
+- src/scriptgen/parse.py: fixed latent bug where parse_part_file split the
+  characters line on commas INSIDE <VOICE> tags; it now strips <VOICE>...</VOICE>
+  before splitting.
+
+PHASE 2 — Director's Treatment (whole-script planning; the biggest dullness fix)
+- New pass 1: cli._generate_treatment runs BEFORE any part is generated.
+  prompts.build_treatment_system_instruction + build_treatment_prompt plan the
+  entire scene as one short film with EXACTLY these sections: Hook, Dramatic
+  Question, Escalation Ladder (one bullet per segment), The Turn, Unforgettable
+  Image, Dialogue Spine (5-8 lines with speaker + job tag), Final Held Frame.
+  Treatment is kept ~600 chars.
+- The treatment string is embedded in EVERY part prompt
+  (build_part0_prompt / build_next_part_prompt both take a new `treatment`
+  parameter — signature change; tests updated). Segment 0 must land the Hook;
+  later segments must raise their rung on the ladder and serve the
+  Unforgettable Image / Final Held Frame.
+
+PHASE 3 — Instagram dialogue guide (deliberately NOT a dialogue cap)
+- User decision: IG shorts squeeze lots of dialogue into 30s; too much was the
+  problem, not dialogue itself. So prompts.py DIALOGUE CRAFT section now
+  enforces volume + economy instead of a cap: ~50-70 spoken words per scene
+  across 5-8 lines; max 8-10 words per line; one idea per line; the FINAL line
+  is the shortest and hardest (the punch); "the deletion test" (a line that
+  could be removed without changing the scene does not exist); each line does
+  exactly one job — ASK / ANSWER / DEFLECT / WARN / REVEAL; every exchange
+  shifts power/emotional balance; speak-in-action (every line paired with a
+  visible physical act; the listener's body is half the scene); subtext over
+  exposition; no invented backstory beyond the story beat.
+
+PHASE 4 — Attention engineering system prompt
+- prompts.build_system_instruction rewritten (~7,000 chars of rules condensed;
+  now ~14k including roster/style injection, but rule-duplication removed).
+  Core new sections:
+  * ATTENTION ENGINEERING: hook-first opens (NEVER establishing wides or static
+    frames in second one); ONE focal point per beat (brightest point / only
+    moving thing / eyeline cue / story object); escalation across parts;
+    plant-and-payoff micro-questions; the turn shifts camera+light+sound+music
+    together; the unforgettable image gets a held beat.
+  * LITERAL DIRECTION LANGUAGE: only observable physical facts; emotion ONLY
+    as visible body action (no bare labels); simple literal camera words; NO
+    invented numbers (no degrees/kelvin/inches/percentages — literal models
+    ignore them); one camera move per segment, stillness is a deliberate choice.
+  * TIME-CODED BEATS kept ([0:00-0:03] tiling the 10s).
+  * SPATIAL & PHYSICAL LAWS: spatial mapping first sentence; one unbroken shot;
+    continuous locomotion; feet on floor; shared depth plane for interaction;
+    continuous secondary motion; never into lens; only speaker mouths move.
+  * DIALOGUE CRAFT = the Phase 3 guide.
+- Output format unchanged (title / Logline / Characters in Scene /
+  Setting & Light / ## Segment N (span)) so scriptgen.parse and
+  animator.script parsing still work; segment bodies remain self-contained.
+
+PHASE 5 — Critique loop (modeled on blueprint_generator's reviewer pattern)
+- prompts.build_critique_prompt: after each part draft, a critic scores 7 axes
+  1-10 (hook, escalation, attention, dialogue economy, literalness,
+  filmability, length) vs the treatment and returns ONE concrete fix per axis
+  under 8.
+- prompts.build_polish_prompt applies fixes in a single rewrite preserving
+  structure/limits.
+- cli._critique parses "SCORES:" / "FIXES:"; CRITIQUE_PASS_THRESHOLD = 8 (min
+  score across axes). If all axes >= 8, no polish call is made. Exactly ONE
+  polish rewrite max per part (no loop).
+
+FLOW SUMMARY (cli.run)
+----------------------
+1. _generate_treatment(story, scene, parts, ...)        [1 LLM call]
+2. per part idx:
+   a. build_part0_prompt / build_next_part_prompt (treatment embedded)
+   b. _generate                                            [1 LLM call]
+   c. _critique                                            [1 LLM call]
+   d. if fixes: polish via build_polish_prompt             [0-1 LLM call]
+   e. render via format_segment_base_prompt; measure vs MAX_SCRIPT_CHARS
+   f. if over: condense retry up to MAX_RETRIES            [0-3 LLM calls]
+   g. still over: RuntimeError (hard fail; nothing written for that part)
+3. prune obsolete part files beyond --parts.
+Total API calls per scene: 1 + parts*(2..6). Default model qwen/qwen3.8-max,
+reasoning effort medium, temperature 0.7 (unchanged).
+
+TESTS (tests/test_scriptgen_parts.py rewritten; run via unittest, NOT pytest —
+pytest is not installed in the venv)
+----------------------------------------------------------------
+Command: PYTHONPATH=src .venv/bin/python -m unittest discover -s tests
+- new tests: treatment passed to build_part0_prompt; oversized part raises
+  instead of writing; critique fixes trigger exactly one polish call; passing
+  scores skip polish; low scores yield fixes; budget constants.
+- pre-existing failure unrelated to this work: tests/test_prompt.py
+  test_build_initial_prompt (blueprint prompt checklist mismatch; fails on main
+  too — left alone).
+
+OUT OF SCOPE / KNOWN GAPS for future work
+----------------------------------------------------------------
+- No hand-written gold exemplar segment added to the system prompt yet (plan
+  item from Phase 4; deferred — would teach shot-paragraph shape better than
+  rules if outputs still read flat after manual testing).
+- Critique threshold (8) and single polish pass are tunables in cli.py.
+- Temperature 0.7 for drafts; could be raised to ~0.9 now that the critic
+  constrains output, if user testing shows drafts too safe.
+- Existing saved scripts under films/*/out/scripts are OLD FORMAT-ERA outputs;
+  regenerate with --force to get treatment+critique behavior.
+- readme.md section 4.B updated to describe treatment/critique/length/dialogue
+  guide behavior.
+
+USER PREFERENCES ESTABLISHED HERE (carry into future scriptgen work)
+--------------------------------------------------------------------
+- User tests video generation manually; NEVER run animator.py/scriptgen
+  generation for them (also in AGENTS.md).
+- Dialogue must stay plentiful but economical — do not re-introduce hard line
+  caps; the craft guide (words-per-scene, words-per-line, one-job-per-line)
+  is the mechanism.
+- 7,000 absolute video-prompt ceiling and ~1,000 animator headroom are fixed
+  constraints of the downstream models, not preferences.
+================================================================================
+
+MINIMAX PROMPT-GUIDE ALIGNMENT — follow-up change set
+Date: 2026-08-08 (same session, after the polish above)
+Reference: MiniMax Video Prompt Writing Guide
+(docs_VIDEO_PROMPT_WRITING_GUIDE_base_en.txt; original at
+/mnt/storage/jdunlap/Downloads/)
+================================================================================
+
+WHY
+---
+The default video provider is MiniMax H3 (both `minimax` and `openrouter`
+providers), and the guide specifies an exact prompt structure our free-form
+part files did not follow. Phases 1-4 implemented; Phase 5 (multishot) is
+deferred and documented in logs/scriptgen-multishot-proposal.log.
+
+WHAT CHANGED
+------------
+PHASE 1 — Three core fields (src/scriptgen/format.py, prompts.py, parse.py)
+- Saved part file structure is now: preamble (style/camera/scene/characters/
+  MANDATES) → === SHARED SETTING & LIGHT === → segment body consisting of the
+  three labeled fields:
+    integrated_multimodal_description: [Shot 1] 2D-animated, <style token>,
+      <spatial mapping>. <timecoded beats...>
+    overall_soundscape: <1-4 sentences>
+    non_diegetic_music: <1-3 sentences, instrumentation/tempo/rhythm/dynamics
+      only, no mood words; N/A allowed>
+- The old "=== SCENE SCRIPT (story time ...) ===" marker is GONE. Parsing
+  anchors now: extract_segment_body starts at the
+  "integrated_multimodal_description:" line; parse_part_file's setting regex
+  ends at that label. The `span` parameter of format_segment_base_prompt is
+  retained for interface stability but no longer rendered (the animator owns
+  clip duration).
+- Sound split rule in the system prompt: synchronized diegetic sounds stay
+  inline in beats; ambient/physical/non-verbal sounds consolidate into
+  overall_soundscape; audience-only score goes to non_diegetic_music; music
+  audible to characters is diegetic and stays inline.
+- Single [Shot 1] per segment is mandatory (guide favors single shot for
+  FL2VA interpolation; matches our frame-chaining). [0:00-0:03] pacing
+  markers inside the shot are retained.
+
+PHASE 2 — Camera vocabulary lock (prompts.py CAMERA MOTION VOCABULARY)
+- The "simple literal camera words" rule was replaced by the guide's exact
+  vocabulary: Zoom In/Out, Push In/Pull Out, Pan Left/Right, Truck Left/Right,
+  Tilt Up/Down, Pedestal Up/Down, Arc Shot, Tracking Shot, Static Shot,
+  Shake Slightly/Strongly, POV, Roll Clockwise/Counterclockwise, with
+  optional "with small/large amplitude" and "at slow/fast speed", written as
+  natural English actions.
+
+PHASE 3 — Dialogue encoding (prompts.py SPEAKERS & DIALOGUE ENCODING;
+animator/prompt.py tag protection)
+- Speaker IDs (S1)/(S2) assigned in Characters-in-Scene order; identity
+  phrase + ID + physical action + delivery OUTSIDE <d>, only
+  "[English] <verbatim line>" INSIDE. This replaces the old
+  `NAME: "line"` attribution rule (the DIALOGUE CRAFT Instagram guide stays
+  otherwise unchanged: word budget, line jobs, deletion test, punch last).
+- animator/prompt.py tag_character_mentions now protects <d>...</d> spans in
+  addition to double-quoted spans (PROTECTED_SPAN_RE), so character names
+  inside spoken lines never receive <IMAGE_REF_N> tags.
+
+PHASE 4 — Alignment instructions (animator/prompt.py, animator/api.py)
+- The old "[# Sources <FIRST_FRAME>IMAGE_REF_N]" / "[# Background scene use
+  references ...]" prefix markers are REPLACED by the guide's exact sentences
+  (build_alignment_instructions), prepended as the first line(s) of the final
+  prompt:
+  * opening frame only (I2VA, normal chained parts): "For the target video, at
+    0.00 seconds into the target video, <IMAGE_REF_N> (from [Shot 1]) is fully
+    referenced."
+  * opening + closing (FL2VA, --force regen of a middle part): "How the
+    reference pictures align with the target video — ... 0.00-second mark ...;
+    ... S.SS-second mark ..." with S.SS = clip duration, two decimals.
+  * closing only (L2VA, --frame-end): "... <IMAGE_REF_N> (from [Shot 1])
+    aligns with the S.SS-second mark of the target video."
+  * background plate: "The environment set of this video matches background
+    reference <IMAGE_REF_N> exactly."
+  The begin/held-final-pose instruction still follows when there is no
+  opening frame. add_reference_tags gained a `duration` parameter (wired from
+  args.duration in animator/cli.py).
+- animator/api.py (Gemini provider) now labels continuity/closing frames
+  <IMAGE_REF_N> with indices consistent with the prompt builder's numbering
+  (characters → background → continuity → closing), so the alignment
+  sentences reference the correct images for every provider.
+- The ref-statement replacement in add_reference_tags targets the current
+  template line "Match designs EXACTLY to reference images; never use
+  references as opening frames." (old English removed).
+
+TESTS
+-----
+- tests/test_prompt.py updated for the new alignment sentences; new test
+  test_dialogue_blocks_are_not_tagged. All pass except the pre-existing
+  unrelated test_build_initial_prompt failure.
+- Smoke test verified end-to-end: format_segment_base_prompt output with the
+  three fields parses via parse_part_file, animator parse_scene_characters,
+  and build_direction; <d> blocks stay untagged.
+
+COMPATIBILITY NOTES
+-------------------
+- OLD part files (pre-this-change, "=== SCENE SCRIPT" format) still animate:
+  animator treats the whole file as the segment body and prepends alignment
+  instructions; extract_segment_body falls back to the whole text. But their
+  inline Sound:/Music: lines and NAME: "line" dialogue don't follow the new
+  encoding — regenerate scenes with --force for best results.
+- The treatment pass, critique pass, budget contract, and IG dialogue guide
+  from the earlier polish are unchanged by this work.
+================================================================================

@@ -253,9 +253,46 @@ export function resolveSceneFrame(
   return null;
 }
 
+export interface ProposalItem {
+  filename: string;
+  version: number;
+  label: string;
+  path: string;
+}
+
 export interface PartProposals {
-  start: string | null;
-  end: string | null;
+  start: ProposalItem[];
+  end: ProposalItem[];
+}
+
+export function listPartProposals(
+  film: string,
+  sceneName: string,
+  part: number,
+  kind: "start" | "end",
+): ProposalItem[] {
+  const dir = path.join(animationsDir(film), sceneName);
+  if (!fs.existsSync(dir)) return [];
+  const files = fs.readdirSync(dir);
+  const items: ProposalItem[] = [];
+
+  const pattern = new RegExp(`^part-${part}-${kind}-proposal(?:-v(\\d+))?\\.jpg$`);
+  for (const file of files) {
+    const match = file.match(pattern);
+    if (match) {
+      const vStr = match[1];
+      const version = vStr ? parseInt(vStr, 10) : 0;
+      items.push({
+        filename: file,
+        version,
+        label: version === 0 ? "Proposal (Base)" : `Proposal v${version}`,
+        path: `films/${film}/out/animations/${sceneName}/${file}`,
+      });
+    }
+  }
+
+  items.sort((a, b) => a.version - b.version);
+  return items;
 }
 
 export function partProposals(
@@ -263,13 +300,9 @@ export function partProposals(
   sceneName: string,
   part: number,
 ): PartProposals {
-  const dir = path.join(animationsDir(film), sceneName);
-  if (!fs.existsSync(dir)) return { start: null, end: null };
-  const startFile = `part-${part}-start-proposal.jpg`;
-  const endFile = `part-${part}-end-proposal.jpg`;
   return {
-    start: fs.existsSync(path.join(dir, startFile)) ? startFile : null,
-    end: fs.existsSync(path.join(dir, endFile)) ? endFile : null,
+    start: listPartProposals(film, sceneName, part, "start"),
+    end: listPartProposals(film, sceneName, part, "end"),
   };
 }
 
@@ -279,11 +312,10 @@ export function resolveProposalFrame(
   part: number,
   kind: "start" | "end",
 ): string | null {
-  const dir = path.join(animationsDir(film), sceneName);
-  if (!fs.existsSync(dir)) return null;
-  const file = `part-${part}-${kind}-proposal.jpg`;
-  if (fs.existsSync(path.join(dir, file))) {
-    return `films/${film}/out/animations/${sceneName}/${file}`;
+  const proposals = listPartProposals(film, sceneName, part, kind);
+  if (proposals.length > 0) {
+    // Default to the newest / latest version
+    return proposals[proposals.length - 1].path;
   }
   return null;
 }
@@ -293,19 +325,36 @@ export function deleteProposalFiles(
   sceneName: string,
   part: number,
   kind: "start" | "end",
+  filename?: string,
 ): string[] {
   const dir = path.join(animationsDir(film), sceneName);
   if (!fs.existsSync(dir)) return [];
   const deleted: string[] = [];
-  const filesToDelete = [
-    `part-${part}-${kind}-proposal.jpg`,
-    `part-${part}-${kind}-proposal-prompt.txt`,
-  ];
-  for (const filename of filesToDelete) {
-    const filePath = path.join(dir, filename);
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-      deleted.push(filename);
+
+  if (filename) {
+    const cleanName = path.basename(filename);
+    const stem = cleanName.replace(/\.jpg$/, "");
+    const promptName = `${stem}-prompt.txt`;
+    for (const f of [cleanName, promptName]) {
+      const filePath = path.join(dir, f);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        deleted.push(f);
+      }
+    }
+  } else {
+    const files = fs.readdirSync(dir);
+    const pattern = new RegExp(
+      `^part-${part}-${kind}-proposal(?:-v\\d+)?(?:-prompt\\.txt|\\.jpg)$`,
+    );
+    for (const file of files) {
+      if (pattern.test(file)) {
+        const filePath = path.join(dir, file);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          deleted.push(file);
+        }
+      }
     }
   }
   return deleted;
@@ -316,13 +365,13 @@ export function keyframesCommand(
   name: string,
   part: number,
   type: "start" | "end" | "both" = "start",
-  ref?: string,
-  force = false,
+  refPrev?: string,
+  refAfter?: string,
 ): string {
   return (
     `uv run keyframes --film ${film} --scene ${name} --parts ${part} --type ${type}` +
-    (ref ? ` --ref ${ref}` : "") +
-    (force ? " --force" : "")
+    (refPrev ? ` --ref-prev ${refPrev}` : "") +
+    (refAfter ? ` --ref-after ${refAfter}` : "")
   );
 }
 

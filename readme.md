@@ -222,7 +222,7 @@ Generates animated 720p 24fps video clips for each segment prompt in `films/<fil
 
 ### D. Keyframe Generator (`keyframes` / `generate-keyframes` / `src/keyframes.py`)
 
-Generates 16:9 start and/or end keyframe proposal images for scene script parts ahead of animation (`part-<N>-start-proposal.jpg` / `part-<N>-end-proposal.jpg`). Reuses character blueprints and scene background plates as visual references, and supports an explicit `--ref` image parameter (or automatic prior-frame discovery) for scene continuity. Outputs a direct file link in the terminal for human review.
+Generates 16:9 start and/or end keyframe proposal images for scene script parts ahead of animation (`part-<N>-start-proposal.jpg` / `part-<N>-end-proposal.jpg`). If a proposal file already exists, new generations automatically create versioned files (`-v1.jpg`, `-v2.jpg`, etc.) so multiple alternatives can be generated and compared in the web UI. Reuses character blueprints and scene background plates as visual references, and supports explicit `--ref-prev` and `--ref-after` image parameters for scene continuity or generating midway keyframes situated between prior and after frames. Outputs a direct file link in the terminal for human review.
 
 * **CLI Commands**:
   ```bash
@@ -232,11 +232,11 @@ Generates 16:9 start and/or end keyframe proposal images for scene script parts 
   # Generate both start and end keyframe proposals for segment 0
   uv run keyframes --scene <story_scene_name> --parts 0 --both
 
-  # Generate start keyframe for segment 1 using segment 0's proposal as reference
-  uv run keyframes --scene <story_scene_name> --parts 1 --start --ref part-0-end-proposal.jpg
+  # Generate start keyframe for segment 1 using segment 0's proposal as previous reference
+  uv run keyframes --scene <story_scene_name> --parts 1 --start --ref-prev part-0-end-proposal.jpg
 
-  # Regenerate proposals across all parts in the scene
-  uv run keyframes --scene <story_scene_name> --force
+  # Generate a keyframe proposal bridging between a previous frame and an after/next frame
+  uv run keyframes --scene <story_scene_name> --parts 1 --start --ref-prev part-0-end-proposal.jpg --ref-after part-1-end-proposal.jpg
   ```
 
 * **Key Options**:
@@ -245,15 +245,15 @@ Generates 16:9 start and/or end keyframe proposal images for scene script parts 
   * `--parts N` / `--part N`: Segment index (0-indexed). Default: all segments in the scene.
   * `--type {start,end,both}` / `--frame {start,end,both}`: Type of keyframe to generate (default: `start`).
   * `--start` / `--end` / `--both`: Shortcut flags for keyframe type.
-  * `--ref PATH`: Image file to use as previous keyframe / continuity reference (absolute, relative, or in the scene folder).
+  * `--ref-prev PATH` / `--ref PATH`: Image file to use as previous / earlier keyframe reference (absolute, relative, or in the scene animations folder).
+  * `--ref-after PATH`: Image file to use as after / subsequent keyframe reference (absolute, relative, or in the scene animations folder).
   * `--image-model MODEL`: Gemini image generation model ID (default: `gemini-3.1-flash-image-preview`).
   * `--output DIR`: Custom output directory (default: `films/<film>/out/animations/<scene>/`).
-  * `--force`: Overwrite existing proposal images.
 
 * **Output Artifacts** (written to `films/<film>/out/animations/<scene>/`):
-  * `part-<N>-start-proposal.jpg`: 1280x720 16:9 opening keyframe proposal image.
-  * `part-<N>-end-proposal.jpg`: 1280x720 16:9 closing keyframe proposal image.
-  * `part-<N>-<start|end>-proposal-prompt.txt`: Final prompt used for generation.
+  * `part-<N>-start-proposal.jpg` (or `-v1.jpg`, `-v2.jpg`): 1280x720 16:9 opening keyframe proposal image.
+  * `part-<N>-end-proposal.jpg` (or `-v1.jpg`, `-v2.jpg`): 1280x720 16:9 closing keyframe proposal image.
+  * `part-<N>-<start|end>-proposal-prompt.txt` (or `-v1-prompt.txt`): Final prompt used for generation.
 
 ---
 

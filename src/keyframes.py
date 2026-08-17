@@ -58,14 +58,44 @@ from movie_config import (
 logger = logging.getLogger("keyframes")
 
 
-def proposal_path(scene_dir: Path, segment_index: int, keyframe_type: str) -> Path:
-    """Return the output proposal image file path for a given segment and type."""
-    return scene_dir / f"part-{segment_index}-{keyframe_type}-proposal.jpg"
+def proposal_path(
+    scene_dir: Path, segment_index: int, keyframe_type: str, version: int | None = None
+) -> Path:
+    """Return the output proposal image file path for a given segment, type, and optional version."""
+    if version is None or version == 0:
+        return scene_dir / f"part-{segment_index}-{keyframe_type}-proposal.jpg"
+    return scene_dir / f"part-{segment_index}-{keyframe_type}-proposal-v{version}.jpg"
 
 
-def proposal_prompt_path(scene_dir: Path, segment_index: int, keyframe_type: str) -> Path:
-    """Return the saved prompt text path for a given segment and keyframe type."""
-    return scene_dir / f"part-{segment_index}-{keyframe_type}-proposal-prompt.txt"
+def proposal_prompt_path(
+    scene_dir: Path, segment_index: int, keyframe_type: str, version: int | None = None
+) -> Path:
+    """Return the saved prompt text path for a given segment, keyframe type, and optional version."""
+    if version is None or version == 0:
+        return scene_dir / f"part-{segment_index}-{keyframe_type}-proposal-prompt.txt"
+    return scene_dir / f"part-{segment_index}-{keyframe_type}-proposal-v{version}-prompt.txt"
+
+
+def next_proposal_paths(
+    scene_dir: Path, segment_index: int, keyframe_type: str
+) -> tuple[Path, Path]:
+    """Return the next available output proposal image and prompt file paths for a given segment and type.
+
+    If part-{N}-{type}-proposal.jpg does not exist, uses that (v0/base).
+    If it exists, uses part-{N}-{type}-proposal-v1.jpg, -v2.jpg, etc.
+    """
+    base_img = proposal_path(scene_dir, segment_index, keyframe_type)
+    base_prompt = proposal_prompt_path(scene_dir, segment_index, keyframe_type)
+    if not base_img.is_file():
+        return base_img, base_prompt
+
+    version = 1
+    while True:
+        v_img = proposal_path(scene_dir, segment_index, keyframe_type, version=version)
+        v_prompt = proposal_prompt_path(scene_dir, segment_index, keyframe_type, version=version)
+        if not v_img.is_file():
+            return v_img, v_prompt
+        version += 1
 
 
 def resolve_ref_image(ref_arg: str, scene_dir: Path, film: str) -> Path:
@@ -88,35 +118,6 @@ def resolve_ref_image(ref_arg: str, scene_dir: Path, film: str) -> Path:
     )
 
 
-def discover_continuity_ref(
-    scene_dir: Path, segment_index: int, keyframe_type: str
-) -> Path | None:
-    """Find prior keyframe or frame file for automatic continuity reference."""
-    if keyframe_type == "start":
-        if segment_index == 0:
-            return None
-        prev_idx = segment_index - 1
-        candidates = [
-            scene_dir / f"part-{prev_idx}-end-proposal.jpg",
-            scene_dir / f"part-{prev_idx}-end.jpg",
-            scene_dir / f"part-{prev_idx}.jpg",
-        ]
-        for candidate in candidates:
-            if candidate.is_file():
-                logger.info("Found prior segment end frame for continuity: %s", candidate)
-                return candidate.resolve()
-        return None
-    elif keyframe_type == "end":
-        candidates = [
-            scene_dir / f"part-{segment_index}-start-proposal.jpg",
-            scene_dir / f"part-{segment_index}-start.jpg",
-        ]
-        for candidate in candidates:
-            if candidate.is_file():
-                logger.info("Found start frame of current segment for continuity: %s", candidate)
-                return candidate.resolve()
-        return None
-    return None
 
 
 def build_keyframe_prompt(
@@ -125,7 +126,8 @@ def build_keyframe_prompt(
     keyframe_type: str,
     characters: list[str],
     has_background: bool = False,
-    has_ref_image: bool = False,
+    has_ref_prev: bool = False,
+    has_ref_after: bool = False,
 ) -> str:
     """Build the textual direction prompt for keyframe image generation."""
     movie_info = get_movie_info()
@@ -178,13 +180,28 @@ def build_keyframe_prompt(
         )
     if has_background:
         ref_instructions.append(
-            "2. Background Plate Reference (<IMAGE_REF_BG>): The environment set, architecture, depth "
+            f"{len(ref_instructions)+1}. Background Plate Reference (<IMAGE_REF_BG>): The environment set, architecture, depth "
             "layering, and lighting atmosphere must match the background reference plate exactly."
         )
-    if has_ref_image:
+    if has_ref_prev and has_ref_after:
         ref_instructions.append(
-            "3. Previous Keyframe Reference (<IMAGE_REF_PREV>): Maintain strict visual continuity with the "
-            "previous keyframe — character placement, lighting direction, camera perspective, and narrative state."
+            f"{len(ref_instructions)+1}. Chronological Bridge Context: This keyframe sits chronologically "
+            "BETWEEN the Previous Reference Frame (<IMAGE_REF_PREV>) and the Next Reference Frame (<IMAGE_REF_AFTER>). "
+            "Reconcile character positions, poses, lighting, and camera staging so this frame acts as a coherent, harmonious midway state bridging the two moments."
+        )
+        ref_instructions.append(
+            f"{len(ref_instructions)+1}. Previous Reference Frame (<IMAGE_REF_PREV>): Maintain direct visual and stylistic continuity with this earlier frame (character designs, wardrobe, lighting source, environment details)."
+        )
+        ref_instructions.append(
+            f"{len(ref_instructions)+1}. After / Next Reference Frame (<IMAGE_REF_AFTER>): Harmonize with this subsequent frame so character movement, camera angle, and scene flow naturally transition toward it."
+        )
+    elif has_ref_prev:
+        ref_instructions.append(
+            f"{len(ref_instructions)+1}. Previous Reference Frame (<IMAGE_REF_PREV>): Maintain strict visual continuity with this preceding frame — character placement, appearance, lighting direction, camera perspective, and story state."
+        )
+    elif has_ref_after:
+        ref_instructions.append(
+            f"{len(ref_instructions)+1}. After / Next Reference Frame (<IMAGE_REF_AFTER>): Maintain visual consistency and establish a natural compositional and staging flow leading toward this subsequent frame."
         )
 
     alignment_block = "\n".join(ref_instructions) if ref_instructions else "No external image references."
@@ -224,7 +241,8 @@ def generate_keyframe(
     characters: list[str],
     character_refs: list[tuple[str, Path]],
     background_plate: Path | None,
-    ref_image: Path | None,
+    ref_prev: Path | None,
+    ref_after: Path | None,
     output_path: Path,
     prompt_file_path: Path,
 ) -> Path:
@@ -246,7 +264,8 @@ def generate_keyframe(
         keyframe_type=keyframe_type,
         characters=characters,
         has_background=background_plate is not None,
-        has_ref_image=ref_image is not None,
+        has_ref_prev=ref_prev is not None,
+        has_ref_after=ref_after is not None,
     )
 
     prompt_file_path.write_text(prompt_text, encoding="utf-8")
@@ -264,9 +283,13 @@ def generate_keyframe(
             types.Part.from_bytes(data=background_plate.read_bytes(), mime_type="image/jpeg")
         )
 
-    if ref_image is not None:
-        contents.append(f"[Previous Keyframe Reference <IMAGE_REF_PREV>: {ref_image.name}]")
-        contents.append(types.Part.from_bytes(data=ref_image.read_bytes(), mime_type="image/jpeg"))
+    if ref_prev is not None:
+        contents.append(f"[Previous Reference Frame <IMAGE_REF_PREV>: {ref_prev.name}]")
+        contents.append(types.Part.from_bytes(data=ref_prev.read_bytes(), mime_type="image/jpeg"))
+
+    if ref_after is not None:
+        contents.append(f"[After / Next Reference Frame <IMAGE_REF_AFTER>: {ref_after.name}]")
+        contents.append(types.Part.from_bytes(data=ref_after.read_bytes(), mime_type="image/jpeg"))
 
     contents.append(prompt_text)
 
@@ -372,23 +395,23 @@ def run(args: argparse.Namespace) -> int:
             logger.info("Background plate for segment %d: %s", segment.index, background_plate)
 
         for ktype in keyframe_types:
-            out_img = proposal_path(scene_dir, segment.index, ktype)
-            prompt_file = proposal_prompt_path(scene_dir, segment.index, ktype)
+            out_img, prompt_file = next_proposal_paths(scene_dir, segment.index, ktype)
 
-            if out_img.is_file() and not args.force:
-                logger.info(
-                    "Keyframe proposal %s already exists; skipping (use --force to overwrite).",
-                    out_img,
-                )
-                print(f"Keyframe proposal already exists: {out_img.resolve().as_uri()}")
-                continue
+            ref_prev: Path | None = None
+            ref_prev_arg = (
+                getattr(args, "ref_prev", None)
+                or getattr(args, "ref_start", None)
+                or getattr(args, "ref", None)
+            )
+            if ref_prev_arg:
+                ref_prev = resolve_ref_image(ref_prev_arg, scene_dir, get_film())
+                logger.info("Using previous reference image: %s", ref_prev)
 
-            ref_image: Path | None = None
-            if args.ref:
-                ref_image = resolve_ref_image(args.ref, scene_dir, get_film())
-                logger.info("Using specified --ref image: %s", ref_image)
-            else:
-                ref_image = discover_continuity_ref(scene_dir, segment.index, ktype)
+            ref_after: Path | None = None
+            ref_after_arg = getattr(args, "ref_after", None) or getattr(args, "ref_end", None)
+            if ref_after_arg:
+                ref_after = resolve_ref_image(ref_after_arg, scene_dir, get_film())
+                logger.info("Using after reference image: %s", ref_after)
 
             generate_keyframe(
                 client=client,
@@ -399,7 +422,8 @@ def run(args: argparse.Namespace) -> int:
                 characters=characters,
                 character_refs=character_refs,
                 background_plate=background_plate,
-                ref_image=ref_image,
+                ref_prev=ref_prev,
+                ref_after=ref_after,
                 output_path=out_img,
                 prompt_file_path=prompt_file,
             )
@@ -425,7 +449,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description=(
             "Generate start and/or end keyframe proposal images for scene script parts "
-            "using character blueprints, background plates, and prior keyframe references. "
+            "using character blueprints, background plates, and prior/after keyframe references. "
             "Output images are saved to films/<film>/out/animations/<scene>/part-<N>-<start|end>-proposal.jpg "
             "with a direct file link output for human review."
         ),
@@ -438,8 +462,11 @@ def main() -> None:
             "  %(prog)s --scene frisby_visits_mr_ages --parts 0 --both\n"
             "      Generate both start and end keyframe proposals for part 0.\n"
             "\n"
-            "  %(prog)s --scene frisby_visits_mr_ages --parts 1 --start --ref part-0-end-proposal.jpg\n"
-            "      Generate start keyframe proposal for part 1 using part-0-end-proposal.jpg as reference.\n"
+            "  %(prog)s --scene frisby_visits_mr_ages --parts 1 --start --ref-prev part-0-end-proposal.jpg\n"
+            "      Generate start keyframe proposal for part 1 using part-0-end-proposal.jpg as previous reference.\n"
+            "\n"
+            "  %(prog)s --scene frisby_visits_mr_ages --parts 1 --start --ref-prev part-0-end-proposal.jpg --ref-after part-1-end-proposal.jpg\n"
+            "      Generate keyframe bridging between previous and after references.\n"
         ),
     )
     parser.add_argument(
@@ -491,13 +518,43 @@ def main() -> None:
         help="Shortcut to generate both start and end keyframe proposals.",
     )
     parser.add_argument(
-        "--ref",
+        "--ref-prev",
         default=None,
         metavar="PATH",
         help=(
-            "Image file path to use as the previous keyframe / continuity reference. "
+            "Image file path to use as the previous / earlier keyframe continuity reference. "
             "Can be an absolute path, relative path, or filename in the scene animations folder."
         ),
+    )
+    parser.add_argument(
+        "--ref-after",
+        default=None,
+        metavar="PATH",
+        help=(
+            "Image file path to use as the after / subsequent keyframe continuity reference. "
+            "Can be an absolute path, relative path, or filename in the scene animations folder."
+        ),
+    )
+    parser.add_argument(
+        "--ref",
+        default=None,
+        dest="ref_prev",
+        metavar="PATH",
+        help="Alias for --ref-prev.",
+    )
+    parser.add_argument(
+        "--ref-start",
+        default=None,
+        dest="ref_prev",
+        metavar="PATH",
+        help="Alias for --ref-prev.",
+    )
+    parser.add_argument(
+        "--ref-end",
+        default=None,
+        dest="ref_after",
+        metavar="PATH",
+        help="Alias for --ref-after.",
     )
     parser.add_argument(
         "--image-model",
@@ -524,11 +581,6 @@ def main() -> None:
             "Directory of character/scene blueprints "
             f"(default: {film_blueprint_dir(get_film())})."
         ),
-    )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Regenerate keyframe proposal even if output image already exists.",
     )
 
     args = parser.parse_args()

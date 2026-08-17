@@ -3,7 +3,13 @@ import { deleteProposalFiles, isValidFilm, isValidStoryName } from "../../lib/mo
 export const prerender = false;
 
 export async function POST({ request }: { request: Request }) {
-  let body: { film?: string; name?: string; part?: number; kind?: "start" | "end" };
+  let body: {
+    film?: string;
+    name?: string;
+    part?: number;
+    kind?: "start" | "end";
+    filename?: string;
+  };
   try {
     body = await request.json();
   } catch {
@@ -17,6 +23,7 @@ export async function POST({ request }: { request: Request }) {
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const part = typeof body.part === "number" ? body.part : Number.NaN;
   const kind = body.kind === "end" ? "end" : body.kind === "start" ? "start" : null;
+  const filename = typeof body.filename === "string" ? body.filename.trim() : undefined;
 
   if (!film || !isValidFilm(film)) {
     return new Response(JSON.stringify({ error: `Unknown film: "${film}"` }), {
@@ -47,7 +54,7 @@ export async function POST({ request }: { request: Request }) {
   }
 
   try {
-    const deleted = deleteProposalFiles(film, name, part, kind);
+    const deleted = deleteProposalFiles(film, name, part, kind, filename);
     return new Response(JSON.stringify({ success: true, deleted }), {
       status: 200,
       headers: { "Content-Type": "application/json" },

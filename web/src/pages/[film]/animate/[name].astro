@@ -257,8 +257,8 @@ const nextFrame =
         const part = parts[index];
         const segVideo = videos.segments.find((s) => s.part === part);
         const proposals = partProposals(film, name, part);
-        const hasStartProposal = proposals.start !== null;
-        const hasEndProposal = proposals.end !== null;
+        const hasStartProposal = proposals.start.length > 0;
+        const hasEndProposal = proposals.end.length > 0;
         const canUsePreviousSceneFrame = index === 0 && previousFrame;
         const canUseNextSceneFrame = index === parts.length - 1 && nextFrame;
         const priorSegment = index > 0 ? videos.segments.find((s) => s.part === parts[index - 1]) : null;
@@ -562,28 +562,43 @@ const nextFrame =
           </div>
         </div>
 
-        <div>
-          <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted">
-            Continuity Reference (--ref)
-          </label>
-          <select
-            id="keyframe-modal-ref-select"
-            class="w-full rounded-lg border border-line bg-ink/60 px-3 py-2 text-xs text-slate-200 focus:border-amber-key focus:outline-none"
-          >
-            <option value="">Auto Discovery / None</option>
-          </select>
-          <input
-            type="text"
-            id="keyframe-modal-custom-ref"
-            placeholder="Or enter custom image filename / path..."
-            class="mt-2 w-full rounded-lg border border-line bg-ink/60 px-3 py-2 font-mono text-xs text-slate-200 placeholder:text-muted/60 focus:border-amber-key focus:outline-none"
-          />
-        </div>
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
+            <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted">
+              Previous Reference (--ref-prev)
+            </label>
+            <select
+              id="keyframe-modal-ref-prev-select"
+              class="w-full rounded-lg border border-line bg-ink/60 px-3 py-2 text-xs text-slate-200 focus:border-amber-key focus:outline-none"
+            >
+              <option value="">None</option>
+            </select>
+            <input
+              type="text"
+              id="keyframe-modal-custom-ref-prev"
+              placeholder="Or custom previous ref..."
+              class="mt-2 w-full rounded-lg border border-line bg-ink/60 px-3 py-2 font-mono text-xs text-slate-200 placeholder:text-muted/60 focus:border-amber-key focus:outline-none"
+            />
+          </div>
 
-        <label class="flex cursor-pointer items-center gap-2 text-xs text-muted hover:text-slate-200">
-          <input type="checkbox" id="keyframe-modal-force" class="rounded accent-amber-key" />
-          <span>Force overwrite existing proposal files (--force)</span>
-        </label>
+          <div>
+            <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted">
+              Next Reference (--ref-after)
+            </label>
+            <select
+              id="keyframe-modal-ref-after-select"
+              class="w-full rounded-lg border border-line bg-ink/60 px-3 py-2 text-xs text-slate-200 focus:border-amber-key focus:outline-none"
+            >
+              <option value="">None</option>
+            </select>
+            <input
+              type="text"
+              id="keyframe-modal-custom-ref-after"
+              placeholder="Or custom next ref..."
+              class="mt-2 w-full rounded-lg border border-line bg-ink/60 px-3 py-2 font-mono text-xs text-slate-200 placeholder:text-muted/60 focus:border-amber-key focus:outline-none"
+            />
+          </div>
+        </div>
 
         <div class="rounded-lg border border-line bg-ink/70 p-3">
           <span class="block font-mono text-[11px] text-teal-shadow break-all" id="keyframe-modal-cmd-preview">
@@ -712,6 +727,7 @@ const nextFrame =
     value?: string;
     tileElement?: HTMLElement | null;
     isProposal?: boolean;
+    filename?: string;
   } | null = null;
 
   function openImagePreview(
@@ -722,7 +738,8 @@ const nextFrame =
     kind?: "start" | "end",
     value?: string,
     tileElement?: HTMLElement | null,
-    isProposal = false
+    isProposal = false,
+    filename?: string
   ): void {
     if (!previewModal || !previewImg) return;
 
@@ -734,7 +751,7 @@ const nextFrame =
     }
     if (previewOpenTab) previewOpenTab.href = src;
 
-    activePreviewTarget = { part, kind, value, tileElement, isProposal };
+    activePreviewTarget = { part, kind, value, tileElement, isProposal, filename };
 
     if (part !== undefined && kind && value && tileElement) {
       const state = partFrameState.get(part);
@@ -790,9 +807,10 @@ const nextFrame =
       const kind = el.dataset.kind as "start" | "end" | undefined;
       const value = el.dataset.value;
       const tileElement = el.closest<HTMLElement>("[data-tile-container]");
-      const isProposal = path.includes("-proposal.jpg");
+      const isProposal = path.includes("-proposal");
+      const filename = path.split("/").pop();
 
-      openImagePreview(src, title, path, part, kind, value, tileElement, isProposal);
+      openImagePreview(src, title, path, part, kind, value, tileElement, isProposal, filename);
     });
   });
 
@@ -820,16 +838,24 @@ const nextFrame =
     }
   });
 
-  // Handle Delete Proposal API calls
-  async function performDeleteProposal(film: string, name: string, part: number, kind: "start" | "end") {
-    if (!confirm(`Are you sure you want to delete the Part ${part} ${kind} proposal image?`)) {
+  async function performDeleteProposal(
+    film: string,
+    name: string,
+    part: number,
+    kind: "start" | "end",
+    filename?: string,
+  ): Promise<void> {
+    const confirmMsg = filename
+      ? `Delete proposal ${filename}?`
+      : `Delete ${kind} proposal image and prompt for Part ${part}?`;
+    if (!confirm(confirmMsg)) {
       return;
     }
     try {
       const res = await fetch("/api/delete-proposal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ film, name, part, kind }),
+        body: JSON.stringify({ film, name, part, kind, filename }),
       });
       if (res.ok) {
         location.reload();
@@ -849,7 +875,8 @@ const nextFrame =
       const name = btn.dataset.name!;
       const part = Number(btn.dataset.part);
       const kind = btn.dataset.kind as "start" | "end";
-      void performDeleteProposal(film, name, part, kind);
+      const filename = btn.dataset.filename;
+      void performDeleteProposal(film, name, part, kind, filename);
     });
   });
 
@@ -859,8 +886,8 @@ const nextFrame =
       activePreviewTarget.part !== undefined &&
       activePreviewTarget.kind
     ) {
-      const { part, kind } = activePreviewTarget;
-      void performDeleteProposal(currentFilm, currentSceneName, part, kind);
+      const { part, kind, filename } = activePreviewTarget;
+      void performDeleteProposal(currentFilm, currentSceneName, part, kind, filename);
     }
   });
 
@@ -901,9 +928,10 @@ const nextFrame =
   const modalCloseX = document.getElementById("keyframe-modal-close-x");
   const modalCancel = document.getElementById("keyframe-modal-cancel");
   const modalSubmit = document.getElementById("keyframe-modal-submit");
-  const modalRefSelect = document.getElementById("keyframe-modal-ref-select") as HTMLSelectElement | null;
-  const modalCustomRef = document.getElementById("keyframe-modal-custom-ref") as HTMLInputElement | null;
-  const modalForce = document.getElementById("keyframe-modal-force") as HTMLInputElement | null;
+  const modalRefPrevSelect = document.getElementById("keyframe-modal-ref-prev-select") as HTMLSelectElement | null;
+  const modalCustomRefPrev = document.getElementById("keyframe-modal-custom-ref-prev") as HTMLInputElement | null;
+  const modalRefAfterSelect = document.getElementById("keyframe-modal-ref-after-select") as HTMLSelectElement | null;
+  const modalCustomRefAfter = document.getElementById("keyframe-modal-custom-ref-after") as HTMLInputElement | null;
   const modalCmdPreview = document.getElementById("keyframe-modal-cmd-preview");
 
   let activeModalPart = 0;
@@ -916,13 +944,13 @@ const nextFrame =
       'input[name="keyframe-modal-target"]:checked'
     );
     const targetType = targetInput?.value || "start";
-    const refVal = modalCustomRef?.value.trim() || modalRefSelect?.value || "";
-    const force = modalForce?.checked || false;
+    const refPrevVal = modalCustomRefPrev?.value.trim() || modalRefPrevSelect?.value || "";
+    const refAfterVal = modalCustomRefAfter?.value.trim() || modalRefAfterSelect?.value || "";
 
     const cmd = [
       `uv run keyframes --film ${activeModalFilm} --scene ${activeModalName} --parts ${activeModalPart} --type ${targetType}`,
-      refVal ? `--ref ${refVal}` : "",
-      force ? "--force" : "",
+      refPrevVal ? `--ref-prev ${refPrevVal}` : "",
+      refAfterVal ? `--ref-after ${refAfterVal}` : "",
     ]
       .filter(Boolean)
       .join(" ");
@@ -930,47 +958,106 @@ const nextFrame =
     modalCmdPreview.textContent = cmd;
   }
 
-  function populateModalRefOptions(part: number, targetType: "start" | "end" | "both"): void {
-    if (!modalRefSelect) return;
-    modalRefSelect.innerHTML = "";
+  function populateModalRefOptions(part: number, _targetType: "start" | "end" | "both"): void {
+    if (!modalRefPrevSelect || !modalRefAfterSelect) return;
+    modalRefPrevSelect.innerHTML = "";
+    modalRefAfterSelect.innerHTML = "";
 
-    const autoOpt = document.createElement("option");
-    autoOpt.value = "";
-    autoOpt.textContent = "Auto Discovery / None";
-    modalRefSelect.appendChild(autoOpt);
+    const addedPrev = new Set<string>();
+    function addPrevOption(val: string, label: string) {
+      if (!val || addedPrev.has(val)) return;
+      addedPrev.add(val);
+      const opt = document.createElement("option");
+      opt.value = val;
+      opt.textContent = label;
+      modalRefPrevSelect!.appendChild(opt);
+    }
 
-    if (targetType === "end") {
-      // Use whatever is selected for the first frame as the reference image
-      const selectedStart = partFrameState.get(part)?.frameStart;
-      if (selectedStart) {
-        const opt = document.createElement("option");
-        opt.value = selectedStart;
-        opt.textContent = `Selected Start Frame (${selectedStart.split("/").pop()})`;
-        opt.selected = true;
-        modalRefSelect.appendChild(opt);
-      } else {
-        // Fallback: check if start proposal exists on the page
-        const startTile = document.querySelector<HTMLElement>(
-          `[data-frame-selector="start"][data-part="${part}"] [data-tile-container][data-value*="start-proposal"]`
-        );
-        const startPropVal = startTile?.dataset.value;
-        if (startPropVal) {
-          const opt = document.createElement("option");
-          opt.value = startPropVal;
-          opt.textContent = `Start Proposal (${startPropVal.split("/").pop()})`;
-          opt.selected = true;
-          modalRefSelect.appendChild(opt);
-        }
+    const addedAfter = new Set<string>();
+    function addAfterOption(val: string, label: string) {
+      if (!val || addedAfter.has(val)) return;
+      addedAfter.add(val);
+      const opt = document.createElement("option");
+      opt.value = val;
+      opt.textContent = label;
+      modalRefAfterSelect!.appendChild(opt);
+    }
+
+    const noneOptPrev = document.createElement("option");
+    noneOptPrev.value = "";
+    noneOptPrev.textContent = "None";
+    modalRefPrevSelect.appendChild(noneOptPrev);
+
+    const noneOptAfter = document.createElement("option");
+    noneOptAfter.value = "";
+    noneOptAfter.textContent = "None";
+    modalRefAfterSelect.appendChild(noneOptAfter);
+
+    // Populate PREVIOUS reference options
+    if (part > 0) {
+      const prevEndSelected = partFrameState.get(part - 1)?.frameEnd;
+      if (prevEndSelected) {
+        addPrevOption(prevEndSelected, `Part ${part - 1} Selected Last Frame (${prevEndSelected.split("/").pop()})`);
       }
-    } else if (targetType === "start") {
-      if (part > 0) {
-        const prevEndProp = `part-${part - 1}-end-proposal.jpg`;
-        const prevEndOpt = document.createElement("option");
-        prevEndOpt.value = prevEndProp;
-        prevEndOpt.textContent = `Prior Part End Proposal (${prevEndProp})`;
-        modalRefSelect.appendChild(prevEndOpt);
+      document.querySelectorAll<HTMLElement>(
+        `[data-frame-selector="end"][data-part="${part - 1}"] [data-tile-container]`
+      ).forEach((tile) => {
+        const val = tile.dataset.value;
+        const label = tile.querySelector("span.text-xs")?.textContent?.trim() || val?.split("/").pop();
+        if (val) addPrevOption(val, `Part ${part - 1} Last Frame: ${label} (${val.split("/").pop()})`);
+      });
+      addPrevOption(`part-${part - 1}-end-proposal.jpg`, `Part ${part - 1} End Proposal (part-${part - 1}-end-proposal.jpg)`);
+      addPrevOption(`part-${part - 1}-end.jpg`, `Part ${part - 1} End Frame (part-${part - 1}-end.jpg)`);
+    } else {
+      const prevSceneTile = document.querySelector<HTMLElement>(
+        `[data-frame-selector="start"][data-part="0"] [data-tile-container][data-value*="part-"][data-value*="-end.jpg"]`
+      );
+      if (prevSceneTile?.dataset.value) {
+        addPrevOption(prevSceneTile.dataset.value, `Previous Scene End Frame (${prevSceneTile.dataset.value.split("/").pop()})`);
       }
     }
+    const currentStartSelected = partFrameState.get(part)?.frameStart;
+    if (currentStartSelected) {
+      addPrevOption(currentStartSelected, `Current Part ${part} Selected Start Frame (${currentStartSelected.split("/").pop()})`);
+    }
+    document.querySelectorAll<HTMLElement>(
+      `[data-frame-selector="start"][data-part="${part}"] [data-tile-container]`
+    ).forEach((tile) => {
+      const val = tile.dataset.value;
+      const label = tile.querySelector("span.text-xs")?.textContent?.trim() || val?.split("/").pop();
+      if (val) addPrevOption(val, `Current Part ${part} Start Frame: ${label} (${val.split("/").pop()})`);
+    });
+    addPrevOption(`part-${part}-start-proposal.jpg`, `Current Part ${part} Start Proposal (part-${part}-start-proposal.jpg)`);
+    addPrevOption(`part-${part}-start.jpg`, `Current Part ${part} Start Frame (part-${part}-start.jpg)`);
+
+    // Populate AFTER reference options
+    const currentEndSelected = partFrameState.get(part)?.frameEnd;
+    if (currentEndSelected) {
+      addAfterOption(currentEndSelected, `Current Part ${part} Selected Last Frame (${currentEndSelected.split("/").pop()})`);
+    }
+    document.querySelectorAll<HTMLElement>(
+      `[data-frame-selector="end"][data-part="${part}"] [data-tile-container]`
+    ).forEach((tile) => {
+      const val = tile.dataset.value;
+      const label = tile.querySelector("span.text-xs")?.textContent?.trim() || val?.split("/").pop();
+      if (val) addAfterOption(val, `Current Part ${part} Last Frame: ${label} (${val.split("/").pop()})`);
+    });
+    addAfterOption(`part-${part}-end-proposal.jpg`, `Current Part ${part} End Proposal (part-${part}-end-proposal.jpg)`);
+    addAfterOption(`part-${part}-end.jpg`, `Current Part ${part} End Frame (part-${part}-end.jpg)`);
+
+    const nextStartSelected = partFrameState.get(part + 1)?.frameStart;
+    if (nextStartSelected) {
+      addAfterOption(nextStartSelected, `Part ${part + 1} Selected Start Frame (${nextStartSelected.split("/").pop()})`);
+    }
+    document.querySelectorAll<HTMLElement>(
+      `[data-frame-selector="start"][data-part="${part + 1}"] [data-tile-container]`
+    ).forEach((tile) => {
+      const val = tile.dataset.value;
+      const label = tile.querySelector("span.text-xs")?.textContent?.trim() || val?.split("/").pop();
+      if (val) addAfterOption(val, `Part ${part + 1} Start Frame: ${label} (${val.split("/").pop()})`);
+    });
+    addAfterOption(`part-${part + 1}-start-proposal.jpg`, `Part ${part + 1} Start Proposal (part-${part + 1}-start-proposal.jpg)`);
+    addAfterOption(`part-${part + 1}-start.jpg`, `Part ${part + 1} Start Frame (part-${part + 1}-start.jpg)`);
   }
 
   function openKeyframeModal(film: string, name: string, part: number, preselectedType: "start" | "end" | "both" = "start"): void {
@@ -987,8 +1074,8 @@ const nextFrame =
     if (radio) radio.checked = true;
 
     populateModalRefOptions(part, preselectedType);
-    if (modalCustomRef) modalCustomRef.value = "";
-    if (modalForce) modalForce.checked = false;
+    if (modalCustomRefPrev) modalCustomRefPrev.value = "";
+    if (modalCustomRefAfter) modalCustomRefAfter.value = "";
 
     updateKeyframeCommandPreview();
 
@@ -1033,22 +1120,23 @@ const nextFrame =
       updateKeyframeCommandPreview();
     });
   });
-  modalRefSelect?.addEventListener("change", updateKeyframeCommandPreview);
-  modalCustomRef?.addEventListener("input", updateKeyframeCommandPreview);
-  modalForce?.addEventListener("change", updateKeyframeCommandPreview);
+  modalRefPrevSelect?.addEventListener("change", updateKeyframeCommandPreview);
+  modalCustomRefPrev?.addEventListener("input", updateKeyframeCommandPreview);
+  modalRefAfterSelect?.addEventListener("change", updateKeyframeCommandPreview);
+  modalCustomRefAfter?.addEventListener("input", updateKeyframeCommandPreview);
 
   modalSubmit?.addEventListener("click", () => {
     const targetInput = document.querySelector<HTMLInputElement>(
       'input[name="keyframe-modal-target"]:checked'
     );
     const targetType = (targetInput?.value as "start" | "end" | "both") || "start";
-    const refVal = modalCustomRef?.value.trim() || modalRefSelect?.value || "";
-    const force = modalForce?.checked || false;
+    const refPrevVal = modalCustomRefPrev?.value.trim() || modalRefPrevSelect?.value || "";
+    const refAfterVal = modalCustomRefAfter?.value.trim() || modalRefAfterSelect?.value || "";
 
     const command = [
       `uv run keyframes --film ${activeModalFilm} --scene ${activeModalName} --parts ${activeModalPart} --type ${targetType}`,
-      refVal ? `--ref ${refVal}` : "",
-      force ? "--force" : "",
+      refPrevVal ? `--ref-prev ${refPrevVal}` : "",
+      refAfterVal ? `--ref-after ${refAfterVal}` : "",
     ]
       .filter(Boolean)
       .join(" ");
@@ -1062,8 +1150,8 @@ const nextFrame =
         name: activeModalName,
         parts: activeModalPart,
         type: targetType,
-        ref: refVal,
-        force,
+        refPrev: refPrevVal || undefined,
+        refAfter: refAfterVal || undefined,
       },
       command,
     });

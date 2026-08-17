@@ -10,7 +10,10 @@ export async function POST({ request }: { request: Request }) {
     parts?: number;
     type?: "start" | "end" | "both";
     ref?: string;
-    force?: boolean;
+    refPrev?: string;
+    refAfter?: string;
+    refStart?: string;
+    refEnd?: string;
   };
   try {
     body = await request.json();
@@ -25,8 +28,20 @@ export async function POST({ request }: { request: Request }) {
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const parts = typeof body.parts === "number" ? body.parts : undefined;
   const keyframeType = body.type === "end" || body.type === "both" ? body.type : "start";
-  const ref = typeof body.ref === "string" ? body.ref.trim() : "";
-  const force = body.force === true;
+  const refPrev =
+    typeof body.refPrev === "string"
+      ? body.refPrev.trim()
+      : typeof body.refStart === "string"
+        ? body.refStart.trim()
+        : typeof body.ref === "string"
+          ? body.ref.trim()
+          : "";
+  const refAfter =
+    typeof body.refAfter === "string"
+      ? body.refAfter.trim()
+      : typeof body.refEnd === "string"
+        ? body.refEnd.trim()
+        : "";
 
   if (!film || !isValidFilm(film)) {
     return new Response(JSON.stringify({ error: `Unknown film: "${film}"` }), {
@@ -47,19 +62,19 @@ export async function POST({ request }: { request: Request }) {
     args.push("--parts", String(parts));
   }
   args.push("--type", keyframeType);
-  if (ref) {
-    args.push("--ref", ref);
+  if (refPrev) {
+    args.push("--ref-prev", refPrev);
   }
-  if (force) {
-    args.push("--force");
+  if (refAfter) {
+    args.push("--ref-after", refAfter);
   }
 
   const command =
     `uv run keyframes --film ${film} --scene ${name}` +
     (parts !== undefined ? ` --parts ${parts}` : "") +
     ` --type ${keyframeType}` +
-    (ref ? ` --ref ${ref}` : "") +
-    (force ? " --force" : "");
+    (refPrev ? ` --ref-prev ${refPrev}` : "") +
+    (refAfter ? ` --ref-after ${refAfter}` : "");
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream({

@@ -11,7 +11,6 @@ from animator.models import SceneSegment
 import keyframes
 from keyframes import (
     build_keyframe_prompt,
-    discover_continuity_ref,
     main,
     proposal_path,
     proposal_prompt_path,
@@ -30,10 +29,37 @@ class TestKeyframes(unittest.TestCase):
         start_img = proposal_path(scene_dir, 0, "start")
         end_img = proposal_path(scene_dir, 0, "end")
         start_prompt = proposal_prompt_path(scene_dir, 1, "start")
+        v1_img = proposal_path(scene_dir, 0, "start", version=1)
+        v1_prompt = proposal_prompt_path(scene_dir, 0, "start", version=1)
 
         self.assertEqual(start_img, scene_dir / "part-0-start-proposal.jpg")
         self.assertEqual(end_img, scene_dir / "part-0-end-proposal.jpg")
         self.assertEqual(start_prompt, scene_dir / "part-1-start-proposal-prompt.txt")
+        self.assertEqual(v1_img, scene_dir / "part-0-start-proposal-v1.jpg")
+        self.assertEqual(v1_prompt, scene_dir / "part-0-start-proposal-v1-prompt.txt")
+
+    def test_next_proposal_paths_versioning(self) -> None:
+        from keyframes import next_proposal_paths
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            scene_dir = Path(tmp_dir)
+
+            # Initially, base paths are returned
+            img0, prompt0 = next_proposal_paths(scene_dir, 0, "start")
+            self.assertEqual(img0, scene_dir / "part-0-start-proposal.jpg")
+            self.assertEqual(prompt0, scene_dir / "part-0-start-proposal-prompt.txt")
+
+            # Create base image
+            img0.write_bytes(b"base")
+            img1, prompt1 = next_proposal_paths(scene_dir, 0, "start")
+            self.assertEqual(img1, scene_dir / "part-0-start-proposal-v1.jpg")
+            self.assertEqual(prompt1, scene_dir / "part-0-start-proposal-v1-prompt.txt")
+
+            # Create v1 image
+            img1.write_bytes(b"v1")
+            img2, prompt2 = next_proposal_paths(scene_dir, 0, "start")
+            self.assertEqual(img2, scene_dir / "part-0-start-proposal-v2.jpg")
+            self.assertEqual(prompt2, scene_dir / "part-0-start-proposal-v2-prompt.txt")
 
     def test_build_keyframe_prompt_start(self) -> None:
         segment = SceneSegment(
@@ -47,7 +73,8 @@ class TestKeyframes(unittest.TestCase):
             keyframe_type="start",
             characters=["Mrs Brisby", "Mr Ages"],
             has_background=True,
-            has_ref_image=False,
+            has_ref_prev=False,
+            has_ref_after=False,
         )
 
         self.assertIn("KEYFRAME TARGET: START FRAME", prompt)
@@ -56,6 +83,7 @@ class TestKeyframes(unittest.TestCase):
         self.assertIn("MR AGES (<IMAGE_REF_1>)", prompt)
         self.assertIn("<IMAGE_REF_BG>", prompt)
         self.assertNotIn("<IMAGE_REF_PREV>", prompt)
+        self.assertNotIn("<IMAGE_REF_AFTER>", prompt)
         self.assertIn("MANDATES:", prompt)
         self.assertIn("1280x720", prompt)
 
@@ -71,13 +99,17 @@ class TestKeyframes(unittest.TestCase):
             keyframe_type="end",
             characters=["Mrs Brisby"],
             has_background=False,
-            has_ref_image=True,
+            has_ref_prev=True,
+            has_ref_after=True,
         )
 
         self.assertIn("KEYFRAME TARGET: END FRAME", prompt)
         self.assertIn("Final Held Pose", prompt)
         self.assertIn("<IMAGE_REF_PREV>", prompt)
-        self.assertIn("Previous Keyframe Reference", prompt)
+        self.assertIn("<IMAGE_REF_AFTER>", prompt)
+        self.assertIn("Chronological Bridge Context", prompt)
+        self.assertIn("Previous Reference Frame", prompt)
+        self.assertIn("After / Next Reference Frame", prompt)
 
     def test_resolve_ref_image_direct_and_relative(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -97,24 +129,51 @@ class TestKeyframes(unittest.TestCase):
             with self.assertRaises(ValueError):
                 resolve_ref_image("non_existent_ref.jpg", scene_dir, "rats")
 
-    def test_discover_continuity_ref(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp_dir:
+    def test_run_without_ref_uses_none(self) -> None:
+        with (
+            patch("keyframes.generate_keyframe") as mock_gen,
+            patch("keyframes.film_scripts_dir") as mock_scripts,
+            patch("keyframes.film_animations_dir") as mock_anims,
+            patch("keyframes.ensure_character_reference", return_value=Path("/tmp/char.jpg")),
+            patch("keyframes.ensure_background_plate", return_value=None),
+            patch("keyframes.find_scene_background_plate", return_value=None),
+            patch("keyframes.genai.Client"),
+            tempfile.TemporaryDirectory() as tmp_dir,
+        ):
             scene_dir = Path(tmp_dir)
+            mock_anims.return_value = scene_dir.parent
+            mock_scripts.return_value = scene_dir.parent / "scripts"
+            script_file = scene_dir.parent / "scripts" / "frisby_visits_mr_ages_part1.md"
+            script_file.parent.mkdir(parents=True, exist_ok=True)
+            script_file.write_text(
+                "Characters: Mrs Brisby\n\nintegrated_multimodal_description: [Shot 1]\n[0:00-0:10] Mrs Brisby stands.",
+                encoding="utf-8",
+            )
 
-            # Part 0 start has no prior ref
-            self.assertIsNone(discover_continuity_ref(scene_dir, 0, "start"))
-
-            # Part 1 start discovers part-0-end-proposal.jpg
             prior_end = scene_dir / "part-0-end-proposal.jpg"
+            prior_end.parent.mkdir(parents=True, exist_ok=True)
             prior_end.write_bytes(b"test")
-            discovered = discover_continuity_ref(scene_dir, 1, "start")
-            self.assertEqual(discovered, prior_end.resolve())
 
-            # Part 1 end discovers part-1-start-proposal.jpg
-            current_start = scene_dir / "part-1-start-proposal.jpg"
-            current_start.write_bytes(b"test")
-            discovered_end = discover_continuity_ref(scene_dir, 1, "end")
-            self.assertEqual(discovered_end, current_start.resolve())
+            from argparse import Namespace
+            args = Namespace(
+                film="rats",
+                scene="frisby_visits_mr_ages",
+                parts=1,
+                type="start",
+                ref=None,
+                ref_prev=None,
+                ref_after=None,
+                image_model="gemini-3.1-flash-image-preview",
+                output=str(scene_dir),
+                scripts_dir=None,
+                blueprint_dir=None,
+            )
+            ret = run(args)
+            self.assertEqual(ret, 0)
+            self.assertTrue(mock_gen.called)
+            # Ensure ref_prev and ref_after passed to generate_keyframe are None
+            self.assertIsNone(mock_gen.call_args.kwargs["ref_prev"])
+            self.assertIsNone(mock_gen.call_args.kwargs["ref_after"])
 
     def test_cli_argument_parsing(self) -> None:
         with (
@@ -127,9 +186,10 @@ class TestKeyframes(unittest.TestCase):
                     "--parts",
                     "0",
                     "--both",
-                    "--ref",
-                    "custom_ref.jpg",
-                    "--force",
+                    "--ref-prev",
+                    "custom_prev_ref.jpg",
+                    "--ref-after",
+                    "custom_after_ref.jpg",
                 ],
             ),
             patch("keyframes.run", return_value=0) as mock_run,
@@ -142,6 +202,8 @@ class TestKeyframes(unittest.TestCase):
         self.assertEqual(args.scene, "frisby_visits_mr_ages")
         self.assertEqual(args.parts, 0)
         self.assertEqual(args.type, "both")
+        self.assertEqual(args.ref_prev, "custom_prev_ref.jpg")
+        self.assertEqual(args.ref_after, "custom_after_ref.jpg")
     def test_orientation_aspect_ratio(self) -> None:
         from blueprint_generator.utils.image import (
             aspect_ratio_to_dimensions,

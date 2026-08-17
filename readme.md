@@ -11,9 +11,10 @@ This project automates the multi-stage visual development and animation generati
 1. **Character Blueprint Sheets**: Generates cohesive 16:9 character style guides (hero poses, turnarounds, detail callouts) with automated multi-turn vision LLM review loops.
 2. **Scene Background Plates**: Generates clean, character-free 16:9 production background plates for cel compositing.
 3. **30-Second Scene Scripts**: Expands abridged story beats from the `story:` section of `movie.yml` into structured 30-second scene design documents divided into three 10-second segments.
-4. **Animated Clips (Pluggable Video Provider)**: Generates 720p 24fps video clips per segment with first/last-frame continuity locking (MiniMax H3 via the MiniMax API directly at 768P by default, Google Gemini Omni Flash, or OpenRouter MiniMax H3 at 768p), exports each clip's first and last frames as `part-<N>-start.jpg` / `part-<N>-end.jpg`, then concatenates the clips into full scene videos with seamless crossfade transitions.
-5. **Film Assembly**: The web console can merge available scene `full.mp4` files in story order into `films/<film>/out/animations/film.mp4` and export a midpoint `film-thumb.jpg`.
-5. **Web Console**: A local browser UI over the pipeline (scene tables, script generation, blueprint viewing, animator command copy) — see section 4.D.
+4. **Keyframe Proposals**: Generates start and closing keyframe proposal images (`part-<N>-start-proposal.jpg` / `part-<N>-end-proposal.jpg`) ahead of video generation, referencing character blueprints, background plates, and prior keyframes to lock framing and character poses.
+5. **Animated Clips (Pluggable Video Provider)**: Generates 720p 24fps video clips per segment with first/last-frame continuity locking (MiniMax H3 via the MiniMax API directly at 768P by default, Google Gemini Omni Flash, or OpenRouter MiniMax H3 at 768p), exports each clip's first and last frames as `part-<N>-start.jpg` / `part-<N>-end.jpg`, then concatenates the clips into full scene videos with seamless crossfade transitions.
+6. **Film Assembly**: The web console can merge available scene `full.mp4` files in story order into `films/<film>/out/animations/film.mp4` and export a midpoint `film-thumb.jpg`.
+7. **Web Console**: A local browser UI over the pipeline (scene tables, script generation, blueprint viewing, animator command copy) — see section 4.E.
 
 ---
 
@@ -58,7 +59,7 @@ All CLI tools take `--film <slug>` (or honor the `FILM` environment variable) to
 
 3. **External Dependencies**:
    * `ffmpeg` and `ffprobe` on `PATH` for video clip extraction, continuity frame locking, and crossfade combination.
-   * `node`/`npm` for the web console (section 4.D).
+   * `bun` (or `node`/`npm`) for the web console runtime (section 4.E).
 
 ---
 
@@ -76,7 +77,10 @@ uv run generate-blueprint --film <film> --scene <scene-slug>             # scene
 # 3. Generate the scene script for a story scene name from movie.yml
 uv run scene-script --film <film> --name <story_scene_name> -v
 
-# 4. Generate video for just part 0 of the scene; full.mp4 is composed
+# 4. (Optional) Generate keyframe proposals for scene parts
+uv run keyframes --film <film> --scene <story_scene_name> --parts 0 --start
+
+# 5. Generate video for just part 0 of the scene; full.mp4 is composed
 #    automatically as additional parts are made
 uv run python src/animator.py --film <film> --scene <story_scene_name> --parts 0 --provider minimax
 ```
@@ -216,7 +220,44 @@ Generates animated 720p 24fps video clips for each segment prompt in `films/<fil
 
 ---
 
-### D. Web Console (`./start_web.sh`)
+### D. Keyframe Generator (`keyframes` / `generate-keyframes` / `src/keyframes.py`)
+
+Generates 16:9 start and/or end keyframe proposal images for scene script parts ahead of animation (`part-<N>-start-proposal.jpg` / `part-<N>-end-proposal.jpg`). Reuses character blueprints and scene background plates as visual references, and supports an explicit `--ref` image parameter (or automatic prior-frame discovery) for scene continuity. Outputs a direct file link in the terminal for human review.
+
+* **CLI Commands**:
+  ```bash
+  # Generate start keyframe proposal for segment 0
+  uv run keyframes --scene <story_scene_name> --parts 0 --start
+
+  # Generate both start and end keyframe proposals for segment 0
+  uv run keyframes --scene <story_scene_name> --parts 0 --both
+
+  # Generate start keyframe for segment 1 using segment 0's proposal as reference
+  uv run keyframes --scene <story_scene_name> --parts 1 --start --ref part-0-end-proposal.jpg
+
+  # Regenerate proposals across all parts in the scene
+  uv run keyframes --scene <story_scene_name> --force
+  ```
+
+* **Key Options**:
+  * `--film SLUG`: Film folder under `films/<slug>/` to use (default: first film found, or `$FILM`).
+  * `--scene NAME`: Story scene name from `movie.yml` (reads `films/<film>/out/scripts/<name>_part<N>.md`).
+  * `--parts N` / `--part N`: Segment index (0-indexed). Default: all segments in the scene.
+  * `--type {start,end,both}` / `--frame {start,end,both}`: Type of keyframe to generate (default: `start`).
+  * `--start` / `--end` / `--both`: Shortcut flags for keyframe type.
+  * `--ref PATH`: Image file to use as previous keyframe / continuity reference (absolute, relative, or in the scene folder).
+  * `--image-model MODEL`: Gemini image generation model ID (default: `gemini-3.1-flash-image-preview`).
+  * `--output DIR`: Custom output directory (default: `films/<film>/out/animations/<scene>/`).
+  * `--force`: Overwrite existing proposal images.
+
+* **Output Artifacts** (written to `films/<film>/out/animations/<scene>/`):
+  * `part-<N>-start-proposal.jpg`: 1280x720 16:9 opening keyframe proposal image.
+  * `part-<N>-end-proposal.jpg`: 1280x720 16:9 closing keyframe proposal image.
+  * `part-<N>-<start|end>-proposal-prompt.txt`: Final prompt used for generation.
+
+---
+
+### E. Web Console (`./start_web.sh`)
 
 A local Astro + Tailwind web UI over the pipeline tools — no authentication, intended to run on your machine alongside the Python pipeline.
 
@@ -247,8 +288,10 @@ A local Astro + Tailwind web UI over the pipeline tools — no authentication, i
           ▼
 [ generate-blueprint ] ──► Generates Character & Background Blueprints (films/<film>/out/blueprint/...)
           │
-          ▼
-[ animator ] ──► Segment Video Generation (Pluggable Provider: Gemini / OpenRouter)
+          ├──► (Optional) [ keyframes ] ──► Start/End Keyframe Proposals (part-<N>-<start|end>-proposal.jpg)
+          │                                  │ (Used as --frame-start / --frame-end in animator)
+          ▼                                  ▼
+[ animator ] ──► Segment Video Generation (Pluggable Provider: MiniMax / Gemini / OpenRouter)
           │
           ├──► Segment 0 (0:00-0:10) ──► films/<film>/out/animations/<scene>/part-0.mp4
           │                                     │ (Exports part-0-start.jpg and part-0-end.jpg)

@@ -253,6 +253,56 @@ export function resolveSceneFrame(
   return null;
 }
 
+export interface PartProposals {
+  start: string | null;
+  end: string | null;
+}
+
+export function partProposals(
+  film: string,
+  sceneName: string,
+  part: number,
+): PartProposals {
+  const dir = path.join(animationsDir(film), sceneName);
+  if (!fs.existsSync(dir)) return { start: null, end: null };
+  const startFile = `part-${part}-start-proposal.jpg`;
+  const endFile = `part-${part}-end-proposal.jpg`;
+  return {
+    start: fs.existsSync(path.join(dir, startFile)) ? startFile : null,
+    end: fs.existsSync(path.join(dir, endFile)) ? endFile : null,
+  };
+}
+
+export function resolveProposalFrame(
+  film: string,
+  sceneName: string,
+  part: number,
+  kind: "start" | "end",
+): string | null {
+  const dir = path.join(animationsDir(film), sceneName);
+  if (!fs.existsSync(dir)) return null;
+  const file = `part-${part}-${kind}-proposal.jpg`;
+  if (fs.existsSync(path.join(dir, file))) {
+    return `films/${film}/out/animations/${sceneName}/${file}`;
+  }
+  return null;
+}
+
+export function keyframesCommand(
+  film: string,
+  name: string,
+  part: number,
+  type: "start" | "end" | "both" = "start",
+  ref?: string,
+  force = false,
+): string {
+  return (
+    `uv run keyframes --film ${film} --scene ${name} --parts ${part} --type ${type}` +
+    (ref ? ` --ref ${ref}` : "") +
+    (force ? " --force" : "")
+  );
+}
+
 function dirHasBlueprintImages(dir: string): boolean {
   const info = blueprintInfo(dir);
   return info.latest !== null || info.style !== null;

@@ -20,10 +20,13 @@ generate-character = "blueprint:main"
 scriptgen = "scriptgen:main"
 scene-script = "scriptgen:main"
 animator = "animator:main"
+keyframes = "keyframes:main"
+generate-keyframe = "keyframes:main"
+generate-keyframes = "keyframes:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
-py-modules = ["blueprint", "scriptgen", "animator"]
+py-modules = ["blueprint", "scriptgen", "animator", "keyframes"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

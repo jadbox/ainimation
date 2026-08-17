@@ -26,17 +26,63 @@ def extract_image(response: Any) -> bytes:
     raise RuntimeError("Gemini returned no inline image data.")
 
 
-def generate_image(client: genai.Client, model: str, prompt: str) -> bytes:
-    """Generate a 16:9 image using Gemini image generation model."""
-    logger.info("Generating image with model=%s ...", model)
-    logger.debug("Image generation prompt:\n%s", prompt[:500] + ("..." if len(prompt) > 500 else ""))
+def normalize_aspect_ratio(orientation: str | None) -> str:
+    """Normalize orientation/aspect ratio string to Gemini supported aspect ratios."""
+    if not orientation:
+        return "16:9"
+    norm = orientation.lower().strip()
+    if norm == "landscape":
+        return "16:9"
+    if norm == "portrait":
+        return "9:16"
+    return norm
+
+
+def aspect_ratio_to_dimensions(aspect_ratio: str) -> tuple[int, int]:
+    """Return (width, height) pixel dimensions for a given aspect ratio string."""
+    norm = normalize_aspect_ratio(aspect_ratio)
+    if norm == "16:9":
+        return (1280, 720)
+    if norm == "9:16":
+        return (720, 1280)
+    if norm == "1:1":
+        return (1024, 1024)
+    if norm == "4:3":
+        return (960, 720)
+    if norm == "3:4":
+        return (720, 960)
+
+    try:
+        w_str, h_str = norm.split(":")
+        w, h = float(w_str), float(h_str)
+        if w >= h:
+            return (int(round(720 * (w / h))), 720)
+        else:
+            return (720, int(round(720 * (h / w))))
+    except Exception:
+        return (1280, 720)
+
+
+def generate_image(
+    client: genai.Client,
+    model: str,
+    prompt: str | list[Any],
+    aspect_ratio: str = "16:9",
+) -> bytes:
+    """Generate an image using Gemini image generation model with specified aspect ratio."""
+    norm_ratio = normalize_aspect_ratio(aspect_ratio)
+    logger.info("Generating image with model=%s (aspect_ratio=%s) ...", model, norm_ratio)
+    if isinstance(prompt, str):
+        logger.debug("Image generation prompt:\n%s", prompt[:500] + ("..." if len(prompt) > 500 else ""))
+    else:
+        logger.debug("Image generation prompt with %d content items", len(prompt))
     t0 = time.monotonic()
     response = client.models.generate_content(
         model=model,
         contents=prompt,
         config=types.GenerateContentConfig(
             response_modalities=["IMAGE", "TEXT"],
-            image_config=types.ImageConfig(aspect_ratio="16:9"),
+            image_config=types.ImageConfig(aspect_ratio=norm_ratio),
         ),
     )
     data = extract_image(response)
@@ -47,19 +93,14 @@ def generate_image(client: genai.Client, model: str, prompt: str) -> bytes:
 
 TARGET_WIDTH = 1280
 TARGET_HEIGHT = 720
-"""True 16:9 output dimensions for processed JPEGs."""
+"""Default 16:9 output dimensions for processed JPEGs."""
 
 
-def crop_to_16_9(image: Image.Image) -> Image.Image:
-    """Center-crop ``image`` to a true 16:9 aspect ratio.
-
-    PIL's ``thumbnail`` preserves the source aspect ratio, so a model that
-    returns a non-16:9 composition would otherwise slip through as e.g.
-    1280x714, which breaks background/animation anchoring. Cropping to exactly
-    16:9 keeps generated blueprints on-canon.
-    """
+def crop_to_aspect_ratio(image: Image.Image, aspect_ratio: str = "16:9") -> Image.Image:
+    """Center-crop ``image`` to match the target aspect ratio."""
+    target_width, target_height = aspect_ratio_to_dimensions(aspect_ratio)
+    target_ratio = target_width / target_height
     width, height = image.size
-    target_ratio = TARGET_WIDTH / TARGET_HEIGHT
     source_ratio = width / height
     if abs(source_ratio - target_ratio) < 1e-6:
         return image
@@ -74,13 +115,19 @@ def crop_to_16_9(image: Image.Image) -> Image.Image:
     return image.crop(box)
 
 
-def to_jpeg(image_data: bytes) -> bytes:
-    """Convert image bytes to a true 16:9 high quality JPEG resized to 1280x720."""
+def crop_to_16_9(image: Image.Image) -> Image.Image:
+    """Center-crop ``image`` to a true 16:9 aspect ratio."""
+    return crop_to_aspect_ratio(image, "16:9")
+
+
+def to_jpeg(image_data: bytes, aspect_ratio: str = "16:9") -> bytes:
+    """Convert image bytes to a high quality JPEG resized to the target aspect ratio."""
+    target_width, target_height = aspect_ratio_to_dimensions(aspect_ratio)
     with Image.open(io.BytesIO(image_data)) as image:
         converted = image.convert("RGB")
-        converted = crop_to_16_9(converted)
+        converted = crop_to_aspect_ratio(converted, aspect_ratio)
         converted = converted.resize(
-            (TARGET_WIDTH, TARGET_HEIGHT), Image.Resampling.LANCZOS
+            (target_width, target_height), Image.Resampling.LANCZOS
         )
         buf = io.BytesIO()
         converted.save(buf, format="JPEG", quality=95, optimize=True)

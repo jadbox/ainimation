@@ -10,31 +10,31 @@ A local Astro + Tailwind UI over the animation pipeline tools (`scriptgen`, `gen
 - **Configure animate** opens a per-part generation page with scripts, character/background references, per-part copy commands, and available cross-scene frame overrides.
 
 ## Running
-
+ 
 From the project root:
-
+ 
 ```bash
 ./start_web.sh
 ```
-
-Or manually:
-
+ 
+Or manually with Bun:
+ 
 ```bash
 cd web
-npm install
-npm run dev
+bun install
+bun run dev
 ```
-
+ 
 Then open http://localhost:4321.
-
-The server resolves the pipeline root by walking up from `web/` until it finds the `films/` directory. Override with `ANIMATION_ROOT=/path/to/animation npm run dev` if needed. The default film is the first folder under `films/` that has a `movie.yml` (override with `FILM=<slug>`). `uv` must be on `PATH`, and the API keys required by `scriptgen` (`OPENROUTER_API_KEY`) must be set in the environment the dev server runs in.
-
+ 
+The server resolves the pipeline root by walking up from `web/` until it finds the `films/` directory. Override with `ANIMATION_ROOT=/path/to/animation bun run dev` if needed. The default film is the first folder under `films/` that has a `movie.yml` (override with `FILM=<slug>`). `uv` must be on `PATH`, and the API keys required by `scriptgen` (`OPENROUTER_API_KEY`) must be set in the environment the dev server runs in.
+ 
 ## Production build
-
+ 
 ```bash
-npm run build
-node dist/server/entry.mjs            # default: http://localhost:4321
-PORT=8080 HOST=127.0.0.1 node dist/server/entry.mjs
+bun run build
+bun dist/server/entry.mjs            # default: http://localhost:4321
+PORT=8080 HOST=127.0.0.1 bun dist/server/entry.mjs
 ```
 
 ## Notes

@@ -8,6 +8,7 @@ import {
   blueprintInfo,
   isValidFilm,
   loadMovie,
+  partProposals,
   readScript,
   resolveSceneFrame,
   sceneVideos,
@@ -37,10 +38,6 @@ const scripts = parts.map((part) => readScript(film, name, part));
 const videos = sceneVideos(film, name);
 const timeRange = (part: number) =>
   `${Math.floor((part * 10) / 60)}:${String((part * 10) % 60).padStart(2, "0")}-${Math.floor(((part + 1) * 10) / 60)}:${String(((part + 1) * 10) % 60).padStart(2, "0")}`;
-const command = (part: number, startFrame?: string, endFrame?: string) =>
-  `uv run animator --film ${film} --scene ${name} --parts ${part}` +
-  (startFrame ? ` --frame_start ${startFrame}` : "") +
-  (endFrame ? ` --frame_end ${endFrame}` : "");
 
 const characterReferences = story.characters.map((character) => {
   const dir = subjectBlueprintDir(film, character);
@@ -106,9 +103,7 @@ const nextFrame =
       <p class="mt-1 font-mono text-sm text-muted">{name}</p>
     </div>
     <p class="max-w-sm text-sm leading-relaxed text-muted">
-      Copy one part command at a time. The animator continues ordinary
-      neighboring-part continuity unless a selected cross-scene frame override
-      is included.
+      Click on any image to open full preview. Select start/last frames for continuity locking, generate keyframe proposals, and run video generation.
     </p>
   </div>
 
@@ -118,7 +113,7 @@ const nextFrame =
     <div class="mb-4 flex flex-wrap items-baseline justify-between gap-2">
       <h2 class="font-display text-xl text-amber-soft">Reference deck</h2>
       <span class="font-mono text-xs text-muted"
-        >latest blueprint attempts used by animator</span
+        >latest blueprint attempts used by animator & keyframes</span
       >
     </div>
     <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -131,37 +126,47 @@ const nextFrame =
         <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {
             characterReferences.map((reference) => (
-              <a
-                href={reference.href}
-                title={`Open ${reference.character} blueprint page`}
-                class="group block overflow-hidden rounded-lg border border-line bg-ink/40 transition-colors hover:border-amber-key/50"
-              >
+              <div class="group relative overflow-hidden rounded-lg border border-line bg-ink/40 transition-colors hover:border-amber-key/50">
                 {reference.image ? (
-                  <img
-                    src={reference.image}
-                    alt={`${reference.character} reference`}
-                    class="aspect-video w-full object-cover"
-                    loading="lazy"
-                  />
+                  <button
+                    type="button"
+                    data-preview-image
+                    data-src={reference.image}
+                    data-title={`${reference.character} Blueprint`}
+                    data-path={reference.path ?? ""}
+                    class="block w-full text-left"
+                    title={`Click to preview ${reference.character} full image`}
+                  >
+                    <img
+                      src={reference.image}
+                      alt={`${reference.character} reference`}
+                      class="aspect-video w-full object-cover transition-transform group-hover:scale-105"
+                      loading="lazy"
+                    />
+                  </button>
                 ) : (
                   <div class="flex aspect-video items-center justify-center px-3 text-center text-xs text-muted">
                     No reference image
                   </div>
                 )}
-                <figcaption class="border-t border-line px-2.5 py-2">
-                  <span class="block truncate text-xs text-slate-200">
+                <figcaption class="flex items-center justify-between border-t border-line px-2.5 py-2">
+                  <a
+                    href={reference.href}
+                    title={`Open ${reference.character} blueprint page`}
+                    class="truncate text-xs text-slate-200 hover:text-amber-soft hover:underline"
+                  >
                     {reference.character}
-                  </span>
+                  </a>
                   {reference.path && (
                     <span
-                      class="mt-0.5 block truncate font-mono text-[10px] text-muted"
+                      class="shrink-0 font-mono text-[10px] text-muted"
                       title={reference.path}
                     >
                       ready
                     </span>
                   )}
                 </figcaption>
-              </a>
+              </div>
             ))
           }
         </div>
@@ -176,37 +181,47 @@ const nextFrame =
           {
             backgroundReferences.length > 0 ? (
               backgroundReferences.map((reference) => (
-                <a
-                  href={reference.href}
-                  title={`Open ${reference.key} blueprint page`}
-                  class="group block overflow-hidden rounded-lg border border-line bg-ink/40 transition-colors hover:border-amber-key/50"
-                >
+                <div class="group relative overflow-hidden rounded-lg border border-line bg-ink/40 transition-colors hover:border-amber-key/50">
                   {reference.image ? (
-                    <img
-                      src={reference.image}
-                      alt={`${reference.key} background reference`}
-                      class="aspect-video w-full object-cover"
-                      loading="lazy"
-                    />
+                    <button
+                      type="button"
+                      data-preview-image
+                      data-src={reference.image}
+                      data-title={`${reference.key} Background Plate`}
+                      data-path={reference.path ?? ""}
+                      class="block w-full text-left"
+                      title={`Click to preview ${reference.key} full image`}
+                    >
+                      <img
+                        src={reference.image}
+                        alt={`${reference.key} background reference`}
+                        class="aspect-video w-full object-cover transition-transform group-hover:scale-105"
+                        loading="lazy"
+                      />
+                    </button>
                   ) : (
                     <div class="flex aspect-video items-center justify-center px-3 text-center text-xs text-muted">
                       No background image
                     </div>
                   )}
-                  <figcaption class="border-t border-line px-2.5 py-2">
-                    <span class="block truncate text-xs text-slate-200">
+                  <figcaption class="flex items-center justify-between border-t border-line px-2.5 py-2">
+                    <a
+                      href={reference.href}
+                      title={`Open ${reference.key} blueprint page`}
+                      class="truncate text-xs text-slate-200 hover:text-amber-soft hover:underline"
+                    >
                       {reference.key}
-                    </span>
+                    </a>
                     {reference.path && (
                       <span
-                        class="mt-0.5 block truncate font-mono text-[10px] text-muted"
+                        class="shrink-0 font-mono text-[10px] text-muted"
                         title={reference.path}
                       >
                         ready
                       </span>
                     )}
                   </figcaption>
-                </a>
+                </div>
               ))
             ) : (
               <p class="col-span-full rounded-lg border border-dashed border-line px-3 py-5 text-sm text-muted">
@@ -235,14 +250,22 @@ const nextFrame =
     )
   }
 
-  <div class="space-y-4">
+  <div class="space-y-6">
     {
       scripts.map((script, index) => {
         const part = parts[index];
-        const canUsePreviousFrame = index === 0 && previousFrame;
-        const canUseNextFrame = index === parts.length - 1 && nextFrame;
-        const baseCommand = command(part);
         const segVideo = videos.segments.find((s) => s.part === part);
+        const proposals = partProposals(film, name, part);
+        const hasStartProposal = proposals.start !== null;
+        const hasEndProposal = proposals.end !== null;
+        const canUsePreviousSceneFrame = index === 0 && previousFrame;
+        const canUseNextSceneFrame = index === parts.length - 1 && nextFrame;
+        const priorSegment = index > 0 ? videos.segments.find((s) => s.part === parts[index - 1]) : null;
+        const nextSegment = index < parts.length - 1 ? videos.segments.find((s) => s.part === parts[index + 1]) : null;
+
+        const hasStartOptions = hasStartProposal || canUsePreviousSceneFrame || (priorSegment && priorSegment.endThumb);
+        const hasEndOptions = hasEndProposal || canUseNextSceneFrame || (nextSegment && nextSegment.startThumb);
+
         return (
           <section class="rounded-xl border border-line bg-panel shadow-lg shadow-black/20">
             <header class="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
@@ -257,133 +280,565 @@ const nextFrame =
                   </code>
                 </p>
               </div>
-              {script ? (
+              <div class="flex items-center gap-2">
                 <button
                   type="button"
-                  data-copy-part
+                  data-open-keyframe-modal
+                  data-part={part}
                   data-film={film}
                   data-name={name}
-                  data-command={baseCommand}
-                  data-start-frame={
-                    canUsePreviousFrame ? previousFrame : undefined
-                  }
-                  data-end-frame={canUseNextFrame ? nextFrame : undefined}
-                  data-part={part}
-                  class="rounded-md bg-teal-shadow/10 px-3 py-2 text-xs font-mono text-teal-shadow ring-1 ring-teal-shadow/30 transition-colors hover:bg-teal-shadow/20"
+                  class="rounded-md bg-amber-key/10 px-3 py-2 text-xs font-medium text-amber-soft ring-1 ring-amber-key/30 transition-colors hover:bg-amber-key/20"
                 >
-                  GENERATE
+                  Keyframe proposal
                 </button>
-              ) : (
-                <span class="rounded-full bg-amber-key/10 px-2.5 py-1 text-xs text-amber-soft ring-1 ring-amber-key/30">
-                  script missing
-                </span>
-              )}
-            </header>
-            <div class="space-y-3 px-5 py-4">
-              {segVideo && (
-                <div class="flex flex-wrap items-end gap-3">
-                  {segVideo.startThumb && (
-                    <a
-                      href={animationFileUrl(film, name, segVideo.startThumb)}
-                      target="_blank"
-                      rel="noreferrer"
-                      title={`Part ${part} start frame`}
-                      class="group block w-40 overflow-hidden rounded-lg border border-line bg-ink/40 transition-colors hover:border-amber-key/50"
-                    >
-                      <img
-                        src={animationFileUrl(film, name, segVideo.startThumb)}
-                        alt={`Part ${part} start frame`}
-                        class="aspect-video w-full object-cover"
-                        loading="lazy"
-                      />
-                      <span class="block border-t border-line px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wide text-muted">
-                        start
-                      </span>
-                    </a>
-                  )}
-                  <a
-                    href={`/${film}/video/${name}_part_${part}`}
-                    title={`View Part ${part} video`}
-                    class="group block w-[300px] overflow-hidden rounded-lg border border-line bg-ink/40 transition-colors hover:border-amber-key/50"
+                {script ? (
+                  <button
+                    type="button"
+                    data-generate-part
+                    data-film={film}
+                    data-name={name}
+                    data-part={part}
+                    class="rounded-md bg-teal-shadow/10 px-3.5 py-2 text-xs font-mono font-semibold text-teal-shadow ring-1 ring-teal-shadow/30 transition-colors hover:bg-teal-shadow/20"
                   >
-                    {segVideo.thumb ? (
-                      <img
-                        src={animationFileUrl(film, name, segVideo.thumb)}
-                        alt={`Part ${part} video thumbnail`}
-                        class="aspect-video w-full object-cover"
-                        loading="lazy"
-                      />
-                    ) : (
-                      <div class="flex aspect-video items-center justify-center px-3 text-center text-xs text-muted">
-                        Part {part} video generated
-                      </div>
+                    GENERATE
+                  </button>
+                ) : (
+                  <span class="rounded-full bg-amber-key/10 px-2.5 py-1 text-xs text-amber-soft ring-1 ring-amber-key/30">
+                    script missing
+                  </span>
+                )}
+              </div>
+            </header>
+
+            <div class="space-y-5 px-5 py-5">
+              {segVideo && (
+                <div>
+                  <h3 class="mb-2 text-xs font-medium uppercase tracking-wider text-muted">
+                    Rendered Video & Extracted Frames
+                  </h3>
+                  <div class="flex flex-wrap items-end gap-3">
+                    {segVideo.startThumb && (
+                      <button
+                        type="button"
+                        data-preview-image
+                        data-src={animationFileUrl(film, name, segVideo.startThumb)}
+                        data-title={`Part ${part} Video Start Frame`}
+                        data-path={`films/${film}/out/animations/${name}/${segVideo.startThumb}`}
+                        title={`Click to preview Part ${part} start frame`}
+                        class="group block w-36 overflow-hidden rounded-lg border border-line bg-ink/40 text-left transition-colors hover:border-amber-key/50"
+                      >
+                        <img
+                          src={animationFileUrl(film, name, segVideo.startThumb)}
+                          alt={`Part ${part} start frame`}
+                          class="aspect-video w-full object-cover transition-transform group-hover:scale-105"
+                          loading="lazy"
+                        />
+                        <span class="block border-t border-line px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wide text-muted">
+                          video start 🔍
+                        </span>
+                      </button>
                     )}
-                    <figcaption class="border-t border-line px-2.5 py-2">
-                      <span class="block truncate text-xs text-slate-200">
-                        Part {part} video
-                      </span>
-                      <span class="mt-0.5 block truncate font-mono text-[10px] text-muted">
-                        {name}_part_{part}.mp4
-                      </span>
-                    </figcaption>
-                  </a>
-                  {segVideo.endThumb && (
                     <a
-                      href={animationFileUrl(film, name, segVideo.endThumb)}
-                      target="_blank"
-                      rel="noreferrer"
-                      title={`Part ${part} end frame`}
-                      class="group block w-40 overflow-hidden rounded-lg border border-line bg-ink/40 transition-colors hover:border-amber-key/50"
+                      href={`/${film}/video/${name}_part_${part}`}
+                      title={`View Part ${part} video`}
+                      class="group block w-[280px] overflow-hidden rounded-lg border border-line bg-ink/40 transition-colors hover:border-amber-key/50"
                     >
-                      <img
-                        src={animationFileUrl(film, name, segVideo.endThumb)}
-                        alt={`Part ${part} end frame`}
-                        class="aspect-video w-full object-cover"
-                        loading="lazy"
-                      />
-                      <span class="block border-t border-line px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wide text-muted">
-                        end
-                      </span>
+                      {segVideo.thumb ? (
+                        <img
+                          src={animationFileUrl(film, name, segVideo.thumb)}
+                          alt={`Part ${part} video thumbnail`}
+                          class="aspect-video w-full object-cover transition-transform group-hover:scale-105"
+                          loading="lazy"
+                        />
+                      ) : (
+                        <div class="flex aspect-video items-center justify-center px-3 text-center text-xs text-muted">
+                          Part {part} video generated
+                        </div>
+                      )}
+                      <figcaption class="border-t border-line px-2.5 py-2">
+                        <span class="block truncate text-xs text-slate-200">
+                          Part {part} video
+                        </span>
+                        <span class="mt-0.5 block truncate font-mono text-[10px] text-muted">
+                          {name}_part_{part}.mp4
+                        </span>
+                      </figcaption>
                     </a>
-                  )}
+                    {segVideo.endThumb && (
+                      <button
+                        type="button"
+                        data-preview-image
+                        data-src={animationFileUrl(film, name, segVideo.endThumb)}
+                        data-title={`Part ${part} Video End Frame`}
+                        data-path={`films/${film}/out/animations/${name}/${segVideo.endThumb}`}
+                        title={`Click to preview Part ${part} end frame`}
+                        class="group block w-36 overflow-hidden rounded-lg border border-line bg-ink/40 text-left transition-colors hover:border-amber-key/50"
+                      >
+                        <img
+                          src={animationFileUrl(film, name, segVideo.endThumb)}
+                          alt={`Part ${part} end frame`}
+                          class="aspect-video w-full object-cover transition-transform group-hover:scale-105"
+                          loading="lazy"
+                        />
+                        <span class="block border-t border-line px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wide text-muted">
+                          video end 🔍
+                        </span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
-              {canUsePreviousFrame && (
-                <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-teal-shadow/25 bg-teal-shadow/5 px-3 py-3 text-sm text-slate-300">
-                  <input
-                    type="checkbox"
-                    data-frame-option={`part-${part}-start`}
-                    class="mt-0.5 accent-[#7fd4d4]"
-                  />
-                  <span>
-                    <span class="block font-medium text-teal-shadow">
-                      Match the previous scene's closing frame
-                    </span>
-                    <span class="mt-1 block font-mono text-xs text-muted">
-                      --frame_start {previousFrame}
-                    </span>
-                  </span>
-                </label>
-              )}
-              {canUseNextFrame && (
-                <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-teal-shadow/25 bg-teal-shadow/5 px-3 py-3 text-sm text-slate-300">
-                  <input
-                    type="checkbox"
-                    data-frame-option={`part-${part}-end`}
-                    class="mt-0.5 accent-[#7fd4d4]"
-                  />
-                  <span>
-                    <span class="block font-medium text-teal-shadow">
-                      Match the next scene's opening frame
-                    </span>
-                    <span class="mt-1 block font-mono text-xs text-muted">
-                      --frame_end {nextFrame}
-                    </span>
-                  </span>
-                </label>
-              )}
+
+              {/* Frame Selectors: Add Start Frame and Add Last Frame */}
+              <div class="grid gap-5 lg:grid-cols-2">
+                {/* START FRAME CARD */}
+                <div class="flex flex-col justify-between rounded-xl border border-line bg-ink/30 p-4">
+                  <div>
+                    <div class="mb-3 flex items-center justify-between">
+                      <div class="flex items-center gap-2">
+                        <span class="h-2 w-2 rounded-full bg-teal-shadow"></span>
+                        <h3 class="font-display text-sm font-semibold tracking-wide text-amber-soft">
+                          Add start frame
+                        </h3>
+                      </div>
+                      <span class="font-mono text-[10px] text-muted">
+                        --frame_start
+                      </span>
+                    </div>
+
+                    {hasStartOptions ? (
+                      <div
+                        class="grid grid-cols-1 gap-3 sm:grid-cols-2"
+                        data-frame-selector="start"
+                        data-part={part}
+                      >
+                        {/* Option: Start Proposal (if available) */}
+                        {hasStartProposal && (
+                          <div
+                            data-tile-container
+                            data-value={`films/${film}/out/animations/${name}/${proposals.start}`}
+                            class="frame-choice-tile group relative flex flex-col justify-between overflow-hidden rounded-lg border border-line bg-panel/70 p-2.5 transition-all hover:border-slate-400"
+                          >
+                            <button
+                              type="button"
+                              data-preview-image
+                              data-src={animationFileUrl(film, name, proposals.start!)}
+                              data-title={`Part ${part} Start Proposal`}
+                              data-path={`films/${film}/out/animations/${name}/${proposals.start}`}
+                              data-part={part}
+                              data-kind="start"
+                              data-value={`films/${film}/out/animations/${name}/${proposals.start}`}
+                              class="relative block w-full text-left"
+                              title="Click to open full preview"
+                            >
+                              <div class="relative overflow-hidden rounded">
+                                <img
+                                  src={animationFileUrl(film, name, proposals.start!)}
+                                  alt={`Part ${part} start proposal`}
+                                  class="aspect-video w-full rounded border border-line object-cover transition-transform group-hover:scale-105"
+                                  loading="lazy"
+                                />
+                                <span class="absolute right-1.5 bottom-1.5 rounded bg-black/70 px-1.5 py-0.5 font-mono text-[9px] text-teal-shadow backdrop-blur-sm">
+                                  🔍 Preview
+                                </span>
+                              </div>
+                            </button>
+                            <div class="mt-2">
+                              <span class="block truncate text-xs font-semibold text-slate-200">
+                                Start Proposal
+                              </span>
+                              <span
+                                class="mt-0.5 block truncate font-mono text-[10px] text-muted"
+                                title={proposals.start!}
+                              >
+                                {proposals.start}
+                              </span>
+                            </div>
+                            <div class="mt-2.5 flex items-center justify-between border-t border-line/60 pt-2">
+                              <button
+                                type="button"
+                                data-toggle-selection
+                                class="rounded bg-ink/70 px-2.5 py-1 text-[10px] font-medium text-slate-300 ring-1 ring-line hover:bg-ink hover:text-emerald-300 transition-colors"
+                              >
+                                Select frame
+                              </button>
+                              <span class="selected-badge hidden rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-300 ring-1 ring-emerald-500/40">
+                                Selected
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Option: Previous Scene Closing Frame (Part 0 only) */}
+                        {canUsePreviousSceneFrame && (
+                          <div
+                            data-tile-container
+                            data-value={previousFrame!}
+                            class="frame-choice-tile group relative flex flex-col justify-between overflow-hidden rounded-lg border border-line bg-panel/70 p-2.5 transition-all hover:border-slate-400"
+                          >
+                            <button
+                              type="button"
+                              data-preview-image
+                              data-src={animationFileUrl(
+                                film,
+                                previousStory!.name,
+                                `part-${previousPart}-end.jpg`
+                              )}
+                              data-title={`Previous Scene Closing Frame (${previousStory?.title})`}
+                              data-path={previousFrame!}
+                              data-part={part}
+                              data-kind="start"
+                              data-value={previousFrame!}
+                              class="relative block w-full text-left"
+                              title="Click to open full preview"
+                            >
+                              <div class="relative overflow-hidden rounded">
+                                <img
+                                  src={animationFileUrl(
+                                    film,
+                                    previousStory!.name,
+                                    `part-${previousPart}-end.jpg`
+                                  )}
+                                  alt="Previous scene closing frame"
+                                  class="aspect-video w-full rounded border border-line object-cover transition-transform group-hover:scale-105"
+                                  loading="lazy"
+                                />
+                                <span class="absolute right-1.5 bottom-1.5 rounded bg-black/70 px-1.5 py-0.5 font-mono text-[9px] text-teal-shadow backdrop-blur-sm">
+                                  🔍 Preview
+                                </span>
+                              </div>
+                            </button>
+                            <div class="mt-2">
+                              <span class="block truncate text-xs font-semibold text-slate-200">
+                                Match Prev Scene
+                              </span>
+                              <span
+                                class="mt-0.5 block truncate font-mono text-[10px] text-muted"
+                                title={previousFrame!}
+                              >
+                                {previousStory?.title || "Previous scene"}
+                              </span>
+                            </div>
+                            <div class="mt-2.5 flex items-center justify-between border-t border-line/60 pt-2">
+                              <button
+                                type="button"
+                                data-toggle-selection
+                                class="rounded bg-ink/70 px-2.5 py-1 text-[10px] font-medium text-slate-300 ring-1 ring-line hover:bg-ink hover:text-emerald-300 transition-colors"
+                              >
+                                Select frame
+                              </button>
+                              <span class="selected-badge hidden rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-300 ring-1 ring-emerald-500/40">
+                                Selected
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Option: Prior Part End Frame (Part > 0) */}
+                        {priorSegment && priorSegment.endThumb && (
+                          <div
+                            data-tile-container
+                            data-value={`films/${film}/out/animations/${name}/${priorSegment.endThumb}`}
+                            class="frame-choice-tile group relative flex flex-col justify-between overflow-hidden rounded-lg border border-line bg-panel/70 p-2.5 transition-all hover:border-slate-400"
+                          >
+                            <button
+                              type="button"
+                              data-preview-image
+                              data-src={animationFileUrl(film, name, priorSegment.endThumb)}
+                              data-title={`Part ${part - 1} End Frame`}
+                              data-path={`films/${film}/out/animations/${name}/${priorSegment.endThumb}`}
+                              data-part={part}
+                              data-kind="start"
+                              data-value={`films/${film}/out/animations/${name}/${priorSegment.endThumb}`}
+                              class="relative block w-full text-left"
+                              title="Click to open full preview"
+                            >
+                              <div class="relative overflow-hidden rounded">
+                                <img
+                                  src={animationFileUrl(film, name, priorSegment.endThumb)}
+                                  alt="Prior part end frame"
+                                  class="aspect-video w-full rounded border border-line object-cover transition-transform group-hover:scale-105"
+                                  loading="lazy"
+                                />
+                                <span class="absolute right-1.5 bottom-1.5 rounded bg-black/70 px-1.5 py-0.5 font-mono text-[9px] text-teal-shadow backdrop-blur-sm">
+                                  🔍 Preview
+                                </span>
+                              </div>
+                            </button>
+                            <div class="mt-2">
+                              <span class="block truncate text-xs font-semibold text-slate-200">
+                                Part {part - 1} End Frame
+                              </span>
+                              <span
+                                class="mt-0.5 block truncate font-mono text-[10px] text-muted"
+                                title={priorSegment.endThumb}
+                              >
+                                {priorSegment.endThumb}
+                              </span>
+                            </div>
+                            <div class="mt-2.5 flex items-center justify-between border-t border-line/60 pt-2">
+                              <button
+                                type="button"
+                                data-toggle-selection
+                                class="rounded bg-ink/70 px-2.5 py-1 text-[10px] font-medium text-slate-300 ring-1 ring-line hover:bg-ink hover:text-emerald-300 transition-colors"
+                              >
+                                Select frame
+                              </button>
+                              <span class="selected-badge hidden rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-300 ring-1 ring-emerald-500/40">
+                                Selected
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p class="py-2 text-xs italic text-muted">
+                        No start frame overrides available. (Defaults to {index === 0 ? "scene background plate" : `prior part ${part - 1} end frame`}).
+                      </p>
+                    )}
+                  </div>
+
+                  {!hasStartProposal && (
+                    <button
+                      type="button"
+                      data-trigger-keyframe="start"
+                      data-part={part}
+                      data-film={film}
+                      data-name={name}
+                      class="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-line/80 py-2.5 text-xs font-medium text-muted transition-colors hover:border-amber-key/50 hover:bg-amber-key/5 hover:text-amber-soft"
+                    >
+                      <span class="text-amber-key">+</span>
+                      <span>Generate start frame proposal</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* LAST FRAME CARD */}
+                <div class="flex flex-col justify-between rounded-xl border border-line bg-ink/30 p-4">
+                  <div>
+                    <div class="mb-3 flex items-center justify-between">
+                      <div class="flex items-center gap-2">
+                        <span class="h-2 w-2 rounded-full bg-amber-key"></span>
+                        <h3 class="font-display text-sm font-semibold tracking-wide text-amber-soft">
+                          Add last frame
+                        </h3>
+                      </div>
+                      <span class="font-mono text-[10px] text-muted">
+                        --frame_end
+                      </span>
+                    </div>
+
+                    {hasEndOptions ? (
+                      <div
+                        class="grid grid-cols-1 gap-3 sm:grid-cols-2"
+                        data-frame-selector="end"
+                        data-part={part}
+                      >
+                        {/* Option: End Proposal (if available) */}
+                        {hasEndProposal && (
+                          <div
+                            data-tile-container
+                            data-value={`films/${film}/out/animations/${name}/${proposals.end}`}
+                            class="frame-choice-tile group relative flex flex-col justify-between overflow-hidden rounded-lg border border-line bg-panel/70 p-2.5 transition-all hover:border-slate-400"
+                          >
+                            <button
+                              type="button"
+                              data-preview-image
+                              data-src={animationFileUrl(film, name, proposals.end!)}
+                              data-title={`Part ${part} End Proposal`}
+                              data-path={`films/${film}/out/animations/${name}/${proposals.end}`}
+                              data-part={part}
+                              data-kind="end"
+                              data-value={`films/${film}/out/animations/${name}/${proposals.end}`}
+                              class="relative block w-full text-left"
+                              title="Click to open full preview"
+                            >
+                              <div class="relative overflow-hidden rounded">
+                                <img
+                                  src={animationFileUrl(film, name, proposals.end!)}
+                                  alt={`Part ${part} end proposal`}
+                                  class="aspect-video w-full rounded border border-line object-cover transition-transform group-hover:scale-105"
+                                  loading="lazy"
+                                />
+                                <span class="absolute right-1.5 bottom-1.5 rounded bg-black/70 px-1.5 py-0.5 font-mono text-[9px] text-amber-key backdrop-blur-sm">
+                                  🔍 Preview
+                                </span>
+                              </div>
+                            </button>
+                            <div class="mt-2">
+                              <span class="block truncate text-xs font-semibold text-slate-200">
+                                End Proposal
+                              </span>
+                              <span
+                                class="mt-0.5 block truncate font-mono text-[10px] text-muted"
+                                title={proposals.end!}
+                              >
+                                {proposals.end}
+                              </span>
+                            </div>
+                            <div class="mt-2.5 flex items-center justify-between border-t border-line/60 pt-2">
+                              <button
+                                type="button"
+                                data-toggle-selection
+                                class="rounded bg-ink/70 px-2.5 py-1 text-[10px] font-medium text-slate-300 ring-1 ring-line hover:bg-ink hover:text-emerald-300 transition-colors"
+                              >
+                                Select frame
+                              </button>
+                              <span class="selected-badge hidden rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-300 ring-1 ring-emerald-500/40">
+                                Selected
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Option: Next Scene Opening Frame (Last Part only) */}
+                        {canUseNextSceneFrame && (
+                          <div
+                            data-tile-container
+                            data-value={nextFrame!}
+                            class="frame-choice-tile group relative flex flex-col justify-between overflow-hidden rounded-lg border border-line bg-panel/70 p-2.5 transition-all hover:border-slate-400"
+                          >
+                            <button
+                              type="button"
+                              data-preview-image
+                              data-src={animationFileUrl(
+                                film,
+                                nextStory!.name,
+                                `part-${nextPart}-start.jpg`
+                              )}
+                              data-title={`Next Scene Opening Frame (${nextStory?.title})`}
+                              data-path={nextFrame!}
+                              data-part={part}
+                              data-kind="end"
+                              data-value={nextFrame!}
+                              class="relative block w-full text-left"
+                              title="Click to open full preview"
+                            >
+                              <div class="relative overflow-hidden rounded">
+                                <img
+                                  src={animationFileUrl(
+                                    film,
+                                    nextStory!.name,
+                                    `part-${nextPart}-start.jpg`
+                                  )}
+                                  alt="Next scene opening frame"
+                                  class="aspect-video w-full rounded border border-line object-cover transition-transform group-hover:scale-105"
+                                  loading="lazy"
+                                />
+                                <span class="absolute right-1.5 bottom-1.5 rounded bg-black/70 px-1.5 py-0.5 font-mono text-[9px] text-amber-key backdrop-blur-sm">
+                                  🔍 Preview
+                                </span>
+                              </div>
+                            </button>
+                            <div class="mt-2">
+                              <span class="block truncate text-xs font-semibold text-slate-200">
+                                Match Next Scene
+                              </span>
+                              <span
+                                class="mt-0.5 block truncate font-mono text-[10px] text-muted"
+                                title={nextFrame!}
+                              >
+                                {nextStory?.title || "Next scene"}
+                              </span>
+                            </div>
+                            <div class="mt-2.5 flex items-center justify-between border-t border-line/60 pt-2">
+                              <button
+                                type="button"
+                                data-toggle-selection
+                                class="rounded bg-ink/70 px-2.5 py-1 text-[10px] font-medium text-slate-300 ring-1 ring-line hover:bg-ink hover:text-emerald-300 transition-colors"
+                              >
+                                Select frame
+                              </button>
+                              <span class="selected-badge hidden rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-300 ring-1 ring-emerald-500/40">
+                                Selected
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Option: Next Part Start Frame (Middle parts) */}
+                        {nextSegment && nextSegment.startThumb && (
+                          <div
+                            data-tile-container
+                            data-value={`films/${film}/out/animations/${name}/${nextSegment.startThumb}`}
+                            class="frame-choice-tile group relative flex flex-col justify-between overflow-hidden rounded-lg border border-line bg-panel/70 p-2.5 transition-all hover:border-slate-400"
+                          >
+                            <button
+                              type="button"
+                              data-preview-image
+                              data-src={animationFileUrl(film, name, nextSegment.startThumb)}
+                              data-title={`Part ${part + 1} Start Frame`}
+                              data-path={`films/${film}/out/animations/${name}/${nextSegment.startThumb}`}
+                              data-part={part}
+                              data-kind="end"
+                              data-value={`films/${film}/out/animations/${name}/${nextSegment.startThumb}`}
+                              class="relative block w-full text-left"
+                              title="Click to open full preview"
+                            >
+                              <div class="relative overflow-hidden rounded">
+                                <img
+                                  src={animationFileUrl(film, name, nextSegment.startThumb)}
+                                  alt="Next part start frame"
+                                  class="aspect-video w-full rounded border border-line object-cover transition-transform group-hover:scale-105"
+                                  loading="lazy"
+                                />
+                                <span class="absolute right-1.5 bottom-1.5 rounded bg-black/70 px-1.5 py-0.5 font-mono text-[9px] text-amber-key backdrop-blur-sm">
+                                  🔍 Preview
+                                </span>
+                              </div>
+                            </button>
+                            <div class="mt-2">
+                              <span class="block truncate text-xs font-semibold text-slate-200">
+                                Part {part + 1} Start Frame
+                              </span>
+                              <span
+                                class="mt-0.5 block truncate font-mono text-[10px] text-muted"
+                                title={nextSegment.startThumb}
+                              >
+                                {nextSegment.startThumb}
+                              </span>
+                            </div>
+                            <div class="mt-2.5 flex items-center justify-between border-t border-line/60 pt-2">
+                              <button
+                                type="button"
+                                data-toggle-selection
+                                class="rounded bg-ink/70 px-2.5 py-1 text-[10px] font-medium text-slate-300 ring-1 ring-line hover:bg-ink hover:text-emerald-300 transition-colors"
+                              >
+                                Select frame
+                              </button>
+                              <span class="selected-badge hidden rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-emerald-300 ring-1 ring-emerald-500/40">
+                                Selected
+                              </span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p class="py-2 text-xs italic text-muted">
+                        No last frame overrides available. (Defaults to natural ending pose).
+                      </p>
+                    )}
+                  </div>
+
+                  {!hasEndProposal && (
+                    <button
+                      type="button"
+                      data-trigger-keyframe="end"
+                      data-part={part}
+                      data-film={film}
+                      data-name={name}
+                      class="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-line/80 py-2.5 text-xs font-medium text-muted transition-colors hover:border-amber-key/50 hover:bg-amber-key/5 hover:text-amber-soft"
+                    >
+                      <span class="text-amber-key">+</span>
+                      <span>Generate last frame reference</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Collapsible script viewer */}
               <details class="group rounded-lg border border-line bg-ink/25">
-                <summary class="cursor-pointer px-3 py-2.5 text-sm text-slate-300 marker:text-amber-key">
+                <summary class="cursor-pointer px-3.5 py-2.5 text-sm text-slate-300 marker:text-amber-key">
                   View part script
                 </summary>
                 {script ? (
@@ -403,49 +858,529 @@ const nextFrame =
     }
   </div>
 
+  {/* FULL POPUP PANEL IMAGE PREVIEW MODAL */}
+  <div
+    id="image-preview-modal"
+    class="fixed inset-0 z-50 hidden items-center justify-center bg-black/85 p-4 backdrop-blur-md transition-opacity"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Image Preview"
+  >
+    <div class="flex max-h-[95vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">
+      <div class="flex items-center justify-between border-b border-line bg-ink/75 px-5 py-3.5">
+        <div class="min-w-0 flex-1 pr-4">
+          <h3 id="preview-modal-title" class="truncate font-display text-lg text-amber-soft">
+            Frame Preview
+          </h3>
+          <p id="preview-modal-path" class="truncate font-mono text-xs text-muted" title="">
+            path/to/image.jpg
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <a
+            id="preview-modal-open-tab"
+            href="#"
+            target="_blank"
+            rel="noreferrer"
+            class="rounded px-2.5 py-1 text-xs text-muted ring-1 ring-line hover:text-slate-200 transition-colors"
+            title="Open original image in new tab"
+          >
+            Open raw ↗
+          </a>
+          <button
+            type="button"
+            id="preview-modal-close-x"
+            class="rounded p-1 text-muted hover:text-slate-200 transition-colors"
+            aria-label="Close"
+          >
+            &times;
+          </button>
+        </div>
+      </div>
+
+      <div class="flex flex-1 items-center justify-center overflow-auto bg-black/60 p-4 sm:p-6">
+        <img
+          id="preview-modal-img"
+          src=""
+          alt="Full frame preview"
+          class="max-h-[72vh] w-auto max-w-full rounded-lg border border-line/60 object-contain shadow-2xl"
+        />
+      </div>
+
+      <div class="flex flex-wrap items-center justify-between gap-3 border-t border-line bg-ink/60 px-5 py-3.5">
+        <span id="preview-modal-status" class="font-mono text-xs text-muted">
+          Click below to select this frame for video generation
+        </span>
+        <div class="flex items-center gap-2.5">
+          <button
+            type="button"
+            id="preview-modal-close-btn"
+            class="rounded-md px-3.5 py-1.5 text-xs text-muted ring-1 ring-line hover:text-slate-200 transition-colors"
+          >
+            Close
+          </button>
+          <button
+            type="button"
+            id="preview-modal-use-btn"
+            class="hidden rounded-md bg-emerald-600/20 px-4 py-1.5 text-xs font-semibold text-emerald-300 ring-1 ring-emerald-500/50 hover:bg-emerald-600/30 transition-colors"
+          >
+            Use this frame
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {/* KEYFRAME PROPOSAL POPUP MODAL */}
+  <div
+    id="keyframe-modal"
+    class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+    role="dialog"
+    aria-modal="true"
+    aria-label="Generate Keyframe Proposal"
+  >
+    <div class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-line bg-panel shadow-2xl">
+      <div class="flex items-center justify-between border-b border-line bg-ink/70 px-5 py-3.5">
+        <div>
+          <h3 id="keyframe-modal-title" class="font-display text-lg text-amber-soft">
+            Generate Keyframe Proposal
+          </h3>
+          <p id="keyframe-modal-subtitle" class="font-mono text-xs text-muted">
+            Part 0
+          </p>
+        </div>
+        <button
+          type="button"
+          id="keyframe-modal-close-x"
+          class="rounded p-1 text-muted hover:text-slate-200 transition-colors"
+        >
+          &times;
+        </button>
+      </div>
+
+      <div class="space-y-4 overflow-y-auto px-5 py-4 text-sm">
+        <div>
+          <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted">
+            Proposal Target
+          </label>
+          <div class="grid grid-cols-3 gap-2">
+            <label class="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-line bg-ink/40 p-3 text-center transition-all hover:border-amber-key/50 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-950/20 has-[:checked]:ring-2 has-[:checked]:ring-emerald-500/40">
+              <input type="radio" name="keyframe-modal-target" value="start" checked class="sr-only" />
+              <span class="text-xs font-semibold text-slate-200">Start Frame</span>
+              <span class="mt-0.5 text-[10px] text-muted">0:00 Mark</span>
+            </label>
+            <label class="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-line bg-ink/40 p-3 text-center transition-all hover:border-amber-key/50 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-950/20 has-[:checked]:ring-2 has-[:checked]:ring-emerald-500/40">
+              <input type="radio" name="keyframe-modal-target" value="end" class="sr-only" />
+              <span class="text-xs font-semibold text-slate-200">Last Frame</span>
+              <span class="mt-0.5 text-[10px] text-muted">Final Pose</span>
+            </label>
+            <label class="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-line bg-ink/40 p-3 text-center transition-all hover:border-amber-key/50 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-950/20 has-[:checked]:ring-2 has-[:checked]:ring-emerald-500/40">
+              <input type="radio" name="keyframe-modal-target" value="both" class="sr-only" />
+              <span class="text-xs font-semibold text-slate-200">Both</span>
+              <span class="mt-0.5 text-[10px] text-muted">Start & End</span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted">
+            Continuity Reference (--ref)
+          </label>
+          <select
+            id="keyframe-modal-ref-select"
+            class="w-full rounded-lg border border-line bg-ink/60 px-3 py-2 text-xs text-slate-200 focus:border-amber-key focus:outline-none"
+          >
+            <option value="">Auto Discovery / None</option>
+          </select>
+          <input
+            type="text"
+            id="keyframe-modal-custom-ref"
+            placeholder="Or enter custom image filename / path..."
+            class="mt-2 w-full rounded-lg border border-line bg-ink/60 px-3 py-2 font-mono text-xs text-slate-200 placeholder:text-muted/60 focus:border-amber-key focus:outline-none"
+          />
+        </div>
+
+        <label class="flex cursor-pointer items-center gap-2 text-xs text-muted hover:text-slate-200">
+          <input type="checkbox" id="keyframe-modal-force" class="rounded accent-amber-key" />
+          <span>Force overwrite existing proposal files (--force)</span>
+        </label>
+
+        <div class="rounded-lg border border-line bg-ink/70 p-3">
+          <span class="block font-mono text-[11px] text-teal-shadow break-all" id="keyframe-modal-cmd-preview">
+            uv run keyframes --film ...
+          </span>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2 border-t border-line bg-ink/40 px-5 py-3">
+        <button
+          type="button"
+          id="keyframe-modal-cancel"
+          class="rounded-md px-3 py-1.5 text-xs text-muted ring-1 ring-line hover:text-slate-200 transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          id="keyframe-modal-submit"
+          class="rounded-md bg-amber-key/20 px-3.5 py-1.5 text-xs font-medium text-amber-soft ring-1 ring-amber-key/50 hover:bg-amber-key/30 transition-colors"
+        >
+          Generate Proposal in Terminal
+        </button>
+      </div>
+    </div>
+  </div>
+
   <CLITerminal />
 </Layout>
 
 <script>
   import { openCLITerminal } from "../../../components/cli-terminal";
 
-  document
-    .querySelectorAll<HTMLButtonElement>("[data-copy-part]")
-    .forEach((button) => {
-      button.addEventListener("click", () => {
-        const part = button.dataset.part;
-        const start = document.querySelector<HTMLInputElement>(
-          `[data-frame-option="part-${part}-start"]`,
-        );
-        const end = document.querySelector<HTMLInputElement>(
-          `[data-frame-option="part-${part}-end"]`,
-        );
-        const frameStart =
-          start?.checked && button.dataset.startFrame
-            ? button.dataset.startFrame
-            : "";
-        const frameEnd =
-          end?.checked && button.dataset.endFrame
-            ? button.dataset.endFrame
-            : "";
-        const command = [
-          button.dataset.command,
-          frameStart ? `--frame_start ${frameStart}` : "",
-          frameEnd ? `--frame_end ${frameEnd}` : "",
-        ]
-          .filter(Boolean)
-          .join(" ");
-        openCLITerminal({
-          url: "/api/animator",
-          body: {
-            film: button.dataset.film,
-            name: button.dataset.name,
-            parts: Number(part),
-            frameStart,
-            frameEnd,
-          },
-          command,
-        });
+  // State maps per part: part -> { frameStart: string, frameEnd: string }
+  const partFrameState = new Map<number, { frameStart: string; frameEnd: string }>();
+
+  function toggleTileSelection(container: HTMLElement, part: number, kind: "start" | "end", value: string): boolean {
+    const parentSelector = container.closest<HTMLElement>("[data-frame-selector]");
+    if (!parentSelector) return false;
+
+    const allTiles = parentSelector.querySelectorAll<HTMLElement>("[data-tile-container]");
+    const isSelected = container.classList.contains("selected");
+    const state = partFrameState.get(part)!;
+
+    // Deselect all
+    allTiles.forEach((t) => {
+      t.classList.remove(
+        "selected",
+        "border-2",
+        "border-emerald-500",
+        "bg-emerald-950/20",
+        "ring-2",
+        "ring-emerald-500/40",
+        "text-emerald-300"
+      );
+      t.classList.add("border", "border-line", "bg-panel/70");
+      const badge = t.querySelector(".selected-badge");
+      if (badge) badge.classList.add("hidden");
+      const btn = t.querySelector<HTMLButtonElement>("[data-toggle-selection]");
+      if (btn) btn.textContent = "Select frame";
+    });
+
+    if (isSelected) {
+      if (kind === "start") state.frameStart = "";
+      else state.frameEnd = "";
+      return false;
+    } else {
+      container.classList.add(
+        "selected",
+        "border-2",
+        "border-emerald-500",
+        "bg-emerald-950/20",
+        "ring-2",
+        "ring-emerald-500/40",
+        "text-emerald-300"
+      );
+      container.classList.remove("border-line", "bg-panel/70");
+      const badge = container.querySelector(".selected-badge");
+      if (badge) badge.classList.remove("hidden");
+      const btn = container.querySelector<HTMLButtonElement>("[data-toggle-selection]");
+      if (btn) btn.textContent = "Deselect";
+
+      if (kind === "start") state.frameStart = value;
+      else state.frameEnd = value;
+      return true;
+    }
+  }
+
+  // Initialize frame selectors & toggle buttons
+  document.querySelectorAll<HTMLElement>("[data-frame-selector]").forEach((selectorContainer) => {
+    const part = Number(selectorContainer.dataset.part);
+    const kind = selectorContainer.dataset.frameSelector as "start" | "end";
+
+    if (!partFrameState.has(part)) {
+      partFrameState.set(part, { frameStart: "", frameEnd: "" });
+    }
+
+    const tiles = selectorContainer.querySelectorAll<HTMLElement>("[data-tile-container]");
+    tiles.forEach((tile) => {
+      const toggleBtn = tile.querySelector<HTMLButtonElement>("[data-toggle-selection]");
+      toggleBtn?.addEventListener("click", () => {
+        const val = tile.dataset.value ?? "";
+        toggleTileSelection(tile, part, kind, val);
       });
     });
+  });
+
+  // Image preview modal elements
+  const previewModal = document.getElementById("image-preview-modal") as HTMLDivElement | null;
+  const previewImg = document.getElementById("preview-modal-img") as HTMLImageElement | null;
+  const previewTitle = document.getElementById("preview-modal-title");
+  const previewPath = document.getElementById("preview-modal-path");
+  const previewOpenTab = document.getElementById("preview-modal-open-tab") as HTMLAnchorElement | null;
+  const previewCloseX = document.getElementById("preview-modal-close-x");
+  const previewCloseBtn = document.getElementById("preview-modal-close-btn");
+  const previewUseBtn = document.getElementById("preview-modal-use-btn") as HTMLButtonElement | null;
+  const previewStatus = document.getElementById("preview-modal-status");
+
+  let activePreviewTarget: {
+    part?: number;
+    kind?: "start" | "end";
+    value?: string;
+    tileElement?: HTMLElement | null;
+  } | null = null;
+
+  function openImagePreview(src: string, title: string, path: string, part?: number, kind?: "start" | "end", value?: string, tileElement?: HTMLElement | null): void {
+    if (!previewModal || !previewImg) return;
+
+    previewImg.src = src;
+    if (previewTitle) previewTitle.textContent = title;
+    if (previewPath) {
+      previewPath.textContent = path;
+      previewPath.title = path;
+    }
+    if (previewOpenTab) previewOpenTab.href = src;
+
+    activePreviewTarget = { part, kind, value, tileElement };
+
+    if (part !== undefined && kind && value && tileElement) {
+      const state = partFrameState.get(part);
+      const isSelected = (kind === "start" ? state?.frameStart : state?.frameEnd) === value;
+
+      if (previewUseBtn) {
+        previewUseBtn.classList.remove("hidden");
+        if (isSelected) {
+          previewUseBtn.textContent = "✓ Frame Selected (Click to Deselect)";
+          previewUseBtn.classList.remove("bg-emerald-600/20", "text-emerald-300", "ring-emerald-500/50");
+          previewUseBtn.classList.add("bg-rose-600/20", "text-rose-300", "ring-rose-500/50");
+        } else {
+          previewUseBtn.textContent = `Select for ${kind === "start" ? "Start" : "Last"} Frame`;
+          previewUseBtn.classList.add("bg-emerald-600/20", "text-emerald-300", "ring-emerald-500/50");
+          previewUseBtn.classList.remove("bg-rose-600/20", "text-rose-300", "ring-rose-500/50");
+        }
+      }
+      if (previewStatus) {
+        previewStatus.textContent = isSelected
+          ? `Currently active for Part ${part} ${kind} continuity`
+          : `Click below to select as Part ${part} ${kind} frame`;
+      }
+    } else {
+      if (previewUseBtn) previewUseBtn.classList.add("hidden");
+      if (previewStatus) previewStatus.textContent = "Reference image preview";
+    }
+
+    previewModal.classList.remove("hidden");
+    previewModal.classList.add("flex");
+  }
+
+  function closeImagePreview(): void {
+    if (previewModal) {
+      previewModal.classList.add("hidden");
+      previewModal.classList.remove("flex");
+    }
+    activePreviewTarget = null;
+  }
+
+  // Bind preview triggers
+  document.querySelectorAll<HTMLElement>("[data-preview-image]").forEach((el) => {
+    el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const src = el.dataset.src || (el.querySelector("img") as HTMLImageElement)?.src || "";
+      const title = el.dataset.title || "Image Preview";
+      const path = el.dataset.path || "";
+      const part = el.dataset.part !== undefined ? Number(el.dataset.part) : undefined;
+      const kind = el.dataset.kind as "start" | "end" | undefined;
+      const value = el.dataset.value;
+      const tileElement = el.closest<HTMLElement>("[data-tile-container]");
+
+      openImagePreview(src, title, path, part, kind, value, tileElement);
+    });
+  });
+
+  previewCloseX?.addEventListener("click", closeImagePreview);
+  previewCloseBtn?.addEventListener("click", closeImagePreview);
+  previewModal?.addEventListener("click", (e) => {
+    if (e.target === previewModal) closeImagePreview();
+  });
+
+  previewUseBtn?.addEventListener("click", () => {
+    if (
+      activePreviewTarget &&
+      activePreviewTarget.part !== undefined &&
+      activePreviewTarget.kind &&
+      activePreviewTarget.value &&
+      activePreviewTarget.tileElement
+    ) {
+      const nowSelected = toggleTileSelection(
+        activePreviewTarget.tileElement,
+        activePreviewTarget.part,
+        activePreviewTarget.kind,
+        activePreviewTarget.value
+      );
+      closeImagePreview();
+    }
+  });
+
+  // Handle GENERATE video button per part
+  document.querySelectorAll<HTMLButtonElement>("[data-generate-part]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const film = button.dataset.film!;
+      const name = button.dataset.name!;
+      const part = Number(button.dataset.part);
+      const state = partFrameState.get(part) ?? { frameStart: "", frameEnd: "" };
+
+      const command = [
+        `uv run animator --film ${film} --scene ${name} --parts ${part}`,
+        state.frameStart ? `--frame_start ${state.frameStart}` : "",
+        state.frameEnd ? `--frame_end ${state.frameEnd}` : "",
+      ]
+        .filter(Boolean)
+        .join(" ");
+
+      openCLITerminal({
+        url: "/api/animator",
+        body: {
+          film,
+          name,
+          parts: part,
+          frameStart: state.frameStart,
+          frameEnd: state.frameEnd,
+        },
+        command,
+      });
+    });
+  });
+
+  // Keyframe Modal elements
+  const keyframeModal = document.getElementById("keyframe-modal") as HTMLDivElement | null;
+  const modalTitle = document.getElementById("keyframe-modal-title");
+  const modalSubtitle = document.getElementById("keyframe-modal-subtitle");
+  const modalCloseX = document.getElementById("keyframe-modal-close-x");
+  const modalCancel = document.getElementById("keyframe-modal-cancel");
+  const modalSubmit = document.getElementById("keyframe-modal-submit");
+  const modalRefSelect = document.getElementById("keyframe-modal-ref-select") as HTMLSelectElement | null;
+  const modalCustomRef = document.getElementById("keyframe-modal-custom-ref") as HTMLInputElement | null;
+  const modalForce = document.getElementById("keyframe-modal-force") as HTMLInputElement | null;
+  const modalCmdPreview = document.getElementById("keyframe-modal-cmd-preview");
+
+  let activeModalPart = 0;
+  let activeModalFilm = "";
+  let activeModalName = "";
+
+  function updateKeyframeCommandPreview(): void {
+    if (!modalCmdPreview) return;
+    const targetInput = document.querySelector<HTMLInputElement>(
+      'input[name="keyframe-modal-target"]:checked'
+    );
+    const targetType = targetInput?.value || "start";
+    const refVal = modalCustomRef?.value.trim() || modalRefSelect?.value || "";
+    const force = modalForce?.checked || false;
+
+    const cmd = [
+      `uv run keyframes --film ${activeModalFilm} --scene ${activeModalName} --parts ${activeModalPart} --type ${targetType}`,
+      refVal ? `--ref ${refVal}` : "",
+      force ? "--force" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    modalCmdPreview.textContent = cmd;
+  }
+
+  function openKeyframeModal(film: string, name: string, part: number, preselectedType: "start" | "end" | "both" = "start"): void {
+    activeModalFilm = film;
+    activeModalName = name;
+    activeModalPart = part;
+
+    if (modalTitle) modalTitle.textContent = `Generate Keyframe Proposal`;
+    if (modalSubtitle) modalSubtitle.textContent = `Part ${part} · ${name}`;
+
+    const radio = document.querySelector<HTMLInputElement>(
+      `input[name="keyframe-modal-target"][value="${preselectedType}"]`
+    );
+    if (radio) radio.checked = true;
+
+    if (modalRefSelect) {
+      modalRefSelect.innerHTML = '<option value="">Auto Discovery / None</option>';
+      if (part > 0) {
+        const prevEndProp = `part-${part - 1}-end-proposal.jpg`;
+        const prevEndOpt = document.createElement("option");
+        prevEndOpt.value = prevEndProp;
+        prevEndOpt.textContent = `Prior Part End Proposal (${prevEndProp})`;
+        modalRefSelect.appendChild(prevEndOpt);
+      }
+    }
+    if (modalCustomRef) modalCustomRef.value = "";
+    if (modalForce) modalForce.checked = false;
+
+    updateKeyframeCommandPreview();
+
+    if (keyframeModal) {
+      keyframeModal.classList.remove("hidden");
+      keyframeModal.classList.add("flex");
+    }
+  }
+
+  function closeKeyframeModal(): void {
+    if (keyframeModal) {
+      keyframeModal.classList.add("hidden");
+      keyframeModal.classList.remove("flex");
+    }
+  }
+
+  // Open keyframe modal triggers
+  document.querySelectorAll<HTMLButtonElement>("[data-open-keyframe-modal]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      openKeyframeModal(btn.dataset.film!, btn.dataset.name!, Number(btn.dataset.part), "start");
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>("[data-trigger-keyframe]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const type = (btn.dataset.triggerKeyframe as "start" | "end") || "start";
+      openKeyframeModal(btn.dataset.film!, btn.dataset.name!, Number(btn.dataset.part), type);
+    });
+  });
+
+  // Modal events
+  modalCloseX?.addEventListener("click", closeKeyframeModal);
+  modalCancel?.addEventListener("click", closeKeyframeModal);
+
+  document.querySelectorAll('input[name="keyframe-modal-target"]').forEach((el) => {
+    el.addEventListener("change", updateKeyframeCommandPreview);
+  });
+  modalRefSelect?.addEventListener("change", updateKeyframeCommandPreview);
+  modalCustomRef?.addEventListener("input", updateKeyframeCommandPreview);
+  modalForce?.addEventListener("change", updateKeyframeCommandPreview);
+
+  modalSubmit?.addEventListener("click", () => {
+    const targetInput = document.querySelector<HTMLInputElement>(
+      'input[name="keyframe-modal-target"]:checked'
+    );
+    const targetType = (targetInput?.value as "start" | "end" | "both") || "start";
+    const refVal = modalCustomRef?.value.trim() || modalRefSelect?.value || "";
+    const force = modalForce?.checked || false;
+
+    const command = [
+      `uv run keyframes --film ${activeModalFilm} --scene ${activeModalName} --parts ${activeModalPart} --type ${targetType}`,
+      refVal ? `--ref ${refVal}` : "",
+      force ? "--force" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    closeKeyframeModal();
+
+    openCLITerminal({
+      url: "/api/keyframes",
+      body: {
+        film: activeModalFilm,
+        name: activeModalName,
+        parts: activeModalPart,
+        type: targetType,
+        ref: refVal,
+        force,
+      },
+      command,
+    });
+  });
 </script>

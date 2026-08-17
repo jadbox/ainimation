@@ -288,6 +288,29 @@ export function resolveProposalFrame(
   return null;
 }
 
+export function deleteProposalFiles(
+  film: string,
+  sceneName: string,
+  part: number,
+  kind: "start" | "end",
+): string[] {
+  const dir = path.join(animationsDir(film), sceneName);
+  if (!fs.existsSync(dir)) return [];
+  const deleted: string[] = [];
+  const filesToDelete = [
+    `part-${part}-${kind}-proposal.jpg`,
+    `part-${part}-${kind}-proposal-prompt.txt`,
+  ];
+  for (const filename of filesToDelete) {
+    const filePath = path.join(dir, filename);
+    if (fs.existsSync(filePath)) {
+      fs.unlinkSync(filePath);
+      deleted.push(filename);
+    }
+  }
+  return deleted;
+}
+
 export function keyframesCommand(
   film: string,
   name: string,

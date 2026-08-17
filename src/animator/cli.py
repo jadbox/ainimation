@@ -23,16 +23,12 @@ from animator.config import (
 )
 from animator.media import (
     combine_parts,
-    end_frame_path,
     extract_first_frame,
     extract_last_frame,
     latest_part_path,
     next_frame,
     next_part_paths,
-    part_path,
     previous_frame,
-    prompt_path,
-    start_frame_path,
 )
 from animator.models import SceneSegment
 from animator.prompt import add_reference_tags, build_video_request
@@ -191,6 +187,9 @@ def run(args: argparse.Namespace) -> int:
     default_animations_dir = film_animations_dir(get_film())
     scene_dir = Path(args.output) if args.output else default_animations_dir / args.scene
     scene_dir.mkdir(parents=True, exist_ok=True)
+
+    default_blueprint_dir = film_blueprint_dir(get_film())
+    blueprint_dir = Path(args.blueprint_dir) if args.blueprint_dir else default_blueprint_dir
 
     if args.compose_only:
         present = [

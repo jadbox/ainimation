@@ -51,9 +51,11 @@ CHARACTER ROSTER (use only these characters, spelled exactly in ALL CAPS):
 CHARACTER VOICES:
 {char_voices}
 
-ATTENTION ENGINEERING (required — every frame exists to hold the viewer):
+ATTENTION ENGINEERING & DYNAMIC ANIMATION (required — every frame must feel alive and gripping):
 - HOOK: a segment must open on something already in motion, in danger, or visually striking — NEVER on an empty room, an establishing wide, or a character standing still. The first described second is the scroll-stopper.
-- ONE FOCAL POINT PER BEAT: state where the viewer's eye must go and why — the brightest point in frame, the only thing moving, a character's eyeline pointing at it, or the story object. Never let two things compete for attention.
+- CONTINUOUS CHARACTER VITALITY: characters must NEVER freeze, stand limp, or idle with hands at their sides. Every character on screen stays in continuous, expressive physical motion (breathing, weight shifts, posture changes, tactile touch, adjusting props, head and eyeline tracking).
+- DYNAMIC STAGING & SILHOUETTES: stage characters with expressive full-body silhouettes, contrasting heights (leaning down to child eye level, crouching, stepping forward into the light), and tactile physical interaction (holding a hand, supporting a back, soothing, gripping a prop).
+- ONE FOCAL POINT PER BEAT: state where the viewer's eye must go and why — the brightest point in frame, the primary physical action, a character's eyeline pointing at it, or the story object. Never let two things compete for attention.
 - ESCALATION ACROSS PARTS: each part must be MORE than the previous one — closer camera, higher stakes, a shift in light or sound. The treatment's ladder is law.
 - PLANT AND PAY OFF: plant a micro-question early (a glance, an unseen sound, an unopened object) and pay it off within the scene.
 - THE TURN: when the emotion pivots, camera distance, light, sound, and music must all shift together in the same beat.
@@ -61,7 +63,7 @@ ATTENTION ENGINEERING (required — every frame exists to hold the viewer):
 
 LITERAL DIRECTION LANGUAGE (required):
 - Write only observable physical facts: who is where, what moves, where the camera is and where it goes. The video model animates exactly this and nothing it must infer.
-- Express emotion ONLY through visible body action: trembling fingers, ears flattening, a paw freezing mid-gesture, chest heaving. Never write a bare emotion label ("she feels sad", "naked reverence").
+- Express emotion ONLY through visible body action: trembling fingers, furrowed brows, a sharp intake of breath, a hand tightening its grip, shoulders relaxing, leaning in with urgent focus. Never write a bare emotion label ("she feels sad", "naked reverence").
 - Never write invented numbers — no degrees, kelvin, inches, or percentages; the model ignores them.
 - One camera move per segment (a hold counts). Stillness is a deliberate choice; use it for the held beats.
 
@@ -74,14 +76,14 @@ CAMERA MOTION VOCABULARY (required — the video model understands ONLY these mo
 SPEAKERS & DIALOGUE ENCODING (required — the video model's exact dialogue format):
 - Assign each speaking character a stable speaker ID in the order of the Characters in Scene list: (S1), (S2). A character keeps the same ID for the entire scene; characters who never speak get no ID.
 - When a speaker first appears, establish their identity from visual and audio context (character type, age, pitch, timbre, speaking rate, accent — from the character's <VOICE> description).
-- Place the speaker's identifying phrase, ID, physical action, and delivery OUTSIDE the dialogue tags. Inside <d> put ONLY the language tag and the spoken words verbatim: `{sample_speaker1}, a soft, breathless field mouse (S1), wrings her cape and says: <d>[English] His breath rattles like dry leaves.</d>`
+- Place the speaker's identifying phrase, ID, physical action, and delivery OUTSIDE the dialogue tags. Inside <d> put ONLY the language tag and the spoken words verbatim: `{sample_speaker1}, a soft, breathless speaker (S1), leans forward with trembling hands and says: <d>[English] We must act now.</d>`
 - Preserve every word and punctuation mark of each line verbatim; never translate or rewrite.
 
 SOUND ARCHITECTURE (required — the video model expects sound split across fields):
-- Synchronized diegetic sounds that belong to a specific visible action (a claw scratching parchment, a page turning, a gasp) stay inline in that beat of the multimodal description.
+- Synchronized diegetic sounds that belong to a specific visible action (a latch clicking, fabric rustling, a gasp) stay inline in that beat of the multimodal description.
 - overall_soundscape (1-4 sentences): summarize the scene's ambient sound, physical action sounds, and non-verbal human sounds across the whole segment — wind, rain, fire crackle, footsteps, fabric, breathing. Do NOT repeat dialogue or music here.
-- non_diegetic_music (1-3 sentences): the score only the audience hears. Describe instrumentation, tempo, rhythm, and dynamics ONLY — no abstract mood words, no emotional explanations ("sparse music-box notes at a slow tempo, joined by a low cello that swells before fading"). Use N/A if there is no score.
-- Diegetic music the characters hear (a music box playing IN the scene) belongs in the multimodal description, not in non_diegetic_music.
+- non_diegetic_music (1-3 sentences): the score only the audience hears. Describe instrumentation, tempo, rhythm, and dynamics ONLY — no abstract mood words, no emotional explanations ("sparse acoustic guitar notes at a slow tempo, joined by a low cello that swells before fading"). Use N/A if there is no score.
+- Diegetic music the characters hear belongs in the multimodal description, not in non_diegetic_music.
 
 SPATIAL & PHYSICAL LAWS (required):
 - First sentence of every segment: a semicolon-separated list placing every character, key prop, and light source relative to the camera (left, right, center, foreground, background).
@@ -89,8 +91,8 @@ SPATIAL & PHYSICAL LAWS (required):
 - Every position or facing change is continuous physical locomotion (step, walk, turn, pivot, climb). No teleporting, no position pops, no duplicate characters.
 - Characters never stand on furniture unless the beat calls for climbing; feet stay on the floor.
 - Interacting characters share one depth plane so both faces read in 3/4 or profile.
-- Every character is alive every second: breathing, weight shifts, ear/whisker twitches, hands working a task. Nobody stands rigid.
-- Characters look at each other or at scene objects — never into the lens. Only the declared speaker moves their mouth.
+- Every character is alive every second: continuous secondary motion (breathing, weight shifts, reactive facial shifts, tactile interactions). Nobody stands rigid or frozen.
+- Characters look at each other or at scene objects — NEVER into the lens (no fourth-wall breaks). Only the declared speaker moves their mouth.
 
 DIALOGUE CRAFT — the Instagram dialogue guide (required — dialogue is the engine of short-form video; every word must fight for its life):
 - VOLUME: across the whole scene, roughly 50-70 spoken words total split into 5-8 short lines. Enough to feel snappy, few enough that every line gets a physical performance.
@@ -98,7 +100,7 @@ DIALOGUE CRAFT — the Instagram dialogue guide (required — dialogue is the en
 - THE DELETION TEST: if removing a line would not change the scene, the line does not exist. Ban greetings, filler, small talk, and any line that merely describes what the picture already shows.
 - ONE JOB PER LINE: every line either ASKs, ANSWERs, DEFLECTs, WARNs, or REVEALs. Every exchange must shift the power or emotional balance between the characters.
 - GROUNDED IN THE STORY BEAT: lines come only from the beat's actions, emotions, and talking points — never invent backstory, past events, or implications the beat does not state.
-- SPEAK IN ACTION: pair every spoken line with a visible physical act (wringing a cape, freezing mid-gesture, turning away). While one character speaks, the other reacts physically — the listener's body is half the scene.
+- SPEAK IN ACTION: pair every spoken line with a visible physical act (leaning down, guiding a prop, supporting a shoulder). While one character speaks, the other reacts physically — the listener's body is half the scene.
 - SUBTEXT OVER EXPOSITION: convey feeling through what a character almost says, not through stating facts. No TV scolding tropes ("I told you...", "calm down"), no melodrama, no modern slang.
 - ATTRIBUTE dialogue using the SPEAKERS & DIALOGUE ENCODING format above (identifying phrase + (S-ID) + physical action + `says: <d>[English] line</d>`).
 
@@ -284,6 +286,7 @@ def build_critique_prompt(treatment: str, document: str) -> str:
         "- HOOK (does the first second stop a scrolling thumb?)\n"
         "- ESCALATION (is this segment more than the last, per the treatment ladder?)\n"
         "- ATTENTION CONTROL (is there one clear focal point per beat?)\n"
+        "- DYNAMISM & ACTING (are all characters continuously alive with expressive physical acting, dynamic postures, tactile contact, and zero standing still/frozen mannequins?)\n"
         "- DIALOGUE ECONOMY (every line <=10 words, one job each, no deletable lines?)\n"
         "- LITERALNESS (only physical facts; no emotion labels, no invented numbers?)\n"
         "- FILMABILITY (one camera move, continuous locomotion, no teleporting?)\n"
@@ -291,7 +294,7 @@ def build_critique_prompt(treatment: str, document: str) -> str:
         f"DIRECTOR'S TREATMENT:\n{treatment}\n\n"
         f"SEGMENT UNDER REVIEW:\n{document}\n\n"
         "Return ONLY:\n"
-        "SCORES: hook=N, escalation=N, attention=N, dialogue=N, literalness=N, filmability=N, length=N\n"
+        "SCORES: hook=N, escalation=N, attention=N, dynamism=N, dialogue=N, literalness=N, filmability=N, length=N\n"
         "FIXES: numbered list, one line per fix."
     )
 

@@ -263,6 +263,8 @@ const nextFrame =
         const canUseNextSceneFrame = index === parts.length - 1 && nextFrame;
         const priorSegment = index > 0 ? videos.segments.find((s) => s.part === parts[index - 1]) : null;
         const nextSegment = index < parts.length - 1 ? videos.segments.find((s) => s.part === parts[index + 1]) : null;
+        const priorProposals = index > 0 ? partProposals(film, name, parts[index - 1]) : null;
+        const nextProposals = index < parts.length - 1 ? partProposals(film, name, parts[index + 1]) : null;
 
         return (
           <section class="rounded-xl border border-line bg-panel shadow-lg shadow-black/20">
@@ -384,6 +386,8 @@ const nextFrame =
                 nextPart={nextPart}
                 priorSegment={priorSegment}
                 nextSegment={nextSegment}
+                priorProposals={priorProposals}
+                nextProposals={nextProposals}
               />
 
               {/* Collapsible script viewer */}

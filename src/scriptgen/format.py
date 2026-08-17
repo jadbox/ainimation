@@ -58,6 +58,6 @@ Scene: "{scene_name}" — {logline or 'see script below.'}
 Characters appearing: {char_header_str}.
 Match designs EXACTLY to reference images; never use references as opening frames.
 
-MANDATES: One unbroken continuous shot — no cuts, only smooth camera motion. No teleporting, position pops, fades, or duplicate characters — all position/facing changes are continuous physical locomotion. Only the declared speaker moves mouth/lips; all others keep mouths CLOSED and react with body language. Every character stays alive with continuous secondary motion (breathing, weight shifts, twitches); never freeze or stand rigid.
+MANDATES: One unbroken continuous shot — no cuts, only smooth camera motion. No teleporting, position pops, fades, or duplicate characters — all position/facing changes are continuous physical locomotion. Only the declared speaker moves mouth/lips; all others keep mouths CLOSED and react with body language. Every character stays alive with continuous secondary motion (breathing, weight shifts, posture shifts, tactile interactions); never freeze, idle, or stand rigid.
 
 {setting_block}{segment_body}"""

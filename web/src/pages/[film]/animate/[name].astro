@@ -279,16 +279,6 @@ const nextFrame =
                 </p>
               </div>
               <div class="flex items-center gap-2">
-                <button
-                  type="button"
-                  data-open-keyframe-modal
-                  data-part={part}
-                  data-film={film}
-                  data-name={name}
-                  class="rounded-md bg-amber-key/10 px-3 py-2 text-xs font-medium text-amber-soft ring-1 ring-amber-key/30 transition-colors hover:bg-amber-key/20"
-                >
-                  Keyframe proposal
-                </button>
                 {script ? (
                   <button
                     type="button"
@@ -1134,12 +1124,6 @@ const nextFrame =
   }
 
   // Open keyframe modal triggers
-  document.querySelectorAll<HTMLButtonElement>("[data-open-keyframe-modal]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      openKeyframeModal(btn.dataset.film!, btn.dataset.name!, Number(btn.dataset.part), "start");
-    });
-  });
-
   document.querySelectorAll<HTMLButtonElement>("[data-trigger-keyframe]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const type = (btn.dataset.triggerKeyframe as "start" | "end") || "start";

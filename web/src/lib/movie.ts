@@ -376,6 +376,51 @@ export function deleteProposalFiles(
   return deleted;
 }
 
+export function deleteVideoFiles(
+  film: string,
+  sceneName: string,
+  part: number,
+  filename?: string,
+): string[] {
+  const dir = path.join(animationsDir(film), sceneName);
+  if (!fs.existsSync(dir)) return [];
+  const deleted: string[] = [];
+
+  if (filename) {
+    const cleanName = path.basename(filename);
+    const stem = cleanName.replace(/\.mp4$/, "");
+    const targets = [
+      `${stem}.mp4`,
+      `${stem}-start.jpg`,
+      `${stem}-end.jpg`,
+      `${stem}.jpg`,
+      `${stem}-prompt.md`,
+    ];
+    for (const f of targets) {
+      const filePath = path.join(dir, f);
+      if (fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        deleted.push(f);
+      }
+    }
+  } else {
+    const files = fs.readdirSync(dir);
+    const pattern = new RegExp(
+      `^part-${part}(?:-v\\d+)?(?:\\.mp4|-start\\.jpg|-end\\.jpg|\\.jpg|-prompt\\.md)$`,
+    );
+    for (const file of files) {
+      if (pattern.test(file)) {
+        const filePath = path.join(dir, file);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          deleted.push(file);
+        }
+      }
+    }
+  }
+  return deleted;
+}
+
 export function keyframesCommand(
   film: string,
   name: string,

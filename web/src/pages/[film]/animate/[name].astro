@@ -319,39 +319,55 @@ const nextFrame =
                       const isLatest = ver.version === segVideo.versions[segVideo.versions.length - 1].version;
                       const videoSlug = ver.version > 0 ? `${name}_part_${part}_v${ver.version}` : `${name}_part_${part}`;
                       return (
-                        <a
-                          href={`/${film}/video/${videoSlug}`}
-                          title={`View Part ${part} ${ver.label}`}
-                          class="group block w-[280px] overflow-hidden rounded-lg border border-line bg-ink/40 transition-colors hover:border-amber-key/50"
-                        >
-                          {ver.thumb ? (
-                            <img
-                              src={animationFileUrl(film, name, ver.thumb)}
-                              alt={`Part ${part} ${ver.label} thumbnail`}
-                              class="aspect-video w-full object-cover transition-transform group-hover:scale-105"
-                              loading="lazy"
-                            />
-                          ) : (
-                            <div class="flex aspect-video items-center justify-center px-3 text-center text-xs text-muted">
-                              Part {part} {ver.label}
-                            </div>
-                          )}
-                          <figcaption class="border-t border-line px-2.5 py-2">
-                            <div class="flex items-center justify-between">
-                              <span class="block truncate text-xs text-slate-200 font-medium">
+                        <div class="group relative block w-[280px] overflow-hidden rounded-lg border border-line bg-ink/40 transition-colors hover:border-amber-key/50">
+                          <button
+                            type="button"
+                            data-delete-video
+                            data-film={film}
+                            data-name={name}
+                            data-part={part}
+                            data-filename={ver.filename}
+                            title={`Delete ${ver.filename}`}
+                            class="absolute top-1.5 right-1.5 z-10 flex h-6 w-6 items-center justify-center rounded bg-black/70 text-slate-300 backdrop-blur-sm transition-colors hover:bg-rose-900/80 hover:text-rose-200 cursor-pointer"
+                          >
+                            <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                          <a
+                            href={`/${film}/video/${videoSlug}`}
+                            title={`View Part ${part} ${ver.label}`}
+                            class="block"
+                          >
+                            {ver.thumb ? (
+                              <img
+                                src={animationFileUrl(film, name, ver.thumb)}
+                                alt={`Part ${part} ${ver.label} thumbnail`}
+                                class="aspect-video w-full object-cover transition-transform group-hover:scale-105"
+                                loading="lazy"
+                              />
+                            ) : (
+                              <div class="flex aspect-video items-center justify-center px-3 text-center text-xs text-muted">
                                 Part {part} {ver.label}
-                              </span>
-                              {isLatest && segVideo.versions.length > 1 && (
-                                <span class="rounded bg-teal-shadow/20 px-1.5 py-0.5 font-mono text-[9px] text-teal-shadow">
-                                  Latest
+                              </div>
+                            )}
+                            <figcaption class="border-t border-line px-2.5 py-2">
+                              <div class="flex items-center justify-between">
+                                <span class="block truncate text-xs text-slate-200 font-medium">
+                                  Part {part} {ver.label}
                                 </span>
-                              )}
-                            </div>
-                            <span class="mt-0.5 block truncate font-mono text-[10px] text-muted">
-                              {ver.filename}
-                            </span>
-                          </figcaption>
-                        </a>
+                                {isLatest && segVideo.versions.length > 1 && (
+                                  <span class="rounded bg-teal-shadow/20 px-1.5 py-0.5 font-mono text-[9px] text-teal-shadow">
+                                    Latest
+                                  </span>
+                                )}
+                              </div>
+                              <span class="mt-0.5 block truncate font-mono text-[10px] text-muted">
+                                {ver.filename}
+                              </span>
+                            </figcaption>
+                          </a>
+                        </div>
                       );
                     })}
                   </div>
@@ -602,6 +618,7 @@ const nextFrame =
 
 <script>
   import { openCLITerminal } from "../../../components/cli-terminal";
+  import { confirmModal } from "../../../components/confirm-modal";
 
   const currentFilm = document.querySelector<HTMLElement>("[data-film]")?.dataset.film ?? "";
   const currentSceneName = document.querySelector<HTMLElement>("[data-name]")?.dataset.name ?? "";
@@ -816,10 +833,16 @@ const nextFrame =
     kind: "start" | "end",
     filename?: string,
   ): Promise<void> {
-    const confirmMsg = filename
-      ? `Delete proposal ${filename}?`
-      : `Delete ${kind} proposal image and prompt for Part ${part}?`;
-    if (!confirm(confirmMsg)) {
+    const confirmed = await confirmModal({
+      title: "Delete Keyframe Proposal",
+      message: filename
+        ? `Are you sure you want to delete proposal "${filename}"?`
+        : `Are you sure you want to delete the ${kind} proposal image and prompt for Part ${part}?`,
+      details: "This will permanently remove the proposal image and its generated prompt file.",
+      confirmLabel: "Delete Proposal",
+      variant: "danger",
+    });
+    if (!confirmed) {
       return;
     }
     try {
@@ -839,6 +862,41 @@ const nextFrame =
     }
   }
 
+  async function performDeleteVideo(
+    film: string,
+    name: string,
+    part: number,
+    filename?: string,
+  ): Promise<void> {
+    const confirmed = await confirmModal({
+      title: "Delete Generated Video",
+      message: filename
+        ? `Are you sure you want to delete "${filename}"?`
+        : `Are you sure you want to delete all video clips for Part ${part}?`,
+      details: "This will remove the video clip, extracted start/end frame thumbnails, and prompt metadata.",
+      confirmLabel: "Delete Video",
+      variant: "danger",
+    });
+    if (!confirmed) {
+      return;
+    }
+    try {
+      const res = await fetch("/api/delete-video", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ film, name, part, filename }),
+      });
+      if (res.ok) {
+        location.reload();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(`Failed to delete video: ${err.error || res.statusText}`);
+      }
+    } catch (err) {
+      alert(`Failed to delete video: ${(err as Error).message}`);
+    }
+  }
+
   document.querySelectorAll<HTMLButtonElement>("[data-delete-proposal]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -848,6 +906,18 @@ const nextFrame =
       const kind = btn.dataset.kind as "start" | "end";
       const filename = btn.dataset.filename;
       void performDeleteProposal(film, name, part, kind, filename);
+    });
+  });
+
+  document.querySelectorAll<HTMLButtonElement>("[data-delete-video]").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const film = btn.dataset.film!;
+      const name = btn.dataset.name!;
+      const part = Number(btn.dataset.part);
+      const filename = btn.dataset.filename;
+      void performDeleteVideo(film, name, part, filename);
     });
   });
 

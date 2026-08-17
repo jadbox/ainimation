@@ -1,5 +1,6 @@
 ---
 import "../styles/global.css";
+import ConfirmModal from "../components/ConfirmModal.astro";
 import { listFilms, loadMovie } from "../lib/movie";
 
 interface Props {
@@ -69,5 +70,7 @@ const logoLetter = (movie.movie.title.trim()[0] ?? "A").toUpperCase();
     <footer class="mx-auto max-w-6xl px-6 pb-10 pt-4 text-xs text-muted/80">
       scriptgen → blueprint → animator
     </footer>
+
+    <ConfirmModal />
   </body>
 </html>

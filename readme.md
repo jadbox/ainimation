@@ -178,8 +178,8 @@ Generates animated 720p 24fps video clips for each segment prompt in `films/<fil
   # Generate only segment 2 (0:20-0:30)
   uv run animator --scene <story_scene_name> --parts 2
 
-  # Force regeneration of segment 1
-  uv run animator --scene <story_scene_name> --parts 1 --force
+  # Generate a new version of segment 1 (e.g. part-1-v1.mp4)
+  uv run animator --scene <story_scene_name> --parts 1
 
   # Generate a part with explicitly supplied opening and closing frames
   uv run animator --scene <story_scene_name> --parts 1 --frame_start path/to/start.jpg --frame_end path/to/end.jpg
@@ -191,9 +191,8 @@ Generates animated 720p 24fps video clips for each segment prompt in `films/<fil
 * **Key Options**:
   * `--film SLUG`: Film folder under `films/<slug>/` to use (default: first film found, or `$FILM`).
   * `--scene NAME`: Scene script name (reads `films/<film>/out/scripts/<scene>_part<N>.md`).
-  * `--parts N`: Generate only segment index `N` (0-indexed). Default: generate all missing segments.
-  * `--force`: Regenerate parts even if clip already exists.
-  * `--compose-only`: Skip API calls and combine existing `part-*.mp4` clips into `full.mp4`.
+  * `--parts N`: Generate only segment index `N` (0-indexed). Automatically creates a new version (`-v1`, `-v2`, ...) if the base clip already exists. Default: generate all missing segments.
+  * `--compose-only`: Skip API calls and combine the highest version of each existing `part-*.mp4` clip into `full.mp4`.
    * `--frame_start PATH` / `--frame-start PATH`: Use an image as the mandatory opening frame for every generated part, overriding automatically discovered prior-part continuity frames.
    * `--frame_end PATH` / `--frame-end PATH`: Use an image as the mandatory closing frame for every generated part, overriding automatically discovered next-part continuity frames.
   * `--provider NAME`: Video generation provider (`google`, `openrouter` or `minimax`; `gemini` is an alias for `google`). Default: `minimax` (MiniMax H3 via the MiniMax API). The `openrouter` provider uses `OPENROUTER_API_KEY` and defaults to `minimax/hailuo-3` at `768p`. The `minimax` provider uses `MINIMAX_API_KEY` and defaults to `MiniMax-H3` at `768P`.
@@ -208,11 +207,11 @@ Generates animated 720p 24fps video clips for each segment prompt in `films/<fil
   1. Reads `films/<film>/out/scripts/<scene>_part<N>.md` for each segment and extracts characters from the prompt.
   2. Loads latest blueprint images (`attempt-*.jpg`) from `films/<film>/out/blueprint/<character-slug>/` as character reference inputs. Missing blueprints are generated automatically via `generate-blueprint` (the exact command is echoed as `CREATING BLUEPRINT: ...`).
   3. For the first segment (index 0), attaches the scene location's background plate (`films/<film>/out/blueprint/<scene-slug>/attempt-*.jpg`, auto-generated if missing) as an environment reference so the set layout and depth layering stay anchored. The script name is mapped to a scene location via the `story:` section of the film's `movie.yml`.
-   4. For segment `N > 0`, locates the last frame of segment `N-1` (`part-<N-1>-end.jpg`, falling back to the legacy `part-<N-1>.jpg` or extracting it from `part-<N-1>.mp4` via `ffmpeg`) and sends it as a mandatory opening frame reference for exact visual/background continuity (no background plate is attached to these segments).
-   5. When regenerating a part (e.g. `--parts N --force`), also locates the first frame of segment `N+1` (`part-<N+1>-start.jpg`, or extracted from `part-<N+1>.mp4`) when it exists and sends it as a mandatory closing frame reference, so the regenerated clip's final frame lines up with the next shot.
-   6. Tacks reference image tags (<IMAGE_REF_N>) and continuity/opening/closing frame instructions onto the segment prompt, saving the final tagged prompt to `films/<film>/out/animations/<scene>/part-<N>-prompt.md`.
-   7. Generates `part-<N>.mp4` for each segment and exports its first and last frames as `part-<N>-start.jpg` and `part-<N>-end.jpg`.
-   8. Combines all parts into `films/<film>/out/animations/<scene>/full.mp4` with a 0.2s crossfade transition using `ffmpeg`.
+   4. For segment `N > 0`, locates the latest last frame of segment `N-1` (`part-<N-1>-end.jpg` or `part-<N-1>-v<V>-end.jpg`, falling back to extracting it from the latest clip via `ffmpeg`) and sends it as a mandatory opening frame reference for exact visual/background continuity (no background plate is attached to these segments).
+   5. When generating a specific part (`--parts N`), also locates the first frame of segment `N+1` (`part-<N+1>-start.jpg` or `part-<N+1>-v<V>-start.jpg`) when it exists and sends it as a mandatory closing frame reference, so the clip's final frame lines up with the next shot.
+   6. Tacks reference image tags (<IMAGE_REF_N>) and continuity/opening/closing frame instructions onto the segment prompt, saving the final tagged prompt to `films/<film>/out/animations/<scene>/part-<N>-prompt.md` (or `-v<V>-prompt.md`).
+   7. Generates `part-<N>.mp4` (or `-v1.mp4`, `-v2.mp4`) for each segment and exports its first and last frames as `part-<N>-start.jpg` and `part-<N>-end.jpg`.
+   8. Combines all parts (using the highest available version for each part) into `films/<film>/out/animations/<scene>/full.mp4` with a 0.2s crossfade transition using `ffmpeg`.
 
 * **Module Layout**:
   * `src/animator.py`: Executable CLI launcher script.

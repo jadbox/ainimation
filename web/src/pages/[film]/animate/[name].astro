@@ -309,80 +309,51 @@ const nextFrame =
             </header>
 
             <div class="space-y-5 px-5 py-5">
-              {segVideo && (
+              {segVideo && segVideo.versions.length > 0 && (
                 <div>
                   <h3 class="mb-2 text-xs font-medium uppercase tracking-wider text-muted">
-                    Rendered Video & Extracted Frames
+                    Rendered Video
                   </h3>
                   <div class="flex flex-wrap items-end gap-3">
-                    {segVideo.startThumb && (
-                      <button
-                        type="button"
-                        data-preview-image
-                        data-src={animationFileUrl(film, name, segVideo.startThumb)}
-                        data-title={`Part ${part} Video Start Frame`}
-                        data-path={`films/${film}/out/animations/${name}/${segVideo.startThumb}`}
-                        title={`Click to preview Part ${part} start frame`}
-                        class="group block w-36 overflow-hidden rounded-lg border border-line bg-ink/40 text-left transition-colors hover:border-amber-key/50"
-                      >
-                        <img
-                          src={animationFileUrl(film, name, segVideo.startThumb)}
-                          alt={`Part ${part} start frame`}
-                          class="aspect-video w-full object-cover transition-transform group-hover:scale-105"
-                          loading="lazy"
-                        />
-                        <span class="block border-t border-line px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wide text-muted">
-                          video start 🔍
-                        </span>
-                      </button>
-                    )}
-                    <a
-                      href={`/${film}/video/${name}_part_${part}`}
-                      title={`View Part ${part} video`}
-                      class="group block w-[280px] overflow-hidden rounded-lg border border-line bg-ink/40 transition-colors hover:border-amber-key/50"
-                    >
-                      {segVideo.thumb ? (
-                        <img
-                          src={animationFileUrl(film, name, segVideo.thumb)}
-                          alt={`Part ${part} video thumbnail`}
-                          class="aspect-video w-full object-cover transition-transform group-hover:scale-105"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div class="flex aspect-video items-center justify-center px-3 text-center text-xs text-muted">
-                          Part {part} video generated
-                        </div>
-                      )}
-                      <figcaption class="border-t border-line px-2.5 py-2">
-                        <span class="block truncate text-xs text-slate-200">
-                          Part {part} video
-                        </span>
-                        <span class="mt-0.5 block truncate font-mono text-[10px] text-muted">
-                          {name}_part_{part}.mp4
-                        </span>
-                      </figcaption>
-                    </a>
-                    {segVideo.endThumb && (
-                      <button
-                        type="button"
-                        data-preview-image
-                        data-src={animationFileUrl(film, name, segVideo.endThumb)}
-                        data-title={`Part ${part} Video End Frame`}
-                        data-path={`films/${film}/out/animations/${name}/${segVideo.endThumb}`}
-                        title={`Click to preview Part ${part} end frame`}
-                        class="group block w-36 overflow-hidden rounded-lg border border-line bg-ink/40 text-left transition-colors hover:border-amber-key/50"
-                      >
-                        <img
-                          src={animationFileUrl(film, name, segVideo.endThumb)}
-                          alt={`Part ${part} end frame`}
-                          class="aspect-video w-full object-cover transition-transform group-hover:scale-105"
-                          loading="lazy"
-                        />
-                        <span class="block border-t border-line px-2.5 py-1.5 font-mono text-[10px] uppercase tracking-wide text-muted">
-                          video end 🔍
-                        </span>
-                      </button>
-                    )}
+                    {segVideo.versions.map((ver) => {
+                      const isLatest = ver.version === segVideo.versions[segVideo.versions.length - 1].version;
+                      const videoSlug = ver.version > 0 ? `${name}_part_${part}_v${ver.version}` : `${name}_part_${part}`;
+                      return (
+                        <a
+                          href={`/${film}/video/${videoSlug}`}
+                          title={`View Part ${part} ${ver.label}`}
+                          class="group block w-[280px] overflow-hidden rounded-lg border border-line bg-ink/40 transition-colors hover:border-amber-key/50"
+                        >
+                          {ver.thumb ? (
+                            <img
+                              src={animationFileUrl(film, name, ver.thumb)}
+                              alt={`Part ${part} ${ver.label} thumbnail`}
+                              class="aspect-video w-full object-cover transition-transform group-hover:scale-105"
+                              loading="lazy"
+                            />
+                          ) : (
+                            <div class="flex aspect-video items-center justify-center px-3 text-center text-xs text-muted">
+                              Part {part} {ver.label}
+                            </div>
+                          )}
+                          <figcaption class="border-t border-line px-2.5 py-2">
+                            <div class="flex items-center justify-between">
+                              <span class="block truncate text-xs text-slate-200 font-medium">
+                                Part {part} {ver.label}
+                              </span>
+                              {isLatest && segVideo.versions.length > 1 && (
+                                <span class="rounded bg-teal-shadow/20 px-1.5 py-0.5 font-mono text-[9px] text-teal-shadow">
+                                  Latest
+                                </span>
+                              )}
+                            </div>
+                            <span class="mt-0.5 block truncate font-mono text-[10px] text-muted">
+                              {ver.filename}
+                            </span>
+                          </figcaption>
+                        </a>
+                      );
+                    })}
                   </div>
                 </div>
               )}

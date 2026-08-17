@@ -26,7 +26,9 @@ from animator.media import (
     end_frame_path,
     extract_first_frame,
     extract_last_frame,
+    latest_part_path,
     next_frame,
+    next_part_paths,
     part_path,
     previous_frame,
     prompt_path,
@@ -191,8 +193,16 @@ def run(args: argparse.Namespace) -> int:
     scene_dir.mkdir(parents=True, exist_ok=True)
 
     if args.compose_only:
-        present = [segment for segment in segments if part_path(scene_dir, segment).exists()]
-        missing = [segment for segment in segments if not part_path(scene_dir, segment).exists()]
+        present = [
+            segment
+            for segment in segments
+            if latest_part_path(scene_dir, segment.index) is not None
+        ]
+        missing = [
+            segment
+            for segment in segments
+            if latest_part_path(scene_dir, segment.index) is None
+        ]
         if missing:
             logger.info(
                 "Missing part(s) %s — combining only the existing clips.",
@@ -214,24 +224,24 @@ def run(args: argparse.Namespace) -> int:
                 f"--parts {args.parts} does not match any segment for {args.scene}. "
                 f"Available segment indices: {available}."
             )
+        # When specific part is requested, always generate a new version
+        pending = selected
     else:
         selected = segments
-
-    default_blueprint_dir = film_blueprint_dir(get_film())
-    blueprint_dir = Path(args.blueprint_dir) if args.blueprint_dir else default_blueprint_dir
-
-    pending = [
-        segment
-        for segment in selected
-        if args.force or not part_path(scene_dir, segment).exists()
-    ]
-    skipped = [segment for segment in selected if segment not in pending]
-    for segment in skipped:
-        logger.info(
-            "Part %d already exists at %s; skipping (use --force to regenerate).",
-            segment.index,
-            part_path(scene_dir, segment),
-        )
+        # When all parts are targeted, generate only missing segments
+        pending = [
+            segment
+            for segment in selected
+            if latest_part_path(scene_dir, segment.index) is None
+        ]
+        skipped = [segment for segment in selected if segment not in pending]
+        for segment in skipped:
+            logger.info(
+                "Part %d already exists at %s; skipping (specify --parts %d to generate a new version).",
+                segment.index,
+                latest_part_path(scene_dir, segment.index),
+                segment.index,
+            )
 
     if pending:
         provider_obj = create_video_provider(
@@ -260,7 +270,7 @@ def run(args: argparse.Namespace) -> int:
         for segment in pending:
             movie_info = get_movie_info()
             aspect_ratio = (movie_info.orientation or DEFAULT_ASPECT_RATIO).strip() or DEFAULT_ASPECT_RATIO
-            part_script_path = prompt_path(scene_dir, segment.index)
+            video_dst, start_dst, end_dst, prompt_dst = next_part_paths(scene_dir, segment.index)
             logger.info(
                 "=== Generating movie=%s film=%s scene=%s part=%d (final part "
                 "script: %s) ===",
@@ -268,7 +278,7 @@ def run(args: argparse.Namespace) -> int:
                 get_film(),
                 args.scene,
                 segment.index,
-                part_script_path,
+                prompt_dst,
             )
             continuity_frame = frame_start or previous_frame(scene_dir, segment)
             closing_frame = frame_end or next_frame(scene_dir, segment)
@@ -306,9 +316,8 @@ def run(args: argparse.Namespace) -> int:
                 has_closing_continuity=closing_frame is not None,
                 duration=args.duration,
             )
-            prompt_file = part_script_path
-            prompt_file.write_text(direction, encoding="utf-8")
-            logger.info("Saved prompt for segment %d: %s", segment.index, prompt_file)
+            prompt_dst.write_text(direction, encoding="utf-8")
+            logger.info("Saved prompt for segment %d: %s", segment.index, prompt_dst)
 
             request = build_video_request(
                 direction,
@@ -321,21 +330,28 @@ def run(args: argparse.Namespace) -> int:
                 aspect_ratio=aspect_ratio,
             )
             video_bytes = provider_obj.generate(request, args.timeout)
-            destination = part_path(scene_dir, segment)
-            destination.write_bytes(video_bytes)
+            video_dst.write_bytes(video_bytes)
             logger.info(
                 "Wrote segment %d clip: %s (%d bytes)",
                 segment.index,
-                destination,
+                video_dst,
                 len(video_bytes),
             )
-            extract_first_frame(destination, start_frame_path(scene_dir, segment.index))
-            extract_last_frame(destination, end_frame_path(scene_dir, segment.index))
+            extract_first_frame(video_dst, start_dst)
+            extract_last_frame(video_dst, end_dst)
     else:
         logger.info("Nothing to generate — all selected parts already exist.")
 
-    present = [segment for segment in segments if part_path(scene_dir, segment).exists()]
-    missing = [segment for segment in segments if not part_path(scene_dir, segment).exists()]
+    present = [
+        segment
+        for segment in segments
+        if latest_part_path(scene_dir, segment.index) is not None
+    ]
+    missing = [
+        segment
+        for segment in segments
+        if latest_part_path(scene_dir, segment.index) is None
+    ]
     if len(present) >= 2:
         if missing:
             logger.info(
@@ -380,7 +396,7 @@ def main() -> None:
             "using a configurable video provider (default: MiniMax H3 via the MiniMax API "
             "at 768P; alternative: OpenRouter minimax/hailuo-3 at 768p), with the scene's final "
             "character blueprints as reference images. Each script segment becomes "
-            "films/<film>/out/animations/<scene>/part-<N>.mp4; the existing parts are then "
+            "films/<film>/out/animations/<scene>/part-<N>.mp4 (or -v1.mp4, -v2.mp4); the existing parts are then "
             "combined with 0.2s crossfade transitions into "
             "films/<film>/out/animations/<scene>/full.mp4."
         ),
@@ -396,9 +412,8 @@ def main() -> None:
             "      frame, and part-3-start.jpg (when present) as the mandatory\n"
             "      closing frame.\n"
             "\n"
-            "  %(prog)s --scene frisby_visits_mr_ages --parts 1 --force\n"
-            "      Regenerate segment 1 even though part-1.mp4 already exists\n"
-            "      (new paid API call; without --force existing parts are skipped).\n"
+            "  %(prog)s --scene frisby_visits_mr_ages --parts 1\n"
+            "      Generate a new version of segment 1 (e.g. part-1-v1.mp4).\n"
             "\n"
             "  %(prog)s --scene frisby_visits_mr_ages --compose-only\n"
             "      No generation and no API key needed: combine the existing\n"
@@ -426,13 +441,8 @@ def main() -> None:
         metavar="N",
         help=(
             "Generate only the segment with this index (from 0). E.g. --parts 2 "
-            "generates only the 3rd segment. Default: generate every missing segment."
+            "generates the next version of the 3rd segment. Default: generate every missing segment."
         ),
-    )
-    parser.add_argument(
-        "--force",
-        action="store_true",
-        help="Regenerate parts even if they already exist (full.mp4 is always rebuilt).",
     )
     parser.add_argument(
         "--compose-only",

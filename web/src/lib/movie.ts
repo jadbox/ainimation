@@ -237,6 +237,22 @@ export function resolveSceneFrame(
 ): string | null {
   const dir = path.join(animationsDir(film), sceneName);
   if (!fs.existsSync(dir)) return null;
+
+  const videos = sceneVideos(film, sceneName);
+  const seg = videos.segments.find((s) => s.part === part);
+  if (seg) {
+    const targetThumb = kind === "start" ? seg.startThumb : seg.endThumb;
+    if (targetThumb && fs.existsSync(path.join(dir, targetThumb))) {
+      return `films/${film}/out/animations/${sceneName}/${targetThumb}`;
+    }
+    const clip = path.join(dir, seg.video);
+    const named = `part-${part}-${kind}.jpg`;
+    const namedPath = path.join(dir, named);
+    if (fs.existsSync(clip) && extractFrame(clip, namedPath, kind === "start")) {
+      return `films/${film}/out/animations/${sceneName}/${named}`;
+    }
+  }
+
   const named = `part-${part}-${kind}.jpg`;
   const namedPath = path.join(dir, named);
   if (fs.existsSync(namedPath))
@@ -428,12 +444,23 @@ export function filmVideo(film: string): FilmVideo | null {
     : null;
 }
 
+export interface VideoVersionItem {
+  filename: string;
+  version: number;
+  label: string;
+  path: string;
+  thumb: string | null;
+  startThumb: string | null;
+  endThumb: string | null;
+}
+
 export interface SegmentVideo {
   part: number;
   video: string;
   thumb: string | null;
   startThumb: string | null;
   endThumb: string | null;
+  versions: VideoVersionItem[];
 }
 
 export interface SceneVideos {
@@ -452,20 +479,65 @@ export function sceneVideos(film: string, name: string): SceneVideos {
   const empty: SceneVideos = { full: null, segments: [] };
   if (!fs.existsSync(dir)) return empty;
   const files = new Set(fs.readdirSync(dir));
-  const segments: SegmentVideo[] = [];
+  const partMap = new Map<number, VideoVersionItem[]>();
+
   for (const file of files) {
-    const match = file.match(/^part-(\d+)\.mp4$/);
+    const match = file.match(/^part-(\d+)(?:-v(\d+))?\.mp4$/);
     if (match) {
-      const base = `part-${match[1]}`;
-      segments.push({
-        part: Number(match[1]),
-        video: file,
-        thumb: pickThumb(files, base),
-        startThumb: files.has(`${base}-start.jpg`) ? `${base}-start.jpg` : null,
-        endThumb: files.has(`${base}-end.jpg`) ? `${base}-end.jpg` : null,
-      });
+      const part = Number(match[1]);
+      const version = match[2] ? parseInt(match[2], 10) : 0;
+      const base = version === 0 ? `part-${part}` : `part-${part}-v${version}`;
+
+      const startThumb = files.has(`${base}-start.jpg`)
+        ? `${base}-start.jpg`
+        : files.has(`part-${part}-start.jpg`)
+          ? `part-${part}-start.jpg`
+          : null;
+
+      const endThumb = files.has(`${base}-end.jpg`)
+        ? `${base}-end.jpg`
+        : files.has(`part-${part}-end.jpg`)
+          ? `part-${part}-end.jpg`
+          : null;
+
+      const thumb = files.has(`${base}-end.jpg`)
+        ? `${base}-end.jpg`
+        : files.has(`${base}.jpg`)
+          ? `${base}.jpg`
+          : files.has(`${base}-start.jpg`)
+            ? `${base}-start.jpg`
+            : pickThumb(files, `part-${part}`);
+
+      const item: VideoVersionItem = {
+        filename: file,
+        version,
+        label: version === 0 ? "Video (Base)" : `Video v${version}`,
+        path: `films/${film}/out/animations/${name}/${file}`,
+        thumb,
+        startThumb,
+        endThumb,
+      };
+
+      const list = partMap.get(part) ?? [];
+      list.push(item);
+      partMap.set(part, list);
     }
   }
+
+  const segments: SegmentVideo[] = [];
+  for (const [part, versionList] of partMap.entries()) {
+    versionList.sort((a, b) => a.version - b.version);
+    const latest = versionList[versionList.length - 1];
+    segments.push({
+      part,
+      video: latest.filename,
+      thumb: latest.thumb,
+      startThumb: latest.startThumb,
+      endThumb: latest.endThumb,
+      versions: versionList,
+    });
+  }
+
   segments.sort((a, b) => a.part - b.part);
   const full = files.has("full.mp4")
     ? { thumb: pickThumb(files, "part-0") }

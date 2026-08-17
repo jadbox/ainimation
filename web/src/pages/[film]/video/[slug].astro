@@ -10,9 +10,10 @@ if (!isValidFilm(film)) {
   return Astro.redirect("/");
 }
 
-const partMatch = slug.match(/^(.+)_part_(\d+)$/);
+const partMatch = slug.match(/^(.+)_part_(\d+)(?:_v(\d+))?$/);
 const sceneName = partMatch ? partMatch[1] : slug;
 const part = partMatch ? Number(partMatch[2]) : null;
+const reqVersion = partMatch && partMatch[3] !== undefined ? Number(partMatch[3]) : null;
 
 const movie = loadMovie(film);
 const story = movie.story.find((s) => s.name === sceneName);
@@ -21,13 +22,20 @@ if (!story) {
 }
 
 const videos = sceneVideos(film, sceneName);
+const seg = part !== null ? videos.segments.find((s) => s.part === part) : null;
+const versionItem = seg
+  ? reqVersion !== null
+    ? seg.versions.find((v) => v.version === reqVersion) ?? seg.versions[seg.versions.length - 1]
+    : seg.versions[seg.versions.length - 1]
+  : null;
+
 const current =
   part === null
     ? videos.full && { file: "full.mp4", thumb: videos.full.thumb, label: "Full scene" }
-    : videos.segments.find((s) => s.part === part) && {
-        file: `part-${part}.mp4`,
-        thumb: videos.segments.find((s) => s.part === part)!.thumb,
-        label: `Part ${part}`,
+    : versionItem && {
+        file: versionItem.filename,
+        thumb: versionItem.thumb,
+        label: `Part ${part} ${versionItem.label}`,
       };
 
 if (!current) {
@@ -37,17 +45,30 @@ if (!current) {
 const videoUrl = animationFileUrl(film, sceneName, current.file);
 const posterUrl = current.thumb ? animationFileUrl(film, sceneName, current.thumb) : undefined;
 
-const related = [
-  ...(videos.full
-    ? [{ href: `/${film}/video/${sceneName}`, label: "Full", thumb: videos.full.thumb, active: part === null }]
-    : []),
-  ...videos.segments.map((s) => ({
-    href: `/${film}/video/${sceneName}_part_${s.part}`,
-    label: `Part ${s.part}`,
-    thumb: s.thumb,
-    active: part === s.part,
-  })),
-];
+const related: { href: string; label: string; thumb: string | null; active: boolean }[] = [];
+if (videos.full) {
+  related.push({
+    href: `/${film}/video/${sceneName}`,
+    label: "Full Scene",
+    thumb: videos.full.thumb,
+    active: part === null,
+  });
+}
+for (const s of videos.segments) {
+  for (const v of s.versions) {
+    const isThisActive =
+      part === s.part &&
+      (reqVersion !== null
+        ? v.version === reqVersion
+        : v.version === s.versions[s.versions.length - 1].version);
+    related.push({
+      href: `/${film}/video/${sceneName}_part_${s.part}${v.version > 0 ? `_v${v.version}` : ""}`,
+      label: `Part ${s.part} ${v.label}`,
+      thumb: v.thumb,
+      active: isThisActive,
+    });
+  }
+}
 ---
 
 <Layout film={film} title={`${story.title} · ${current.label}`}>

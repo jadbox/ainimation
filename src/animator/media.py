@@ -10,27 +10,145 @@ from pathlib import Path
 from animator.config import FULL_VIDEO_NAME, TRANSITION_SECONDS
 from animator.models import SceneSegment
 
+import re
+
 logger = logging.getLogger("animator.media")
 
 
-def part_path(scene_dir: Path, segment: SceneSegment) -> Path:
-    """Return the clip file path for a given segment."""
-    return scene_dir / f"part-{segment.index}.mp4"
+def part_path(
+    scene_dir: Path, segment_or_index: int | SceneSegment, version: int | None = None
+) -> Path:
+    """Return the clip file path for a given segment and optional version."""
+    index = segment_or_index.index if isinstance(segment_or_index, SceneSegment) else segment_or_index
+    if version is None or version == 0:
+        return scene_dir / f"part-{index}.mp4"
+    return scene_dir / f"part-{index}-v{version}.mp4"
 
 
-def start_frame_path(scene_dir: Path, segment_index: int) -> Path:
-    """Return the first-frame image file path for a given segment index."""
-    return scene_dir / f"part-{segment_index}-start.jpg"
+def start_frame_path(
+    scene_dir: Path, segment_index: int, version: int | None = None
+) -> Path:
+    """Return the first-frame image file path for a given segment index and optional version."""
+    if version is None or version == 0:
+        return scene_dir / f"part-{segment_index}-start.jpg"
+    return scene_dir / f"part-{segment_index}-v{version}-start.jpg"
 
 
-def end_frame_path(scene_dir: Path, segment_index: int) -> Path:
-    """Return the last-frame image file path for a given segment index."""
-    return scene_dir / f"part-{segment_index}-end.jpg"
+def end_frame_path(
+    scene_dir: Path, segment_index: int, version: int | None = None
+) -> Path:
+    """Return the last-frame image file path for a given segment index and optional version."""
+    if version is None or version == 0:
+        return scene_dir / f"part-{segment_index}-end.jpg"
+    return scene_dir / f"part-{segment_index}-v{version}-end.jpg"
 
 
-def prompt_path(scene_dir: Path, segment_index: int) -> Path:
-    """Return the prompt markdown file path for a given segment index."""
-    return scene_dir / f"part-{segment_index}-prompt.md"
+def prompt_path(
+    scene_dir: Path, segment_index: int, version: int | None = None
+) -> Path:
+    """Return the prompt markdown file path for a given segment index and optional version."""
+    if version is None or version == 0:
+        return scene_dir / f"part-{segment_index}-prompt.md"
+    return scene_dir / f"part-{segment_index}-v{version}-prompt.md"
+
+
+def next_part_paths(
+    scene_dir: Path, segment_index: int
+) -> tuple[Path, Path, Path, Path]:
+    """Return the next available output video, start frame, end frame, and prompt paths for a segment.
+
+    If part-{N}.mp4 does not exist, returns base (v0) paths.
+    If it exists, searches for the first available -v1, -v2, etc.
+    """
+    base_video = part_path(scene_dir, segment_index)
+    base_start = start_frame_path(scene_dir, segment_index)
+    base_end = end_frame_path(scene_dir, segment_index)
+    base_prompt = prompt_path(scene_dir, segment_index)
+    if not base_video.exists():
+        return base_video, base_start, base_end, base_prompt
+
+    version = 1
+    while True:
+        v_video = part_path(scene_dir, segment_index, version=version)
+        v_start = start_frame_path(scene_dir, segment_index, version=version)
+        v_end = end_frame_path(scene_dir, segment_index, version=version)
+        v_prompt = prompt_path(scene_dir, segment_index, version=version)
+        if not v_video.exists():
+            return v_video, v_start, v_end, v_prompt
+        version += 1
+
+
+def latest_part_path(scene_dir: Path, segment_index: int) -> Path | None:
+    """Return the highest version video path for a segment index, or None if none exists."""
+    if not scene_dir.exists():
+        return None
+
+    pattern = re.compile(rf"^part-{segment_index}(?:-v(\d+))?\.mp4$")
+    highest_version = -1
+    highest_file: Path | None = None
+
+    for item in scene_dir.iterdir():
+        if not item.is_file():
+            continue
+        match = pattern.match(item.name)
+        if match:
+            ver = int(match.group(1)) if match.group(1) else 0
+            if ver > highest_version:
+                highest_version = ver
+                highest_file = item
+
+    return highest_file
+
+
+def latest_end_frame_path(scene_dir: Path, segment_index: int) -> Path | None:
+    """Return the end-frame image corresponding to the latest video version for a segment index."""
+    video = latest_part_path(scene_dir, segment_index)
+    if video is None:
+        return None
+
+    match = re.match(rf"^part-{segment_index}(?:-v(\d+))?\.mp4$", video.name)
+    version = int(match.group(1)) if (match and match.group(1)) else 0
+    frame = end_frame_path(scene_dir, segment_index, version=version)
+    if frame.exists():
+        return frame
+
+    # Fallback to base end frame if versioned is missing
+    base_frame = end_frame_path(scene_dir, segment_index)
+    if base_frame.exists():
+        return base_frame
+
+    # Legacy frame name
+    legacy_frame = scene_dir / f"part-{segment_index}.jpg"
+    if legacy_frame.exists():
+        return legacy_frame
+
+    # Extract from the latest video
+    if extract_last_frame(video, frame):
+        return frame
+    return None
+
+
+def latest_start_frame_path(scene_dir: Path, segment_index: int) -> Path | None:
+    """Return the start-frame image corresponding to the latest video version for a segment index."""
+    video = latest_part_path(scene_dir, segment_index)
+    if video is None:
+        return None
+
+    match = re.match(rf"^part-{segment_index}(?:-v(\d+))?\.mp4$", video.name)
+    version = int(match.group(1)) if (match and match.group(1)) else 0
+    frame = start_frame_path(scene_dir, segment_index, version=version)
+    if frame.exists():
+        return frame
+
+    # Fallback to base start frame
+    base_frame = start_frame_path(scene_dir, segment_index)
+    if base_frame.exists():
+        return base_frame
+
+    # Extract from the latest video
+    if extract_first_frame(video, frame):
+        return frame
+    return None
 
 
 def _extract_frame(video_path: Path, destination: Path, first: bool) -> bool:
@@ -81,28 +199,14 @@ def extract_last_frame(video_path: Path, destination: Path) -> bool:
 
 
 def previous_frame(scene_dir: Path, segment: SceneSegment) -> Path | None:
-    """Return the previous segment's last-frame image for continuity, if available.
-
-    Falls back to the legacy ``part-<N>.jpg`` naming, then to extracting the
-    frame from the previous segment's existing clip.
-    """
+    """Return the previous segment's last-frame image for continuity, if available."""
     if segment.index == 0:
         return None
     previous_index = segment.index - 1
-    frame = end_frame_path(scene_dir, previous_index)
-    if frame.exists():
+    frame = latest_end_frame_path(scene_dir, previous_index)
+    if frame and frame.exists():
         logger.info("Continuity: using previous segment's last frame %s", frame)
         return frame
-    legacy_frame = scene_dir / f"part-{previous_index}.jpg"
-    if legacy_frame.exists():
-        logger.info("Continuity: using legacy last-frame image %s", legacy_frame)
-        return legacy_frame
-    previous_video = scene_dir / f"part-{previous_index}.mp4"
-    if previous_video.exists():
-        logger.info("Continuity: extracting last frame from existing %s ...", previous_video)
-        if extract_last_frame(previous_video, frame):
-            return frame
-        return None
     logger.info(
         "Continuity: no part-%d-end.jpg or part-%d.mp4 found; generating segment %d "
         "without an opening continuity reference.",
@@ -114,22 +218,12 @@ def previous_frame(scene_dir: Path, segment: SceneSegment) -> Path | None:
 
 
 def next_frame(scene_dir: Path, segment: SceneSegment) -> Path | None:
-    """Return the next segment's first-frame image for closing continuity, if available.
-
-    Falls back to extracting it from the next segment's existing clip. Used when
-    regenerating a part so its final frame lines up with the following shot.
-    """
+    """Return the next segment's first-frame image for closing continuity, if available."""
     next_index = segment.index + 1
-    frame = start_frame_path(scene_dir, next_index)
-    if frame.exists():
+    frame = latest_start_frame_path(scene_dir, next_index)
+    if frame and frame.exists():
         logger.info("Continuity: using next segment's first frame %s", frame)
         return frame
-    next_video = scene_dir / f"part-{next_index}.mp4"
-    if next_video.exists():
-        logger.info("Continuity: extracting first frame from existing %s ...", next_video)
-        if extract_first_frame(next_video, frame):
-            return frame
-        return None
     logger.info(
         "Continuity: no part-%d-start.jpg or part-%d.mp4 found; generating segment %d "
         "without a closing continuity reference.",
@@ -241,14 +335,13 @@ def combine_parts(scene_dir: Path, segments: list[SceneSegment]) -> Path | None:
 
     part_files: list[Path] = []
     for segment in segments:
-        part = part_path(scene_dir, segment)
-        if part.exists():
+        part = latest_part_path(scene_dir, segment.index)
+        if part and part.exists():
             part_files.append(part)
         else:
             logger.warning(
-                "Part %d clip missing (%s); excluded from the combination.",
+                "Part %d clip missing; excluded from the combination.",
                 segment.index,
-                part,
             )
     if not part_files:
         raise RuntimeError(f"No part-*.mp4 clips found in {scene_dir} to combine.")

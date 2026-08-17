@@ -8,7 +8,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from films import film_animations_dir
+from animator.media import combine_parts
+from animator.script import find_scene_part_scripts, parse_segments
+from films import film_animations_dir, film_scripts_dir
 from movie_config import get_film, list_story_scenes, set_film
 
 FILM_VIDEO_NAME = "film.mp4"
@@ -16,12 +18,23 @@ FILM_THUMB_NAME = "film-thumb.jpg"
 
 
 def run(args: argparse.Namespace) -> int:
-    """Compose every available scene full video in story order."""
+    """Compose every available scene full video in story order, using highest version parts."""
     animations_dir = film_animations_dir(get_film())
     animations_dir.mkdir(parents=True, exist_ok=True)
+    scripts_dir = film_scripts_dir(get_film())
+
     scene_videos: list[Path] = []
     for story in list_story_scenes():
-        video = animations_dir / story.name / "full.mp4"
+        scene_dir = animations_dir / story.name
+        script_files = find_scene_part_scripts(scripts_dir, story.name)
+        if script_files:
+            segments = parse_segments(script_files)
+            try:
+                combine_parts(scene_dir, segments)
+            except Exception as e:
+                print(f"Note: Could not combine parts for {story.name}: {e}")
+
+        video = scene_dir / "full.mp4"
         if video.is_file():
             scene_videos.append(video)
         else:

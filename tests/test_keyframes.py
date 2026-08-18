@@ -82,9 +82,13 @@ class TestKeyframes(unittest.TestCase):
         self.assertIn("MRS BRISBY (<IMAGE_REF_0>)", prompt)
         self.assertIn("MR AGES (<IMAGE_REF_1>)", prompt)
         self.assertIn("<IMAGE_REF_BG>", prompt)
+        self.assertIn("Background Plate Reference (<IMAGE_REF_BG>)", prompt)
+        self.assertIn("MATCH the background reference plate (<IMAGE_REF_BG>) exactly", prompt)
         self.assertNotIn("<IMAGE_REF_PREV>", prompt)
         self.assertNotIn("<IMAGE_REF_AFTER>", prompt)
         self.assertIn("MANDATES:", prompt)
+        self.assertIn("STRICT BACKGROUND MATCHING:", prompt)
+        self.assertIn("STRICT CHARACTER MATCHING:", prompt)
         self.assertIn("1280x720", prompt)
 
     def test_build_keyframe_prompt_end_with_ref(self) -> None:
@@ -110,6 +114,8 @@ class TestKeyframes(unittest.TestCase):
         self.assertIn("Chronological Bridge Context", prompt)
         self.assertIn("Previous Reference Frame", prompt)
         self.assertIn("After / Next Reference Frame", prompt)
+        self.assertIn("STRICT BACKGROUND MATCHING:", prompt)
+        self.assertIn("STRICT CHARACTER MATCHING:", prompt)
 
     def test_resolve_ref_image_direct_and_relative(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -131,13 +137,13 @@ class TestKeyframes(unittest.TestCase):
 
     def test_run_without_ref_uses_none(self) -> None:
         with (
-            patch("keyframes.generate_keyframe") as mock_gen,
-            patch("keyframes.film_scripts_dir") as mock_scripts,
-            patch("keyframes.film_animations_dir") as mock_anims,
-            patch("keyframes.ensure_character_reference", return_value=Path("/tmp/char.jpg")),
-            patch("keyframes.ensure_background_plate", return_value=None),
-            patch("keyframes.find_scene_background_plate", return_value=None),
-            patch("keyframes.genai.Client"),
+            patch("keyframes.cli.generate_keyframe") as mock_gen,
+            patch("keyframes.cli.film_scripts_dir") as mock_scripts,
+            patch("keyframes.cli.film_animations_dir") as mock_anims,
+            patch("keyframes.cli.ensure_character_reference", return_value=Path("/tmp/char.jpg")),
+            patch("keyframes.cli.ensure_background_plate", return_value=None),
+            patch("keyframes.cli.find_scene_background_plate", return_value=None),
+            patch("keyframes.cli.genai.Client"),
             tempfile.TemporaryDirectory() as tmp_dir,
         ):
             scene_dir = Path(tmp_dir)
@@ -175,6 +181,53 @@ class TestKeyframes(unittest.TestCase):
             self.assertIsNone(mock_gen.call_args.kwargs["ref_prev"])
             self.assertIsNone(mock_gen.call_args.kwargs["ref_after"])
 
+    def test_run_with_ref_after_omits_background_plate(self) -> None:
+        with (
+            patch("keyframes.cli.generate_keyframe") as mock_gen,
+            patch("keyframes.cli.film_scripts_dir") as mock_scripts,
+            patch("keyframes.cli.film_animations_dir") as mock_anims,
+            patch("keyframes.cli.ensure_character_reference", return_value=Path("/tmp/char.jpg")),
+            patch("keyframes.cli.ensure_background_plate") as mock_ensure_bg,
+            patch("keyframes.cli.find_scene_background_plate") as mock_find_bg,
+            patch("keyframes.cli.genai.Client"),
+            tempfile.TemporaryDirectory() as tmp_dir,
+        ):
+            scene_dir = Path(tmp_dir)
+            mock_anims.return_value = scene_dir.parent
+            mock_scripts.return_value = scene_dir.parent / "scripts"
+            script_file = scene_dir.parent / "scripts" / "frisby_visits_mr_ages_part0.md"
+            script_file.parent.mkdir(parents=True, exist_ok=True)
+            script_file.write_text(
+                "Characters: Mrs Brisby\n\nintegrated_multimodal_description: [Shot 1]\n[0:00-0:10] Mrs Brisby stands.",
+                encoding="utf-8",
+            )
+
+            after_ref = scene_dir / "part-1-start-proposal.jpg"
+            after_ref.write_bytes(b"after_jpeg")
+
+            from argparse import Namespace
+            args = Namespace(
+                film="rats",
+                scene="frisby_visits_mr_ages",
+                parts=0,
+                type="start",
+                ref=None,
+                ref_prev=None,
+                ref_after=str(after_ref),
+                image_model="gemini-3.1-flash-image-preview",
+                output=str(scene_dir),
+                scripts_dir=None,
+                blueprint_dir=None,
+            )
+            ret = run(args)
+            self.assertEqual(ret, 0)
+            self.assertTrue(mock_gen.called)
+            # Background plate must not be found or passed when ref_after is supplied
+            self.assertFalse(mock_find_bg.called)
+            self.assertFalse(mock_ensure_bg.called)
+            self.assertIsNone(mock_gen.call_args.kwargs["background_plate"])
+            self.assertEqual(mock_gen.call_args.kwargs["ref_after"], after_ref.resolve())
+
     def test_cli_argument_parsing(self) -> None:
         with (
             patch(
@@ -192,7 +245,7 @@ class TestKeyframes(unittest.TestCase):
                     "custom_after_ref.jpg",
                 ],
             ),
-            patch("keyframes.run", return_value=0) as mock_run,
+            patch("keyframes.cli.run", return_value=0) as mock_run,
             self.assertRaises(SystemExit) as exit_ctx,
         ):
             main()
@@ -223,5 +276,67 @@ class TestKeyframes(unittest.TestCase):
         self.assertEqual(aspect_ratio_to_dimensions("3:4"), (720, 960))
 
 
+    def test_submodule_imports(self) -> None:
+        import keyframes.cli as kf_cli
+        import keyframes.generator as kf_gen
+        import keyframes.paths as kf_paths
+        import keyframes.prompt as kf_prompt
+
+        self.assertTrue(callable(kf_cli.main))
+        self.assertTrue(callable(kf_cli.run))
+        self.assertTrue(callable(kf_gen.generate_keyframe))
+        self.assertTrue(callable(kf_paths.proposal_path))
+        self.assertTrue(callable(kf_paths.resolve_ref_image))
+        self.assertTrue(callable(kf_prompt.build_keyframe_prompt))
+
+    def test_generate_keyframe_mocked(self) -> None:
+        from keyframes.generator import generate_keyframe
+
+        mock_client = MagicMock()
+        segment = SceneSegment(
+            index=0,
+            span="0:00-0:10",
+            body="[0:00-0:10] Mrs Brisby stands.",
+        )
+        with (
+            patch("keyframes.generator.generate_image", return_value=b"raw_bytes") as mock_img_gen,
+            patch("keyframes.generator.to_jpeg", return_value=b"jpeg_bytes") as mock_to_jpeg,
+            patch("keyframes.generator.save_jpeg") as mock_save,
+            tempfile.TemporaryDirectory() as tmp_dir,
+        ):
+            scene_dir = Path(tmp_dir)
+            out_path = scene_dir / "part-0-start-proposal.jpg"
+            prompt_path = scene_dir / "part-0-start-proposal-prompt.txt"
+            char_ref_img = scene_dir / "mrs_brisby.jpg"
+            char_ref_img.write_bytes(b"char_bytes")
+            bg_plate_img = scene_dir / "bg.jpg"
+            bg_plate_img.write_bytes(b"bg_bytes")
+            prev_ref_img = scene_dir / "prev.jpg"
+            prev_ref_img.write_bytes(b"prev_bytes")
+            after_ref_img = scene_dir / "after.jpg"
+            after_ref_img.write_bytes(b"after_bytes")
+
+            res = generate_keyframe(
+                client=mock_client,
+                model="gemini-3.1-flash-image-preview",
+                scene_name="frisby_visits_mr_ages",
+                segment=segment,
+                keyframe_type="start",
+                characters=["Mrs Brisby"],
+                character_refs=[("Mrs Brisby", char_ref_img)],
+                background_plate=bg_plate_img,
+                ref_prev=prev_ref_img,
+                ref_after=after_ref_img,
+                output_path=out_path,
+                prompt_file_path=prompt_path,
+            )
+            self.assertEqual(res, out_path)
+            self.assertTrue(prompt_path.is_file())
+            self.assertTrue(mock_img_gen.called)
+            self.assertTrue(mock_to_jpeg.called)
+            self.assertTrue(mock_save.called)
+
+
 if __name__ == "__main__":
     unittest.main()
+

@@ -45,6 +45,6 @@ def format_segment_base_prompt(
     # base-en.txt §4.1-4.4 & ref-en.txt §5.4: Compact preamble & strict mandates
     return f"""Characters appearing: {char_header_str}.
 Match designs EXACTLY to reference images; never use references as opening frames.
-MANDATES: One unbroken continuous shot — strictly NO cuts, jump cuts, or zoom jumps. Expressive theatrical acting with dynamic gestures and changing facial expressions for all visible characters. Declared speaker moves mouth; all others keep mouths closed.
+MANDATES: One unbroken continuous shot — strictly NO cuts, jump cuts, or zoom jumps. Lively character animation in every frame with dynamic gestures and continuously evolving facial expressions (expressions are never flat, dull, or static). Declared speaker moves mouth; all others keep mouths closed.
 
 {segment_body}"""

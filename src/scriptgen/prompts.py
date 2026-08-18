@@ -74,7 +74,7 @@ CHARACTER VOICES:
 
 ATTENTION ENGINEERING & DYNAMIC ANIMATION (required — every frame must feel alive and gripping):
 - HOOK (base-en.txt §4.1): open on action already in progress or visually arresting motion — never an empty room or a standing-still character. The first second is the scroll-stopper.
-- THEATRICAL ACTING & CONTINUOUS VITALITY (ref-en.txt §5.4): characters must NEVER freeze, stand limp, or move like stiff plastic toys with static features. Characters act out their roles like master theatre actors giving a full stage performance. In EVERY beat, explicitly describe what EVERY visible character is doing physically AND what their face is expressing (eyes wide/narrowed, eyebrows furrowed/raised, mouth/jaw tense/softened, reactive smiles, breathing). Never leave any character blank or static.
+- THEATRICAL ACTING & CONTINUOUS VITALITY (ref-en.txt §5.4): characters must NEVER freeze, stand limp, or move like stiff plastic toys with flat, dull, or static features. Characters act out their roles like master theatre actors giving a full, lively stage performance. In EVERY beat, explicitly describe what EVERY visible character is doing physically AND how their facial expressions are continuously animating and lively (eyes wide/narrowed, eyebrows furrowed/raised, mouth/jaw tense/softened, reactive smiles, breathing; expressions must NEVER be flat, dull, or static). Never leave any character blank or static.
 - DYNAMIC STAGING & SILHOUETTES: stage characters with expressive silhouettes, contrasting heights, and tactile physical interaction (holding a hand, supporting a back, soothing, gripping a prop).
 - ONE FOCAL POINT PER BEAT: direct the viewer's eye to the primary physical action, eyeline, or story object.
 - ESCALATION ACROSS PARTS: each part must raise stakes, intimacy, or intensity beyond the previous one.
@@ -246,8 +246,9 @@ def build_part0_prompt(
         "Write Segment 0 ONLY. Later parts are generated separately and will "
         "reference this output, so keep the shared sections self-contained and "
         "maximally concise. Obey every direction rule. In every timecoded beat, "
-        "spell out what EVERY character on screen is doing physically AND what their "
-        "face is expressing (theatrical acting; no plastic/static features). Keep camera "
+        "spell out what EVERY character on screen is doing physically AND how their "
+        "facial expressions are continuously animating (lively character animation in every frame; "
+        "expressions are never flat, dull, or static). Keep camera "
         "motion continuous and unbroken with strictly NO cuts or sudden zoom jumps. "
         f"HARD LIMIT: the Segment 0 body must stay at or under {MAX_SCRIPT_PROMPT_CHARS} characters "
         "so the total prompt remains under 1,350 characters."
@@ -294,8 +295,9 @@ def build_next_part_prompt(
         f"## Segment {part_index} ({span})\n<segment body>\n\n"
         "Do NOT restate the title, Logline, Characters, or Setting & Light. "
         "Follow all direction rules and MAXIMUM CONCISION. In every timecoded beat, "
-        "spell out what EVERY character on screen is doing physically AND what their "
-        "face is expressing (theatrical acting; no plastic/static features). Keep camera "
+        "spell out what EVERY character on screen is doing physically AND how their "
+        "facial expressions are continuously animating (lively character animation in every frame; "
+        "expressions are never flat, dull, or static). Keep camera "
         "motion continuous and unbroken with strictly NO cuts or sudden zoom jumps. "
         f"HARD LIMIT: the segment body must stay at or under {MAX_SCRIPT_PROMPT_CHARS} characters "
         "so the total prompt remains under 1,350 characters."
@@ -316,7 +318,7 @@ def build_critique_prompt(treatment: str, document: str) -> str:
         "- HOOK (does the first second stop a scrolling thumb? base-en.txt §4.1)\n"
         "- ESCALATION (is this segment more than the last, per the treatment ladder?)\n"
         "- ATTENTION CONTROL (is there one clear focal point per beat?)\n"
-        "- DYNAMISM & THEATRICAL ACTING (are all characters on screen continuously alive with expressive physical acting and changing facial expressions in EVERY beat, acting like great theatre actors with zero plastic/stiff doll-like stillness? ref-en.txt §5.4)\n"
+        "- DYNAMISM & THEATRICAL ACTING (are all characters on screen continuously alive with lively physical animation and constantly animating facial expressions in EVERY beat, never flat, dull, or static? ref-en.txt §5.4)\n"
         "- CAMERA CONTINUITY & NO CUTS (is it strictly one continuous unbroken shot with zero cuts, zero jump cuts, and zero sudden zoom jumps across beats? base-en.txt §3.2, §4.2-§4.3)\n"
         "- DIALOGUE ECONOMY (every line <=10 words, one job each, no deletable lines? base-en.txt §4.4)\n"
         "- LITERALNESS (only physical facts; no emotion labels, no invented numbers? ref-en.txt §5.4)\n"

@@ -9,7 +9,12 @@ import subprocess
 from pathlib import Path
 
 from animator.media import combine_parts
-from animator.script import find_scene_part_scripts, parse_segments
+from animator.models import SceneSegment
+from animator.script import (
+    find_scene_part_scripts,
+    parse_segments,
+    strip_html_comments,
+)
 from films import film_animations_dir, film_scripts_dir
 from movie_config import get_film, list_story_scenes, set_film
 
@@ -28,11 +33,27 @@ def run(args: argparse.Namespace) -> int:
         scene_dir = animations_dir / story.name
         script_files = find_scene_part_scripts(scripts_dir, story.name)
         if script_files:
-            segments = parse_segments(script_files)
+            segments = [
+                SceneSegment(
+                    index=idx,
+                    span="",
+                    body=strip_html_comments(path.read_text(encoding="utf-8")),
+                )
+                for idx, path in script_files
+            ]
             try:
                 combine_parts(scene_dir, segments)
             except Exception as e:
                 print(f"Note: Could not combine parts for {story.name}: {e}")
+        else:
+            legacy_path = scripts_dir / f"{story.name}.md"
+            if legacy_path.is_file():
+                script = strip_html_comments(legacy_path.read_text(encoding="utf-8"))
+                segments = parse_segments(script)
+                try:
+                    combine_parts(scene_dir, segments)
+                except Exception as e:
+                    print(f"Note: Could not combine parts for {story.name}: {e}")
 
         video = scene_dir / "full.mp4"
         if video.is_file():

@@ -91,17 +91,10 @@ const hasEndOptions =
                   class="frame-choice-tile group relative flex flex-col justify-between overflow-hidden rounded-lg border border-line bg-panel/70 p-2.5 transition-all hover:border-slate-400"
                 >
                   <div class="relative">
-                    <button
-                      type="button"
-                      data-preview-image
-                      data-src={animationFileUrl(film, name, prop.filename)}
-                      data-title={`Part ${part} Start ${prop.label}`}
-                      data-path={prop.path}
-                      data-part={part}
-                      data-kind="start"
-                      data-value={prop.path}
+                    <a
+                      href={`/${film}/frame/${name}/${prop.filename}`}
                       class="relative block w-full text-left"
-                      title="Click to open full preview"
+                      title="Click to open full preview with metadata"
                     >
                       <div class="relative overflow-hidden rounded">
                         <img
@@ -114,7 +107,7 @@ const hasEndOptions =
                           🔍 Preview
                         </span>
                       </div>
-                    </button>
+                    </a>
 
                     <button
                       type="button"
@@ -166,21 +159,10 @@ const hasEndOptions =
                 data-value={previousFrame!}
                 class="frame-choice-tile group relative flex flex-col justify-between overflow-hidden rounded-lg border border-line bg-panel/70 p-2.5 transition-all hover:border-slate-400"
               >
-                <button
-                  type="button"
-                  data-preview-image
-                  data-src={animationFileUrl(
-                    film,
-                    previousStory!.name,
-                    `part-${previousPart}-end.jpg`
-                  )}
-                  data-title={`Previous Scene Closing Frame (${previousStory?.title})`}
-                  data-path={previousFrame!}
-                  data-part={part}
-                  data-kind="start"
-                  data-value={previousFrame!}
+                <a
+                  href={`/${film}/frame/${previousStory!.name}/part-${previousPart}-end.jpg`}
                   class="relative block w-full text-left"
-                  title="Click to open full preview"
+                  title="Click to open full preview with metadata"
                 >
                   <div class="relative overflow-hidden rounded">
                     <img
@@ -197,7 +179,7 @@ const hasEndOptions =
                       🔍 Preview
                     </span>
                   </div>
-                </button>
+                </a>
                 <div class="mt-2">
                   <span class="block truncate text-xs font-semibold text-slate-200">
                     Match Prev Scene
@@ -231,17 +213,10 @@ const hasEndOptions =
                 data-value={`films/${film}/out/animations/${name}/${priorSegment.endThumb}`}
                 class="frame-choice-tile group relative flex flex-col justify-between overflow-hidden rounded-lg border border-line bg-panel/70 p-2.5 transition-all hover:border-slate-400"
               >
-                <button
-                  type="button"
-                  data-preview-image
-                  data-src={animationFileUrl(film, name, priorSegment.endThumb)}
-                  data-title={`Part ${part - 1} End Frame`}
-                  data-path={`films/${film}/out/animations/${name}/${priorSegment.endThumb}`}
-                  data-part={part}
-                  data-kind="start"
-                  data-value={`films/${film}/out/animations/${name}/${priorSegment.endThumb}`}
+                <a
+                  href={`/${film}/frame/${name}/${priorSegment.endThumb}`}
                   class="relative block w-full text-left"
-                  title="Click to open full preview"
+                  title="Click to open full preview with metadata"
                 >
                   <div class="relative overflow-hidden rounded">
                     <img
@@ -254,7 +229,7 @@ const hasEndOptions =
                       🔍 Preview
                     </span>
                   </div>
-                </button>
+                </a>
                 <div class="mt-2">
                   <span class="block truncate text-xs font-semibold text-slate-200">
                     Part {part - 1} End Frame
@@ -291,17 +266,10 @@ const hasEndOptions =
                   class="frame-choice-tile group relative flex flex-col justify-between overflow-hidden rounded-lg border border-line bg-panel/70 p-2.5 transition-all hover:border-slate-400"
                 >
                   <div class="relative">
-                    <button
-                      type="button"
-                      data-preview-image
-                      data-src={animationFileUrl(film, name, prop.filename)}
-                      data-title={`Part ${part - 1} End ${prop.label}`}
-                      data-path={prop.path}
-                      data-part={part}
-                      data-kind="start"
-                      data-value={prop.path}
+                    <a
+                      href={`/${film}/frame/${name}/${prop.filename}`}
                       class="relative block w-full text-left"
-                      title="Click to open full preview"
+                      title="Click to open full preview with metadata"
                     >
                       <div class="relative overflow-hidden rounded">
                         <img
@@ -314,7 +282,7 @@ const hasEndOptions =
                           🔍 Preview
                         </span>
                       </div>
-                    </button>
+                    </a>
 
                     <button
                       type="button"
@@ -415,16 +383,10 @@ const hasEndOptions =
                   class="frame-choice-tile group relative flex flex-col justify-between overflow-hidden rounded-lg border border-line bg-panel/70 p-2.5 transition-all hover:border-slate-400"
                 >
                   <div class="relative">
-                    <button
-                      type="button"
-                      data-preview-image
-                      data-src={animationFileUrl(film, name, prop.filename)}
-                      data-title={`Part ${part} End ${prop.label}`}
-                      data-path={prop.path}
-                      data-kind="end"
-                      data-value={prop.path}
+                    <a
+                      href={`/${film}/frame/${name}/${prop.filename}`}
                       class="relative block w-full text-left"
-                      title="Click to open full preview"
+                      title="Click to open full preview with metadata"
                     >
                       <div class="relative overflow-hidden rounded">
                         <img
@@ -437,7 +399,7 @@ const hasEndOptions =
                           🔍 Preview
                         </span>
                       </div>
-                    </button>
+                    </a>
 
                     <button
                       type="button"
@@ -489,21 +451,10 @@ const hasEndOptions =
                 data-value={nextFrame!}
                 class="frame-choice-tile group relative flex flex-col justify-between overflow-hidden rounded-lg border border-line bg-panel/70 p-2.5 transition-all hover:border-slate-400"
               >
-                <button
-                  type="button"
-                  data-preview-image
-                  data-src={animationFileUrl(
-                    film,
-                    nextStory!.name,
-                    `part-${nextPart}-start.jpg`
-                  )}
-                  data-title={`Next Scene Opening Frame (${nextStory?.title})`}
-                  data-path={nextFrame!}
-                  data-part={part}
-                  data-kind="end"
-                  data-value={nextFrame!}
+                <a
+                  href={`/${film}/frame/${nextStory!.name}/part-${nextPart}-start.jpg`}
                   class="relative block w-full text-left"
-                  title="Click to open full preview"
+                  title="Click to open full preview with metadata"
                 >
                   <div class="relative overflow-hidden rounded">
                     <img
@@ -520,7 +471,7 @@ const hasEndOptions =
                       🔍 Preview
                     </span>
                   </div>
-                </button>
+                </a>
                 <div class="mt-2">
                   <span class="block truncate text-xs font-semibold text-slate-200">
                     Match Next Scene
@@ -554,17 +505,10 @@ const hasEndOptions =
                 data-value={`films/${film}/out/animations/${name}/${nextSegment.startThumb}`}
                 class="frame-choice-tile group relative flex flex-col justify-between overflow-hidden rounded-lg border border-line bg-panel/70 p-2.5 transition-all hover:border-slate-400"
               >
-                <button
-                  type="button"
-                  data-preview-image
-                  data-src={animationFileUrl(film, name, nextSegment.startThumb)}
-                  data-title={`Part ${part + 1} Start Frame`}
-                  data-path={`films/${film}/out/animations/${name}/${nextSegment.startThumb}`}
-                  data-part={part}
-                  data-kind="end"
-                  data-value={`films/${film}/out/animations/${name}/${nextSegment.startThumb}`}
+                <a
+                  href={`/${film}/frame/${name}/${nextSegment.startThumb}`}
                   class="relative block w-full text-left"
-                  title="Click to open full preview"
+                  title="Click to open full preview with metadata"
                 >
                   <div class="relative overflow-hidden rounded">
                     <img
@@ -577,7 +521,7 @@ const hasEndOptions =
                       🔍 Preview
                     </span>
                   </div>
-                </button>
+                </a>
                 <div class="mt-2">
                   <span class="block truncate text-xs font-semibold text-slate-200">
                     Part {part + 1} Start Frame
@@ -614,16 +558,10 @@ const hasEndOptions =
                   class="frame-choice-tile group relative flex flex-col justify-between overflow-hidden rounded-lg border border-line bg-panel/70 p-2.5 transition-all hover:border-slate-400"
                 >
                   <div class="relative">
-                    <button
-                      type="button"
-                      data-preview-image
-                      data-src={animationFileUrl(film, name, prop.filename)}
-                      data-title={`Part ${part + 1} Start ${prop.label}`}
-                      data-path={prop.path}
-                      data-kind="end"
-                      data-value={prop.path}
+                    <a
+                      href={`/${film}/frame/${name}/${prop.filename}`}
                       class="relative block w-full text-left"
-                      title="Click to open full preview"
+                      title="Click to open full preview with metadata"
                     >
                       <div class="relative overflow-hidden rounded">
                         <img
@@ -636,7 +574,7 @@ const hasEndOptions =
                           🔍 Preview
                         </span>
                       </div>
-                    </button>
+                    </a>
 
                     <button
                       type="button"

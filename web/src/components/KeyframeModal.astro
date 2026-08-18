@@ -1,0 +1,372 @@
+---
+/**
+ * KeyframeModal.astro
+ * 
+ * Interactive modal dialog for configuring and generating keyframe proposals.
+ * Provides controls for:
+ * 1. Proposal target selection (Start frame, Last frame, or Both).
+ * 2. Previous frame continuity reference selection (--ref-prev).
+ * 3. Subsequent frame continuity reference selection (--ref-after).
+ * 4. Custom file path inputs for references.
+ * 5. Live CLI command preview (`uv run keyframes ...`).
+ * 6. Direct execution via the integrated web CLI terminal.
+ */
+---
+
+<div
+  id="keyframe-modal"
+  class="fixed inset-0 z-50 hidden items-center justify-center bg-black/75 p-4 backdrop-blur-sm"
+  role="dialog"
+  aria-modal="true"
+  aria-label="Generate Keyframe Proposal"
+>
+  <div class="flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-xl border border-line bg-panel shadow-2xl">
+    <div class="flex items-center justify-between border-b border-line bg-ink/70 px-5 py-3.5">
+      <div>
+        <h3 id="keyframe-modal-title" class="font-display text-lg text-amber-soft">
+          Generate Keyframe Proposal
+        </h3>
+        <p id="keyframe-modal-subtitle" class="font-mono text-xs text-muted">
+          Part 0
+        </p>
+      </div>
+      <button
+        type="button"
+        id="keyframe-modal-close-x"
+        class="rounded p-1 text-muted hover:text-slate-200 transition-colors"
+        aria-label="Close"
+      >
+        &times;
+      </button>
+    </div>
+
+    <div class="space-y-4 overflow-y-auto px-5 py-4 text-sm">
+      <div>
+        <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted">
+          Proposal Target
+        </label>
+        <div class="grid grid-cols-3 gap-2">
+          <label class="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-line bg-ink/40 p-3 text-center transition-all hover:border-amber-key/50 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-950/20 has-[:checked]:ring-2 has-[:checked]:ring-emerald-500/40">
+            <input type="radio" name="keyframe-modal-target" value="start" checked class="sr-only" />
+            <span class="text-xs font-semibold text-slate-200">Start Frame</span>
+            <span class="mt-0.5 text-[10px] text-muted">0:00 Mark</span>
+          </label>
+          <label class="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-line bg-ink/40 p-3 text-center transition-all hover:border-amber-key/50 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-950/20 has-[:checked]:ring-2 has-[:checked]:ring-emerald-500/40">
+            <input type="radio" name="keyframe-modal-target" value="end" class="sr-only" />
+            <span class="text-xs font-semibold text-slate-200">Last Frame</span>
+            <span class="mt-0.5 text-[10px] text-muted">Final Pose</span>
+          </label>
+          <label class="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-line bg-ink/40 p-3 text-center transition-all hover:border-amber-key/50 has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-950/20 has-[:checked]:ring-2 has-[:checked]:ring-emerald-500/40">
+            <input type="radio" name="keyframe-modal-target" value="both" class="sr-only" />
+            <span class="text-xs font-semibold text-slate-200">Both</span>
+            <span class="mt-0.5 text-[10px] text-muted">Start & End</span>
+          </label>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div>
+          <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted">
+            Previous Reference (--ref-prev)
+          </label>
+          <select
+            id="keyframe-modal-ref-prev-select"
+            class="w-full rounded-lg border border-line bg-ink/60 px-3 py-2 text-xs text-slate-200 focus:border-amber-key focus:outline-none"
+          >
+            <option value="">None</option>
+          </select>
+          <input
+            type="text"
+            id="keyframe-modal-custom-ref-prev"
+            placeholder="Or custom previous ref..."
+            class="mt-2 w-full rounded-lg border border-line bg-ink/60 px-3 py-2 font-mono text-xs text-slate-200 placeholder:text-muted/60 focus:border-amber-key focus:outline-none"
+          />
+        </div>
+
+        <div>
+          <label class="mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted">
+            Next Reference (--ref-after)
+          </label>
+          <select
+            id="keyframe-modal-ref-after-select"
+            class="w-full rounded-lg border border-line bg-ink/60 px-3 py-2 text-xs text-slate-200 focus:border-amber-key focus:outline-none"
+          >
+            <option value="">None</option>
+          </select>
+          <input
+            type="text"
+            id="keyframe-modal-custom-ref-after"
+            placeholder="Or custom next ref..."
+            class="mt-2 w-full rounded-lg border border-line bg-ink/60 px-3 py-2 font-mono text-xs text-slate-200 placeholder:text-muted/60 focus:border-amber-key focus:outline-none"
+          />
+        </div>
+      </div>
+
+      <div class="rounded-lg border border-line bg-ink/70 p-3">
+        <span class="block font-mono text-[11px] text-teal-shadow break-all" id="keyframe-modal-cmd-preview">
+          uv run keyframes --film ...
+        </span>
+      </div>
+    </div>
+
+    <div class="flex items-center justify-end gap-2 border-t border-line bg-ink/40 px-5 py-3">
+      <button
+        type="button"
+        id="keyframe-modal-cancel"
+        class="rounded-md px-3 py-1.5 text-xs text-muted ring-1 ring-line hover:text-slate-200 transition-colors"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        id="keyframe-modal-submit"
+        class="rounded-md bg-amber-key/20 px-3.5 py-1.5 text-xs font-medium text-amber-soft ring-1 ring-amber-key/50 hover:bg-amber-key/30 transition-colors"
+      >
+        Generate Proposal in Terminal
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  import { openCLITerminal } from "./cli-terminal";
+  import { getPartFrameState } from "./frame-selection";
+
+  const keyframeModal = document.getElementById("keyframe-modal") as HTMLDivElement | null;
+  const modalTitle = document.getElementById("keyframe-modal-title");
+  const modalSubtitle = document.getElementById("keyframe-modal-subtitle");
+  const modalCloseX = document.getElementById("keyframe-modal-close-x");
+  const modalCancel = document.getElementById("keyframe-modal-cancel");
+  const modalSubmit = document.getElementById("keyframe-modal-submit");
+  const modalRefPrevSelect = document.getElementById("keyframe-modal-ref-prev-select") as HTMLSelectElement | null;
+  const modalCustomRefPrev = document.getElementById("keyframe-modal-custom-ref-prev") as HTMLInputElement | null;
+  const modalRefAfterSelect = document.getElementById("keyframe-modal-ref-after-select") as HTMLSelectElement | null;
+  const modalCustomRefAfter = document.getElementById("keyframe-modal-custom-ref-after") as HTMLInputElement | null;
+  const modalCmdPreview = document.getElementById("keyframe-modal-cmd-preview");
+
+  let activeModalPart = 0;
+  let activeModalFilm = "";
+  let activeModalName = "";
+
+  function updateKeyframeCommandPreview(): void {
+    if (!modalCmdPreview) return;
+    const targetInput = document.querySelector<HTMLInputElement>(
+      'input[name="keyframe-modal-target"]:checked'
+    );
+    const targetType = targetInput?.value || "start";
+    const refPrevVal = modalCustomRefPrev?.value.trim() || modalRefPrevSelect?.value || "";
+    const refAfterVal = modalCustomRefAfter?.value.trim() || modalRefAfterSelect?.value || "";
+
+    const cmd = [
+      `uv run keyframes --film ${activeModalFilm} --scene ${activeModalName} --parts ${activeModalPart} --type ${targetType}`,
+      refPrevVal ? `--ref-prev ${refPrevVal}` : "",
+      refAfterVal ? `--ref-after ${refAfterVal}` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    modalCmdPreview.textContent = cmd;
+  }
+
+  function populateModalRefOptions(part: number, _targetType: "start" | "end" | "both"): void {
+    if (!modalRefPrevSelect || !modalRefAfterSelect) return;
+    modalRefPrevSelect.innerHTML = "";
+    modalRefAfterSelect.innerHTML = "";
+
+    const addedPrev = new Set<string>();
+    function addPrevOption(val: string, label: string) {
+      if (!val || addedPrev.has(val)) return;
+      addedPrev.add(val);
+      const opt = document.createElement("option");
+      opt.value = val;
+      opt.textContent = label;
+      modalRefPrevSelect!.appendChild(opt);
+    }
+
+    const addedAfter = new Set<string>();
+    function addAfterOption(val: string, label: string) {
+      if (!val || addedAfter.has(val)) return;
+      addedAfter.add(val);
+      const opt = document.createElement("option");
+      opt.value = val;
+      opt.textContent = label;
+      modalRefAfterSelect!.appendChild(opt);
+    }
+
+    const noneOptPrev = document.createElement("option");
+    noneOptPrev.value = "";
+    noneOptPrev.textContent = "None";
+    modalRefPrevSelect.appendChild(noneOptPrev);
+
+    const noneOptAfter = document.createElement("option");
+    noneOptAfter.value = "";
+    noneOptAfter.textContent = "None";
+    modalRefAfterSelect.appendChild(noneOptAfter);
+
+    // Populate PREVIOUS reference options
+    if (part > 0) {
+      const prevEndSelected = getPartFrameState(part - 1).frameEnd;
+      if (prevEndSelected) {
+        addPrevOption(prevEndSelected, `Part ${part - 1} Selected Last Frame (${prevEndSelected.split("/").pop()})`);
+      }
+      document.querySelectorAll<HTMLElement>(
+        `[data-frame-selector="end"][data-part="${part - 1}"] [data-tile-container]`
+      ).forEach((tile) => {
+        const val = tile.dataset.value;
+        const label = tile.querySelector("span.text-xs")?.textContent?.trim() || val?.split("/").pop();
+        if (val) addPrevOption(val, `Part ${part - 1} Last Frame: ${label} (${val.split("/").pop()})`);
+      });
+      addPrevOption(`part-${part - 1}-end-proposal.jpg`, `Part ${part - 1} End Proposal (part-${part - 1}-end-proposal.jpg)`);
+      addPrevOption(`part-${part - 1}-end.jpg`, `Part ${part - 1} End Frame (part-${part - 1}-end.jpg)`);
+    } else {
+      const prevSceneTile = document.querySelector<HTMLElement>(
+        `[data-frame-selector="start"][data-part="0"] [data-tile-container][data-value*="part-"][data-value*="-end.jpg"]`
+      );
+      if (prevSceneTile?.dataset.value) {
+        addPrevOption(prevSceneTile.dataset.value, `Previous Scene End Frame (${prevSceneTile.dataset.value.split("/").pop()})`);
+      }
+    }
+
+    const currentStartSelected = getPartFrameState(part).frameStart;
+    if (currentStartSelected) {
+      addPrevOption(currentStartSelected, `Current Part ${part} Selected Start Frame (${currentStartSelected.split("/").pop()})`);
+    }
+    document.querySelectorAll<HTMLElement>(
+      `[data-frame-selector="start"][data-part="${part}"] [data-tile-container]`
+    ).forEach((tile) => {
+      const val = tile.dataset.value;
+      const label = tile.querySelector("span.text-xs")?.textContent?.trim() || val?.split("/").pop();
+      if (val) addPrevOption(val, `Current Part ${part} Start Frame: ${label} (${val.split("/").pop()})`);
+    });
+    addPrevOption(`part-${part}-start-proposal.jpg`, `Current Part ${part} Start Proposal (part-${part}-start-proposal.jpg)`);
+    addPrevOption(`part-${part}-start.jpg`, `Current Part ${part} Start Frame (part-${part}-start.jpg)`);
+
+    // Populate AFTER reference options
+    const currentEndSelected = getPartFrameState(part).frameEnd;
+    if (currentEndSelected) {
+      addAfterOption(currentEndSelected, `Current Part ${part} Selected Last Frame (${currentEndSelected.split("/").pop()})`);
+    }
+    document.querySelectorAll<HTMLElement>(
+      `[data-frame-selector="end"][data-part="${part}"] [data-tile-container]`
+    ).forEach((tile) => {
+      const val = tile.dataset.value;
+      const label = tile.querySelector("span.text-xs")?.textContent?.trim() || val?.split("/").pop();
+      if (val) addAfterOption(val, `Current Part ${part} Last Frame: ${label} (${val.split("/").pop()})`);
+    });
+    addAfterOption(`part-${part}-end-proposal.jpg`, `Current Part ${part} End Proposal (part-${part}-end-proposal.jpg)`);
+    addAfterOption(`part-${part}-end.jpg`, `Current Part ${part} End Frame (part-${part}-end.jpg)`);
+
+    const nextStartSelected = getPartFrameState(part + 1).frameStart;
+    if (nextStartSelected) {
+      addAfterOption(nextStartSelected, `Part ${part + 1} Selected Start Frame (${nextStartSelected.split("/").pop()})`);
+    }
+    document.querySelectorAll<HTMLElement>(
+      `[data-frame-selector="start"][data-part="${part + 1}"] [data-tile-container]`
+    ).forEach((tile) => {
+      const val = tile.dataset.value;
+      const label = tile.querySelector("span.text-xs")?.textContent?.trim() || val?.split("/").pop();
+      if (val) addAfterOption(val, `Part ${part + 1} Start Frame: ${label} (${val.split("/").pop()})`);
+    });
+    addAfterOption(`part-${part + 1}-start-proposal.jpg`, `Part ${part + 1} Start Proposal (part-${part + 1}-start-proposal.jpg)`);
+    addAfterOption(`part-${part + 1}-start.jpg`, `Part ${part + 1} Start Frame (part-${part + 1}-start.jpg)`);
+  }
+
+  export function openKeyframeModal(
+    film: string,
+    name: string,
+    part: number,
+    preselectedType: "start" | "end" | "both" = "start"
+  ): void {
+    activeModalFilm = film;
+    activeModalName = name;
+    activeModalPart = part;
+
+    if (modalTitle) modalTitle.textContent = `Generate Keyframe Proposal`;
+    if (modalSubtitle) modalSubtitle.textContent = `Part ${part} · ${name}`;
+
+    const radio = document.querySelector<HTMLInputElement>(
+      `input[name="keyframe-modal-target"][value="${preselectedType}"]`
+    );
+    if (radio) radio.checked = true;
+
+    populateModalRefOptions(part, preselectedType);
+    if (modalCustomRefPrev) modalCustomRefPrev.value = "";
+    if (modalCustomRefAfter) modalCustomRefAfter.value = "";
+
+    updateKeyframeCommandPreview();
+
+    if (keyframeModal) {
+      keyframeModal.classList.remove("hidden");
+      keyframeModal.classList.add("flex");
+    }
+  }
+
+  export function closeKeyframeModal(): void {
+    if (keyframeModal) {
+      keyframeModal.classList.add("hidden");
+      keyframeModal.classList.remove("flex");
+    }
+  }
+
+  // Bind trigger buttons for opening keyframe modal
+  document.querySelectorAll<HTMLButtonElement>("[data-trigger-keyframe]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const type = (btn.dataset.triggerKeyframe as "start" | "end") || "start";
+      openKeyframeModal(btn.dataset.film!, btn.dataset.name!, Number(btn.dataset.part), type);
+    });
+  });
+
+  modalCloseX?.addEventListener("click", closeKeyframeModal);
+  modalCancel?.addEventListener("click", closeKeyframeModal);
+  keyframeModal?.addEventListener("click", (e) => {
+    if (e.target === keyframeModal) closeKeyframeModal();
+  });
+
+  document.querySelectorAll('input[name="keyframe-modal-target"]').forEach((el) => {
+    el.addEventListener("change", () => {
+      const targetInput = document.querySelector<HTMLInputElement>(
+        'input[name="keyframe-modal-target"]:checked'
+      );
+      const targetType = (targetInput?.value as "start" | "end" | "both") || "start";
+      populateModalRefOptions(activeModalPart, targetType);
+      updateKeyframeCommandPreview();
+    });
+  });
+
+  modalRefPrevSelect?.addEventListener("change", updateKeyframeCommandPreview);
+  modalCustomRefPrev?.addEventListener("input", updateKeyframeCommandPreview);
+  modalRefAfterSelect?.addEventListener("change", updateKeyframeCommandPreview);
+  modalCustomRefAfter?.addEventListener("input", updateKeyframeCommandPreview);
+
+  modalSubmit?.addEventListener("click", () => {
+    const targetInput = document.querySelector<HTMLInputElement>(
+      'input[name="keyframe-modal-target"]:checked'
+    );
+    const targetType = (targetInput?.value as "start" | "end" | "both") || "start";
+    const refPrevVal = modalCustomRefPrev?.value.trim() || modalRefPrevSelect?.value || "";
+    const refAfterVal = modalCustomRefAfter?.value.trim() || modalRefAfterSelect?.value || "";
+
+    const command = [
+      `uv run keyframes --film ${activeModalFilm} --scene ${activeModalName} --parts ${activeModalPart} --type ${targetType}`,
+      refPrevVal ? `--ref-prev ${refPrevVal}` : "",
+      refAfterVal ? `--ref-after ${refAfterVal}` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    closeKeyframeModal();
+
+    openCLITerminal({
+      url: "/api/keyframes",
+      body: {
+        film: activeModalFilm,
+        name: activeModalName,
+        parts: activeModalPart,
+        type: targetType,
+        refPrev: refPrevVal || undefined,
+        refAfter: refAfterVal || undefined,
+      },
+      command,
+    });
+  });
+</script>

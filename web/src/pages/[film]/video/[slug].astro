@@ -1,6 +1,7 @@
 ---
 import Layout from "../../../layouts/Base.astro";
-import { animationFileUrl, isValidFilm, loadMovie, sceneVideos } from "../../../lib/movie";
+import CommandMetadata from "../../../components/CommandMetadata.astro";
+import { animationFileUrl, isValidFilm, loadMovie, readVideoMetadata, sceneVideos } from "../../../lib/movie";
 
 export const prerender = false;
 
@@ -44,6 +45,7 @@ if (!current) {
 
 const videoUrl = animationFileUrl(film, sceneName, current.file);
 const posterUrl = current.thumb ? animationFileUrl(film, sceneName, current.thumb) : undefined;
+const metadata = readVideoMetadata(film, sceneName, current.file);
 
 const related: { href: string; label: string; thumb: string | null; active: boolean }[] = [];
 if (videos.full) {
@@ -111,6 +113,9 @@ for (const s of videos.segments) {
     <video controls class="w-full max-h-[1366px] object-contain" src={videoUrl} poster={posterUrl}></video>
   </figure>
 
+  {/* Reusable Collapsible CLI Command & Execution Logs Inspector */}
+  <CommandMetadata metadata={metadata} title="CLI Command" />
+
   {related.length > 1 && (
     <section class="mt-6">
       <h2 class="mb-2 text-xs font-medium uppercase tracking-wider text-muted">All videos</h2>
@@ -165,7 +170,7 @@ for (const s of videos.segments) {
     const confirmed = await confirmModal({
       title: "Delete Generated Video",
       message: `Are you sure you want to delete "${filename}"?`,
-      details: "This will delete the video file along with its generated start/end frame thumbnails and prompt file.",
+      details: "This will delete the video file along with its generated start/end frame thumbnails, metadata file, and prompt file.",
       confirmLabel: "Delete Video",
       variant: "danger",
     });

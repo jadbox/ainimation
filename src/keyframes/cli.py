@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import argparse
+import io
 import logging
 import os
+import shlex
+import sys
 from pathlib import Path
 
 from google import genai
@@ -30,133 +33,184 @@ from movie_config import get_film, set_film
 
 logger = logging.getLogger("keyframes")
 
+log_capture_stream = io.StringIO()
+log_capture_handler = logging.StreamHandler(log_capture_stream)
+log_capture_handler.setFormatter(
+    logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s", datefmt="%H:%M:%S")
+)
+
+
+def ensure_log_capture() -> None:
+    root = logging.getLogger()
+    if log_capture_handler not in root.handlers:
+        root.addHandler(log_capture_handler)
+
+
+def get_invocation_cmd() -> str:
+    """Return the full CLI command used to call keyframes."""
+    argv = list(sys.argv)
+    if not argv:
+        return "uv run keyframes"
+    prog = Path(argv[0]).name
+    if prog in ("keyframes", "keyframes.py", "keyframe.py", "cli.py", "__main__.py"):
+        args = argv[1:]
+        if args:
+            return f"uv run keyframes {shlex.join(args)}"
+        return "uv run keyframes"
+    return shlex.join(argv)
+
+
+def format_keyframe_metadata_text(cmd: str, logs: str) -> str:
+    """Format metadata text file with the starting CLI command and an <OUTPUT> section."""
+    cleaned_logs = logs.strip()
+    return f"{cmd}\n\n<OUTPUT>\n{cleaned_logs}\n</OUTPUT>\n"
+
+
+def write_keyframe_metadata(image_path: Path, cmd: str, logs: str) -> Path:
+    """Write the keyframe proposal's accompanying .txt metadata file."""
+    txt_path = image_path.with_suffix(".txt")
+    txt_path.write_text(format_keyframe_metadata_text(cmd, logs), encoding="utf-8")
+    return txt_path
+
 
 def run(args: argparse.Namespace) -> int:
     """Execute the keyframe proposal generation pipeline."""
-    gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-    if not gemini_key:
-        require_environment("GEMINI_API_KEY", "GOOGLE_API_KEY")
+    ensure_log_capture()
+    cmd = get_invocation_cmd()
+    generated_images: list[Path] = []
 
-    client = genai.Client(api_key=gemini_key)
+    try:
+        gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+        if not gemini_key:
+            require_environment("GEMINI_API_KEY", "GOOGLE_API_KEY")
 
-    default_scripts_dir = film_scripts_dir(get_film())
-    scripts_dir = Path(args.scripts_dir) if args.scripts_dir else default_scripts_dir
-    part_scripts = find_scene_part_scripts(scripts_dir, args.scene)
+        client = genai.Client(api_key=gemini_key)
 
-    if not part_scripts:
-        legacy_path = scripts_dir / f"{args.scene}.md"
-        if legacy_path.is_file():
-            script = strip_html_comments(legacy_path.read_text(encoding="utf-8"))
-            segments = parse_segments(script)
-            logger.info("Loaded legacy scene script: %s", legacy_path)
-        else:
-            expected_file = scripts_dir / f"{args.scene}_part0.md"
-            raise RuntimeError(
-                f"Scene script {expected_file} not found. "
-                f"Generate it first with: uv run scene-script --name \"{args.scene}\""
-            )
-    else:
-        segments = [
-            SceneSegment(
-                index=idx, span="", body=strip_html_comments(path.read_text(encoding="utf-8"))
-            )
-            for idx, path in part_scripts
-        ]
-        logger.info("Loaded %d scene segment script(s) for %r", len(segments), args.scene)
+        default_scripts_dir = film_scripts_dir(get_film())
+        scripts_dir = Path(args.scripts_dir) if args.scripts_dir else default_scripts_dir
+        part_scripts = find_scene_part_scripts(scripts_dir, args.scene)
 
-    default_animations_dir = film_animations_dir(get_film())
-    scene_dir = Path(args.output) if args.output else default_animations_dir / args.scene
-    scene_dir.mkdir(parents=True, exist_ok=True)
-
-    default_blueprint_dir = film_blueprint_dir(get_film())
-    blueprint_dir = Path(args.blueprint_dir) if args.blueprint_dir else default_blueprint_dir
-
-    if args.parts is not None:
-        selected = [segment for segment in segments if segment.index == args.parts]
-        if not selected:
-            available = ", ".join(str(segment.index) for segment in segments)
-            raise RuntimeError(
-                f"--parts {args.parts} does not match any segment for {args.scene}. "
-                f"Available segment indices: {available}."
-            )
-    else:
-        selected = segments
-
-    # Determine keyframe types to generate
-    keyframe_types: list[str] = []
-    if getattr(args, "both", False) or args.type == "both":
-        keyframe_types = ["start", "end"]
-    elif getattr(args, "end", False) or args.type == "end":
-        keyframe_types = ["end"]
-    else:
-        keyframe_types = ["start"]
-
-    logger.info(
-        "Generating keyframes for scene=%s film=%s parts=%s type=%s model=%s",
-        args.scene,
-        get_film(),
-        [seg.index for seg in selected],
-        keyframe_types,
-        args.image_model,
-    )
-
-    for segment in selected:
-        characters = parse_scene_characters(segment.body)
-        logger.info("Characters in segment %d: %s", segment.index, ", ".join(characters))
-
-        character_refs = [
-            (character, ensure_character_reference(character, blueprint_dir))
-            for character in characters
-        ]
-
-        scene_slug = resolve_scene_slug(args.scene)
-
-        for ktype in keyframe_types:
-            out_img, prompt_file = next_proposal_paths(scene_dir, segment.index, ktype)
-
-            ref_prev: Path | None = None
-            ref_prev_arg = (
-                getattr(args, "ref_prev", None)
-                or getattr(args, "ref_start", None)
-                or getattr(args, "ref", None)
-            )
-            if ref_prev_arg:
-                ref_prev = resolve_ref_image(ref_prev_arg, scene_dir, get_film())
-                logger.info("Using previous reference image: %s", ref_prev)
-
-            ref_after: Path | None = None
-            ref_after_arg = getattr(args, "ref_after", None) or getattr(args, "ref_end", None)
-            if ref_after_arg:
-                ref_after = resolve_ref_image(ref_after_arg, scene_dir, get_film())
-                logger.info("Using after reference image: %s", ref_after)
-
-            background_plate: Path | None = None
-            if scene_slug and ref_prev is None and ref_after is None:
-                background_plate = find_scene_background_plate(
-                    scene_slug, blueprint_dir, segment.body
+        if not part_scripts:
+            legacy_path = scripts_dir / f"{args.scene}.md"
+            if legacy_path.is_file():
+                script = strip_html_comments(legacy_path.read_text(encoding="utf-8"))
+                segments = parse_segments(script)
+                logger.info("Loaded legacy scene script: %s", legacy_path)
+            else:
+                expected_file = scripts_dir / f"{args.scene}_part0.md"
+                raise RuntimeError(
+                    f"Scene script {expected_file} not found. "
+                    f"Generate it first with: uv run scene-script --name \"{args.scene}\""
                 )
-                if background_plate is None:
-                    background_plate = ensure_background_plate(
+        else:
+            segments = [
+                SceneSegment(
+                    index=idx, span="", body=strip_html_comments(path.read_text(encoding="utf-8"))
+                )
+                for idx, path in part_scripts
+            ]
+            logger.info("Loaded %d scene segment script(s) for %r", len(segments), args.scene)
+
+        default_animations_dir = film_animations_dir(get_film())
+        scene_dir = Path(args.output) if args.output else default_animations_dir / args.scene
+        scene_dir.mkdir(parents=True, exist_ok=True)
+
+        default_blueprint_dir = film_blueprint_dir(get_film())
+        blueprint_dir = Path(args.blueprint_dir) if args.blueprint_dir else default_blueprint_dir
+
+        if args.parts is not None:
+            selected = [segment for segment in segments if segment.index == args.parts]
+            if not selected:
+                available = ", ".join(str(segment.index) for segment in segments)
+                raise RuntimeError(
+                    f"--parts {args.parts} does not match any segment for {args.scene}. "
+                    f"Available segment indices: {available}."
+                )
+        else:
+            selected = segments
+
+        # Determine keyframe types to generate
+        keyframe_types: list[str] = []
+        if getattr(args, "both", False) or args.type == "both":
+            keyframe_types = ["start", "end"]
+        elif getattr(args, "end", False) or args.type == "end":
+            keyframe_types = ["end"]
+        else:
+            keyframe_types = ["start"]
+
+        logger.info(
+            "Generating keyframes for scene=%s film=%s parts=%s type=%s model=%s",
+            args.scene,
+            get_film(),
+            [seg.index for seg in selected],
+            keyframe_types,
+            args.image_model,
+        )
+
+        for segment in selected:
+            characters = parse_scene_characters(segment.body)
+            logger.info("Characters in segment %d: %s", segment.index, ", ".join(characters))
+
+            character_refs = [
+                (character, ensure_character_reference(character, blueprint_dir))
+                for character in characters
+            ]
+
+            scene_slug = resolve_scene_slug(args.scene)
+
+            for ktype in keyframe_types:
+                out_img, prompt_file = next_proposal_paths(scene_dir, segment.index, ktype)
+
+                ref_prev: Path | None = None
+                ref_prev_arg = (
+                    getattr(args, "ref_prev", None)
+                    or getattr(args, "ref_start", None)
+                    or getattr(args, "ref", None)
+                )
+                if ref_prev_arg:
+                    ref_prev = resolve_ref_image(ref_prev_arg, scene_dir, get_film())
+                    logger.info("Using previous reference image: %s", ref_prev)
+
+                ref_after: Path | None = None
+                ref_after_arg = getattr(args, "ref_after", None) or getattr(args, "ref_end", None)
+                if ref_after_arg:
+                    ref_after = resolve_ref_image(ref_after_arg, scene_dir, get_film())
+                    logger.info("Using after reference image: %s", ref_after)
+
+                background_plate: Path | None = None
+                if scene_slug and ref_prev is None and ref_after is None:
+                    background_plate = find_scene_background_plate(
                         scene_slug, blueprint_dir, segment.body
                     )
-                logger.info("Background plate for segment %d: %s", segment.index, background_plate)
+                    if background_plate is None:
+                        background_plate = ensure_background_plate(
+                            scene_slug, blueprint_dir, segment.body
+                        )
+                    logger.info("Background plate for segment %d: %s", segment.index, background_plate)
 
-            generate_keyframe(
-                client=client,
-                model=args.image_model,
-                scene_name=args.scene,
-                segment=segment,
-                keyframe_type=ktype,
-                characters=characters,
-                character_refs=character_refs,
-                background_plate=background_plate,
-                ref_prev=ref_prev,
-                ref_after=ref_after,
-                output_path=out_img,
-                prompt_file_path=prompt_file,
-            )
+                generate_keyframe(
+                    client=client,
+                    model=args.image_model,
+                    scene_name=args.scene,
+                    segment=segment,
+                    keyframe_type=ktype,
+                    characters=characters,
+                    character_refs=character_refs,
+                    background_plate=background_plate,
+                    ref_prev=ref_prev,
+                    ref_after=ref_after,
+                    output_path=out_img,
+                    prompt_file_path=prompt_file,
+                )
+                generated_images.append(out_img)
 
-    return 0
+        return 0
+    finally:
+        logs = log_capture_stream.getvalue()
+        for img_path in generated_images:
+            if img_path.is_file():
+                txt_path = write_keyframe_metadata(img_path, cmd, logs)
+                logger.info("Saved keyframe metadata to %s", txt_path)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -307,6 +361,7 @@ def main() -> None:
         format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
         datefmt="%H:%M:%S",
     )
+    ensure_log_capture()
     pre = argparse.ArgumentParser(add_help=False)
     pre.add_argument("--film", default=None)
     pre_args, _ = pre.parse_known_args()

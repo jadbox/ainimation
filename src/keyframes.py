@@ -18,6 +18,7 @@ from keyframes.cli import build_parser, main, run
 from keyframes.generator import generate_keyframe
 from keyframes.paths import (
     next_proposal_paths,
+    proposal_metadata_path,
     proposal_path,
     proposal_prompt_path,
     resolve_ref_image,
@@ -30,6 +31,7 @@ __all__ = [
     "generate_keyframe",
     "main",
     "next_proposal_paths",
+    "proposal_metadata_path",
     "proposal_path",
     "proposal_prompt_path",
     "resolve_ref_image",

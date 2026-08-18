@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import io
+import json
 import logging
+import shlex
 import subprocess
+import sys
 from pathlib import Path
 
 import requests
@@ -50,6 +54,45 @@ from movie_config import (
 )
 
 logger = logging.getLogger("animator")
+
+log_capture_stream = io.StringIO()
+log_capture_handler = logging.StreamHandler(log_capture_stream)
+log_capture_handler.setFormatter(
+    logging.Formatter("%(asctime)s [%(name)s] %(levelname)s: %(message)s", datefmt="%H:%M:%S")
+)
+
+
+def ensure_log_capture() -> None:
+    root = logging.getLogger()
+    if log_capture_handler not in root.handlers:
+        root.addHandler(log_capture_handler)
+
+
+def get_invocation_cmd() -> str:
+    """Return the full CLI command used to call animator."""
+    argv = list(sys.argv)
+    if not argv:
+        return "uv run animator"
+    prog = Path(argv[0]).name
+    if prog in ("animator", "animator.py", "cli.py", "__main__.py"):
+        args = argv[1:]
+        if args:
+            return f"uv run animator {shlex.join(args)}"
+        return "uv run animator"
+    return shlex.join(argv)
+
+
+def format_video_metadata_text(cmd: str, logs: str) -> str:
+    """Format metadata text file with the starting CLI command and an <OUTPUT> section."""
+    cleaned_logs = logs.strip()
+    return f"{cmd}\n\n<OUTPUT>\n{cleaned_logs}\n</OUTPUT>\n"
+
+
+def write_video_metadata(video_path: Path, cmd: str, logs: str) -> Path:
+    """Write the video's accompanying .txt metadata file."""
+    txt_path = video_path.with_suffix(".txt")
+    txt_path.write_text(format_video_metadata_text(cmd, logs), encoding="utf-8")
+    return txt_path
 
 
 def latest_attempt(folder: Path) -> Path | None:
@@ -150,48 +193,205 @@ def ensure_background_plate(
 
 def run(args: argparse.Namespace) -> int:
     """Execute the animation generation or composition pipeline."""
-    frame_start_value = getattr(args, "frame_start", None)
-    frame_end_value = getattr(args, "frame_end", None)
-    frame_start = Path(frame_start_value) if frame_start_value else None
-    frame_end = Path(frame_end_value) if frame_end_value else None
-    for option, frame_path in (("--frame-start", frame_start), ("--frame-end", frame_end)):
-        if frame_path is not None and not frame_path.is_file():
-            raise ValueError(f"{option} must point to an existing image file: {frame_path}")
+    ensure_log_capture()
+    cmd = get_invocation_cmd()
+    generated_videos: list[Path] = []
 
-    default_scripts_dir = film_scripts_dir(get_film())
-    scripts_dir = Path(args.scripts_dir) if args.scripts_dir else default_scripts_dir
-    part_scripts = find_scene_part_scripts(scripts_dir, args.scene)
+    try:
+        frame_start_value = getattr(args, "frame_start", None)
+        frame_end_value = getattr(args, "frame_end", None)
+        frame_start = Path(frame_start_value) if frame_start_value else None
+        frame_end = Path(frame_end_value) if frame_end_value else None
+        for option, frame_path in (("--frame-start", frame_start), ("--frame-end", frame_end)):
+            if frame_path is not None and not frame_path.is_file():
+                raise ValueError(f"{option} must point to an existing image file: {frame_path}")
 
-    if not part_scripts:
-        # Check for legacy single-file script
-        legacy_path = scripts_dir / f"{args.scene}.md"
-        if legacy_path.is_file():
-            script = strip_html_comments(legacy_path.read_text(encoding="utf-8"))
-            segments = parse_segments(script)
-            logger.info("Loaded legacy scene script: %s", legacy_path)
+        default_scripts_dir = film_scripts_dir(get_film())
+        scripts_dir = Path(args.scripts_dir) if args.scripts_dir else default_scripts_dir
+        part_scripts = find_scene_part_scripts(scripts_dir, args.scene)
+
+        if not part_scripts:
+            # Check for legacy single-file script
+            legacy_path = scripts_dir / f"{args.scene}.md"
+            if legacy_path.is_file():
+                script = strip_html_comments(legacy_path.read_text(encoding="utf-8"))
+                segments = parse_segments(script)
+                logger.info("Loaded legacy scene script: %s", legacy_path)
+            else:
+                expected_file = scripts_dir / f"{args.scene}_part0.md"
+                raise RuntimeError(
+                    f"Scene script {expected_file} not found. "
+                    f"Generate it first with: uv run scene-script --name \"{args.scene}\""
+                )
         else:
-            expected_file = scripts_dir / f"{args.scene}_part0.md"
-            raise RuntimeError(
-                f"Scene script {expected_file} not found. "
-                f"Generate it first with: uv run scene-script --name \"{args.scene}\""
+            segments = [
+                SceneSegment(index=idx, span="", body=strip_html_comments(path.read_text(encoding="utf-8")))
+                for idx, path in part_scripts
+            ]
+            logger.info(
+                "Loaded %d scene segment script(s) for %r", len(segments), args.scene
             )
-    else:
-        segments = [
-            SceneSegment(index=idx, span="", body=strip_html_comments(path.read_text(encoding="utf-8")))
-            for idx, path in part_scripts
-        ]
-        logger.info(
-            "Loaded %d scene segment script(s) for %r", len(segments), args.scene
-        )
 
-    default_animations_dir = film_animations_dir(get_film())
-    scene_dir = Path(args.output) if args.output else default_animations_dir / args.scene
-    scene_dir.mkdir(parents=True, exist_ok=True)
+        default_animations_dir = film_animations_dir(get_film())
+        scene_dir = Path(args.output) if args.output else default_animations_dir / args.scene
+        scene_dir.mkdir(parents=True, exist_ok=True)
 
-    default_blueprint_dir = film_blueprint_dir(get_film())
-    blueprint_dir = Path(args.blueprint_dir) if args.blueprint_dir else default_blueprint_dir
+        default_blueprint_dir = film_blueprint_dir(get_film())
+        blueprint_dir = Path(args.blueprint_dir) if args.blueprint_dir else default_blueprint_dir
 
-    if args.compose_only:
+        if args.compose_only:
+            present = [
+                segment
+                for segment in segments
+                if latest_part_path(scene_dir, segment.index) is not None
+            ]
+            missing = [
+                segment
+                for segment in segments
+                if latest_part_path(scene_dir, segment.index) is None
+            ]
+            if missing:
+                logger.info(
+                    "Missing part(s) %s — combining only the existing clips.",
+                    ", ".join(str(segment.index) for segment in missing),
+                )
+            full_path = combine_parts(scene_dir, present)
+            if full_path:
+                generated_videos.append(full_path)
+                logger.info("Wrote full scene video: %s", full_path)
+                print(f"Wrote full scene video: {full_path}")
+            return 0
+
+        characters = parse_scene_characters(segments[0].body)
+        logger.info("Characters in scene: %s", ", ".join(characters))
+
+        if args.parts is not None:
+            selected = [segment for segment in segments if segment.index == args.parts]
+            if not selected:
+                available = ", ".join(str(segment.index) for segment in segments)
+                raise RuntimeError(
+                    f"--parts {args.parts} does not match any segment for {args.scene}. "
+                    f"Available segment indices: {available}."
+                )
+            # When specific part is requested, always generate a new version
+            pending = selected
+        else:
+            selected = segments
+            # When all parts are targeted, generate only missing segments
+            pending = [
+                segment
+                for segment in selected
+                if latest_part_path(scene_dir, segment.index) is None
+            ]
+            skipped = [segment for segment in selected if segment not in pending]
+            for segment in skipped:
+                logger.info(
+                    "Part %d already exists at %s; skipping (specify --parts %d to generate a new version).",
+                    segment.index,
+                    latest_part_path(scene_dir, segment.index),
+                    segment.index,
+                )
+
+        if pending:
+            provider_obj = create_video_provider(
+                getattr(args, "provider", DEFAULT_VIDEO_PROVIDER),
+                model=args.video_model,
+            )
+            logger.info("Using video provider: %s", provider_obj.name)
+
+            references = [
+                (character, ensure_character_reference(character, blueprint_dir))
+                for character in characters
+            ]
+            for character, image_path in references:
+                logger.info("Reference for %s: %s", character, image_path)
+
+            scene_slug = resolve_scene_slug(args.scene)
+            if scene_slug:
+                logger.info("Scene location for the background plate: %s", scene_slug)
+            else:
+                logger.info(
+                    "No movie.yml scene location matches %r; generating without a "
+                    "background plate reference.",
+                    args.scene,
+                )
+
+            for segment in pending:
+                movie_info = get_movie_info()
+                aspect_ratio = (movie_info.orientation or DEFAULT_ASPECT_RATIO).strip() or DEFAULT_ASPECT_RATIO
+                video_dst, start_dst, end_dst, prompt_dst = next_part_paths(scene_dir, segment.index)
+                logger.info(
+                    "=== Generating movie=%s film=%s scene=%s part=%d (final part "
+                    "script: %s) ===",
+                    movie_info.title,
+                    get_film(),
+                    args.scene,
+                    segment.index,
+                    prompt_dst,
+                )
+                continuity_frame = frame_start or previous_frame(scene_dir, segment)
+                closing_frame = frame_end or next_frame(scene_dir, segment)
+                if frame_start is not None:
+                    logger.info(
+                        "Using --frame-start override for segment %d: %s",
+                        segment.index,
+                        frame_start,
+                    )
+                if frame_end is not None:
+                    logger.info(
+                        "Using --frame-end override for segment %d: %s",
+                        segment.index,
+                        frame_end,
+                    )
+                background_plate = None
+                if (
+                    scene_slug
+                    and segment.index == segments[0].index
+                    and continuity_frame is None
+                    and closing_frame is None
+                ):
+                    background_plate = ensure_background_plate(scene_slug, blueprint_dir, segment.body)
+                    logger.info(
+                        "Background plate reference for segment %d: %s",
+                        segment.index,
+                        background_plate,
+                    )
+
+                direction = add_reference_tags(
+                    base_prompt=segment.body,
+                    characters=characters,
+                    has_continuity=continuity_frame is not None,
+                    has_background_reference=background_plate is not None,
+                    has_closing_continuity=closing_frame is not None,
+                    duration=args.duration,
+                )
+                prompt_dst.write_text(direction, encoding="utf-8")
+                logger.info("Saved prompt for segment %d: %s", segment.index, prompt_dst)
+
+                request = build_video_request(
+                    direction,
+                    references,
+                    continuity_frame,
+                    background_plate,
+                    closing_frame=closing_frame,
+                    duration=args.duration,
+                    resolution=DEFAULT_RESOLUTION,
+                    aspect_ratio=aspect_ratio,
+                )
+                video_bytes = provider_obj.generate(request, args.timeout)
+                video_dst.write_bytes(video_bytes)
+                logger.info(
+                    "Wrote segment %d clip: %s (%d bytes)",
+                    segment.index,
+                    video_dst,
+                    len(video_bytes),
+                )
+                generated_videos.append(video_dst)
+                extract_first_frame(video_dst, start_dst)
+                extract_last_frame(video_dst, end_dst)
+        else:
+            logger.info("Nothing to generate — all selected parts already exist.")
+
         present = [
             segment
             for segment in segments
@@ -202,177 +402,37 @@ def run(args: argparse.Namespace) -> int:
             for segment in segments
             if latest_part_path(scene_dir, segment.index) is None
         ]
-        if missing:
+        if len(present) >= 2:
+            if missing:
+                logger.info(
+                    "Scene is incomplete: missing part(s) %s. Combining existing %d parts anyway.",
+                    ", ".join(str(segment.index) for segment in missing),
+                    len(present),
+                )
+            full_path = combine_parts(scene_dir, present)
+            if full_path:
+                generated_videos.append(full_path)
+                logger.info("Wrote full scene video: %s", full_path)
+                print(f"Wrote full scene video: {full_path}")
+        elif missing:
             logger.info(
-                "Missing part(s) %s — combining only the existing clips.",
+                "Scene is incomplete: missing part(s) %s. Run again (optionally with "
+                "--parts) to generate them, then the parts will be combined into %s.",
                 ", ".join(str(segment.index) for segment in missing),
+                scene_dir / FULL_VIDEO_NAME,
             )
-        full_path = combine_parts(scene_dir, present)
-        if full_path:
-            print(f"Wrote full scene video: {full_path}")
-        return 0
-
-    characters = parse_scene_characters(segments[0].body)
-    logger.info("Characters in scene: %s", ", ".join(characters))
-
-    if args.parts is not None:
-        selected = [segment for segment in segments if segment.index == args.parts]
-        if not selected:
-            available = ", ".join(str(segment.index) for segment in segments)
-            raise RuntimeError(
-                f"--parts {args.parts} does not match any segment for {args.scene}. "
-                f"Available segment indices: {available}."
-            )
-        # When specific part is requested, always generate a new version
-        pending = selected
-    else:
-        selected = segments
-        # When all parts are targeted, generate only missing segments
-        pending = [
-            segment
-            for segment in selected
-            if latest_part_path(scene_dir, segment.index) is None
-        ]
-        skipped = [segment for segment in selected if segment not in pending]
-        for segment in skipped:
-            logger.info(
-                "Part %d already exists at %s; skipping (specify --parts %d to generate a new version).",
-                segment.index,
-                latest_part_path(scene_dir, segment.index),
-                segment.index,
-            )
-
-    if pending:
-        provider_obj = create_video_provider(
-            getattr(args, "provider", DEFAULT_VIDEO_PROVIDER),
-            model=args.video_model,
-        )
-        logger.info("Using video provider: %s", provider_obj.name)
-
-        references = [
-            (character, ensure_character_reference(character, blueprint_dir))
-            for character in characters
-        ]
-        for character, image_path in references:
-            logger.info("Reference for %s: %s", character, image_path)
-
-        scene_slug = resolve_scene_slug(args.scene)
-        if scene_slug:
-            logger.info("Scene location for the background plate: %s", scene_slug)
         else:
-            logger.info(
-                "No movie.yml scene location matches %r; generating without a "
-                "background plate reference.",
-                args.scene,
-            )
-
-        for segment in pending:
-            movie_info = get_movie_info()
-            aspect_ratio = (movie_info.orientation or DEFAULT_ASPECT_RATIO).strip() or DEFAULT_ASPECT_RATIO
-            video_dst, start_dst, end_dst, prompt_dst = next_part_paths(scene_dir, segment.index)
-            logger.info(
-                "=== Generating movie=%s film=%s scene=%s part=%d (final part "
-                "script: %s) ===",
-                movie_info.title,
-                get_film(),
-                args.scene,
-                segment.index,
-                prompt_dst,
-            )
-            continuity_frame = frame_start or previous_frame(scene_dir, segment)
-            closing_frame = frame_end or next_frame(scene_dir, segment)
-            if frame_start is not None:
-                logger.info(
-                    "Using --frame-start override for segment %d: %s",
-                    segment.index,
-                    frame_start,
-                )
-            if frame_end is not None:
-                logger.info(
-                    "Using --frame-end override for segment %d: %s",
-                    segment.index,
-                    frame_end,
-                )
-            background_plate = None
-            if (
-                scene_slug
-                and segment.index == segments[0].index
-                and continuity_frame is None
-                and closing_frame is None
-            ):
-                background_plate = ensure_background_plate(scene_slug, blueprint_dir, segment.body)
-                logger.info(
-                    "Background plate reference for segment %d: %s",
-                    segment.index,
-                    background_plate,
-                )
-
-            direction = add_reference_tags(
-                base_prompt=segment.body,
-                characters=characters,
-                has_continuity=continuity_frame is not None,
-                has_background_reference=background_plate is not None,
-                has_closing_continuity=closing_frame is not None,
-                duration=args.duration,
-            )
-            prompt_dst.write_text(direction, encoding="utf-8")
-            logger.info("Saved prompt for segment %d: %s", segment.index, prompt_dst)
-
-            request = build_video_request(
-                direction,
-                references,
-                continuity_frame,
-                background_plate,
-                closing_frame=closing_frame,
-                duration=args.duration,
-                resolution=DEFAULT_RESOLUTION,
-                aspect_ratio=aspect_ratio,
-            )
-            video_bytes = provider_obj.generate(request, args.timeout)
-            video_dst.write_bytes(video_bytes)
-            logger.info(
-                "Wrote segment %d clip: %s (%d bytes)",
-                segment.index,
-                video_dst,
-                len(video_bytes),
-            )
-            extract_first_frame(video_dst, start_dst)
-            extract_last_frame(video_dst, end_dst)
-    else:
-        logger.info("Nothing to generate — all selected parts already exist.")
-
-    present = [
-        segment
-        for segment in segments
-        if latest_part_path(scene_dir, segment.index) is not None
-    ]
-    missing = [
-        segment
-        for segment in segments
-        if latest_part_path(scene_dir, segment.index) is None
-    ]
-    if len(present) >= 2:
-        if missing:
-            logger.info(
-                "Scene is incomplete: missing part(s) %s. Combining existing %d parts anyway.",
-                ", ".join(str(segment.index) for segment in missing),
-                len(present),
-            )
-        full_path = combine_parts(scene_dir, present)
-        if full_path:
-            print(f"Wrote full scene video: {full_path}")
-    elif missing:
-        logger.info(
-            "Scene is incomplete: missing part(s) %s. Run again (optionally with "
-            "--parts) to generate them, then the parts will be combined into %s.",
-            ", ".join(str(segment.index) for segment in missing),
-            scene_dir / FULL_VIDEO_NAME,
-        )
-    else:
-        full_path = combine_parts(scene_dir, segments)
-        if full_path:
-            print(f"Wrote full scene video: {full_path}")
-    return 0
+            full_path = combine_parts(scene_dir, segments)
+            if full_path:
+                generated_videos.append(full_path)
+                logger.info("Wrote full scene video: %s", full_path)
+                print(f"Wrote full scene video: {full_path}")
+        return 0
+    finally:
+        logs = log_capture_stream.getvalue()
+        for v_path in generated_videos:
+            if v_path.exists():
+                write_video_metadata(v_path, cmd, logs)
 
 
 def main() -> None:

@@ -52,6 +52,15 @@ def prompt_path(
     return scene_dir / f"part-{segment_index}-v{version}-prompt.md"
 
 
+def metadata_path(
+    scene_dir: Path, segment_index: int, version: int | None = None
+) -> Path:
+    """Return the metadata txt file path for a given segment index and optional version."""
+    if version is None or version == 0:
+        return scene_dir / f"part-{segment_index}.txt"
+    return scene_dir / f"part-{segment_index}-v{version}.txt"
+
+
 def next_part_paths(
     scene_dir: Path, segment_index: int
 ) -> tuple[Path, Path, Path, Path]:

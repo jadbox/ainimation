@@ -25,6 +25,15 @@ def proposal_prompt_path(
     return scene_dir / f"part-{segment_index}-{keyframe_type}-proposal-v{version}-prompt.txt"
 
 
+def proposal_metadata_path(
+    scene_dir: Path, segment_index: int, keyframe_type: str, version: int | None = None
+) -> Path:
+    """Return the saved metadata text path for a given segment, keyframe type, and optional version."""
+    if version is None or version == 0:
+        return scene_dir / f"part-{segment_index}-{keyframe_type}-proposal.txt"
+    return scene_dir / f"part-{segment_index}-{keyframe_type}-proposal-v{version}.txt"
+
+
 def next_proposal_paths(
     scene_dir: Path, segment_index: int, keyframe_type: str
 ) -> tuple[Path, Path]:

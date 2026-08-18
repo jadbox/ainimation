@@ -96,6 +96,9 @@ def generate_keyframe(
     save_jpeg(jpeg_bytes, output_path)
 
     file_uri = output_path.resolve().as_uri()
+    logger.info("Wrote keyframe proposal: %s", output_path)
+    logger.info("Review proposal image: %s", file_uri)
+    logger.info("Prompt saved to: %s", prompt_file_path)
     print(f"\nWrote keyframe proposal: {output_path}")
     print(f"Review proposal image: {file_uri}")
     print(f"Prompt saved to: {prompt_file_path}\n")

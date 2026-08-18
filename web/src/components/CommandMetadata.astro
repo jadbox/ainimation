@@ -1,0 +1,147 @@
+---
+/**
+ * CommandMetadata.astro
+ * 
+ * Reusable collapsible metadata inspector component for animation clips and keyframe proposals.
+ * Displays the CLI command on the collapsed header, and when expanded, shows:
+ * 1. The full copyable CLI command invocation.
+ * 2. Formatted execution logs from the <OUTPUT> block in a terminal viewer.
+ * 3. An expandable raw metadata file viewer.
+ */
+import type { VideoMetadataItem } from "../lib/movie";
+
+export interface Props {
+  metadata: VideoMetadataItem | null;
+  title?: string;
+}
+
+const { metadata, title = "CLI Command" } = Astro.props;
+---
+
+{
+  metadata && (
+    <details class="group mt-6 rounded-xl border border-line bg-panel shadow-lg shadow-black/20 overflow-hidden">
+      <summary class="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 bg-panel p-4 transition-colors hover:bg-panel-2/60">
+        <div class="flex min-w-0 flex-1 items-center gap-3">
+          <svg
+            class="h-4 w-4 shrink-0 text-muted transition-transform duration-200 group-open:rotate-90"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+          </svg>
+          <span class="shrink-0 text-xs font-semibold uppercase tracking-wider text-amber-soft">
+            {title}
+          </span>
+          {metadata.cmd ? (
+            <code
+              class="min-w-0 max-w-xl truncate rounded bg-ink/75 px-2.5 py-1 font-mono text-xs text-teal-shadow"
+              title={metadata.cmd}
+            >
+              {metadata.cmd}
+            </code>
+          ) : (
+            <span class="font-mono text-xs text-muted">
+              {metadata.filename}
+            </span>
+          )}
+        </div>
+        <div class="flex items-center gap-2">
+          {metadata.cmd && (
+            <button
+              type="button"
+              data-copy-cmd={metadata.cmd}
+              class="copy-cmd-btn shrink-0 rounded bg-panel-2 px-2.5 py-1 text-[11px] font-sans font-medium text-slate-300 ring-1 ring-line hover:text-amber-soft hover:ring-amber-key/40 transition-colors"
+              title="Copy command to clipboard"
+            >
+              Copy cmd
+            </button>
+          )}
+          <span class="font-mono text-[10px] text-muted">
+            {metadata.filename}
+          </span>
+        </div>
+      </summary>
+
+      <div class="border-t border-line bg-ink/40 p-4 space-y-4">
+        {metadata.cmd && (
+          <div>
+            <div class="mb-1.5 flex items-center justify-between">
+              <span class="text-xs font-medium uppercase tracking-wider text-muted">
+                Full Command
+              </span>
+              <span class="font-mono text-[10px] text-muted">cli invocation</span>
+            </div>
+            <div class="relative rounded-lg border border-line bg-ink/85 p-3.5 pr-24 font-mono text-xs leading-relaxed text-teal-shadow break-all">
+              <pre class="whitespace-pre-wrap">{metadata.cmd}</pre>
+              <button
+                type="button"
+                data-copy-cmd={metadata.cmd}
+                class="copy-cmd-btn absolute top-2.5 right-2.5 rounded bg-panel-2 px-2.5 py-1 text-[11px] font-sans font-medium text-slate-300 ring-1 ring-line hover:text-amber-soft hover:ring-amber-key/40 transition-colors"
+                title="Copy command to clipboard"
+              >
+                Copy cmd
+              </button>
+            </div>
+          </div>
+        )}
+
+        {metadata.output && (
+          <div>
+            <div class="mb-1.5 flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <span class="h-2 w-2 rounded-full bg-teal-shadow"></span>
+                <span class="text-xs font-medium uppercase tracking-wider text-muted">
+                  Execution Logs (<code class="text-teal-shadow">&lt;OUTPUT&gt;</code>)
+                </span>
+              </div>
+              <span class="font-mono text-[10px] text-muted">console report</span>
+            </div>
+            <pre class="max-h-96 overflow-auto rounded-lg border border-line bg-black/80 p-4 font-mono text-xs leading-relaxed text-slate-300 whitespace-pre-wrap selection:bg-teal-shadow/30">
+              {metadata.output}
+            </pre>
+          </div>
+        )}
+
+        <details class="text-xs">
+          <summary class="cursor-pointer text-muted hover:text-amber-soft transition-colors">
+            View raw file contents ({metadata.filename})
+          </summary>
+          <pre class="mt-2 max-h-60 overflow-auto rounded-lg border border-line bg-ink/75 p-3 font-mono text-[11px] text-slate-300 whitespace-pre-wrap">
+            {metadata.raw}
+          </pre>
+        </details>
+      </div>
+    </details>
+  )
+}
+
+<script>
+  /**
+   * Clipboard copy handler with stopPropagation to ensure clicking 'Copy cmd'
+   * on the summary row copies cleanly without opening/closing the details accordion.
+   */
+  document.querySelectorAll<HTMLButtonElement>("[data-copy-cmd]").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      const text = btn.dataset.copyCmd ?? "";
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+      }
+      const original = btn.textContent;
+      btn.textContent = "Copied!";
+      setTimeout(() => (btn.textContent = original), 1200);
+    });
+  });
+</script>

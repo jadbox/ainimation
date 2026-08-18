@@ -1,0 +1,152 @@
+---
+/**
+ * ReferenceDeck.astro
+ * 
+ * Renders the reference image deck for a scene in the animation console.
+ * Displays latest blueprint references for:
+ * 1. Characters: Latest blueprint attempt image for each character in the scene,
+ *    linking to their character blueprint page.
+ * 2. Backgrounds: Latest blueprint background plate for each background in the scene location,
+ *    linking to their scene blueprint page.
+ */
+export interface CharacterReferenceItem {
+  character: string;
+  href: string;
+  image: string | null;
+  path: string | null;
+}
+
+export interface BackgroundReferenceItem {
+  key: string;
+  href: string;
+  image: string | null;
+  path: string | null;
+}
+
+export interface Props {
+  characterReferences: CharacterReferenceItem[];
+  backgroundReferences: BackgroundReferenceItem[];
+}
+
+const { characterReferences, backgroundReferences } = Astro.props;
+---
+
+<section class="mb-7 rounded-xl border border-line bg-panel/80 p-5 shadow-lg shadow-black/20">
+  <div class="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+    <h2 class="font-display text-xl text-amber-soft">Reference deck</h2>
+    <span class="font-mono text-xs text-muted">
+      latest blueprint attempts used by animator & keyframes
+    </span>
+  </div>
+  <div class="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+    {/* Characters Column */}
+    <div>
+      <h3 class="mb-2 text-xs font-medium uppercase tracking-wider text-muted">
+        Characters
+      </h3>
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {
+          characterReferences.map((reference) => (
+            <div class="group relative overflow-hidden rounded-lg border border-line bg-ink/40 transition-colors hover:border-amber-key/50">
+              {reference.image ? (
+                <a
+                  href={reference.image}
+                  target="_blank"
+                  rel="noreferrer"
+                  class="block w-full text-left"
+                  title={`Click to view ${reference.character} reference in new tab`}
+                >
+                  <img
+                    src={reference.image}
+                    alt={`${reference.character} reference`}
+                    class="aspect-video w-full object-cover transition-transform group-hover:scale-105"
+                    loading="lazy"
+                  />
+                </a>
+              ) : (
+                <div class="flex aspect-video items-center justify-center px-3 text-center text-xs text-muted">
+                  No reference image
+                </div>
+              )}
+              <figcaption class="flex items-center justify-between border-t border-line px-2.5 py-2">
+                <a
+                  href={reference.href}
+                  title={`Open ${reference.character} blueprint page`}
+                  class="truncate text-xs text-slate-200 hover:text-amber-soft hover:underline"
+                >
+                  {reference.character}
+                </a>
+                {reference.path && (
+                  <span
+                    class="shrink-0 font-mono text-[10px] text-muted"
+                    title={reference.path}
+                  >
+                    ready
+                  </span>
+                )}
+              </figcaption>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+
+    {/* Backgrounds Column */}
+    <div>
+      <h3 class="mb-2 text-xs font-medium uppercase tracking-wider text-muted">
+        Backgrounds
+      </h3>
+      <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
+        {
+          backgroundReferences.length > 0 ? (
+            backgroundReferences.map((reference) => (
+              <div class="group relative overflow-hidden rounded-lg border border-line bg-ink/40 transition-colors hover:border-amber-key/50">
+                {reference.image ? (
+                  <a
+                    href={reference.image}
+                    target="_blank"
+                    rel="noreferrer"
+                    class="block w-full text-left"
+                    title={`Click to view ${reference.key} background in new tab`}
+                  >
+                    <img
+                      src={reference.image}
+                      alt={`${reference.key} background reference`}
+                      class="aspect-video w-full object-cover transition-transform group-hover:scale-105"
+                      loading="lazy"
+                    />
+                  </a>
+                ) : (
+                  <div class="flex aspect-video items-center justify-center px-3 text-center text-xs text-muted">
+                    No background image
+                  </div>
+                )}
+                <figcaption class="flex items-center justify-between border-t border-line px-2.5 py-2">
+                  <a
+                    href={reference.href}
+                    title={`Open ${reference.key} blueprint page`}
+                    class="truncate text-xs text-slate-200 hover:text-amber-soft hover:underline"
+                  >
+                    {reference.key}
+                  </a>
+                  {reference.path && (
+                    <span
+                      class="shrink-0 font-mono text-[10px] text-muted"
+                      title={reference.path}
+                    >
+                      ready
+                    </span>
+                  )}
+                </figcaption>
+              </div>
+            ))
+          ) : (
+            <p class="col-span-full rounded-lg border border-dashed border-line px-3 py-5 text-sm text-muted">
+              No configured background references.
+            </p>
+          )
+        }
+      </div>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,216 @@
+---
+/**
+ * SceneSegmentSection.astro
+ * 
+ * Renders the animation configuration card for an individual scene segment (Part N).
+ * Includes:
+ * 1. Card header with part index, script path, and GENERATE video button.
+ * 2. Rendered video clips list with thumbnail previews, version badges, and delete actions.
+ * 3. Modular Start and Last Frame Selectors (PartFrameSelectors).
+ * 4. Collapsible script viewer for the part's script markdown.
+ */
+import PartFrameSelectors from "./PartFrameSelectors.astro";
+import { animationFileUrl } from "../lib/movie";
+import type { SceneVideoItem, SceneVideosResult } from "../lib/movie";
+
+export interface Props {
+  film: string;
+  name: string;
+  part: number;
+  index: number;
+  partsCount: number;
+  script: string | null;
+  segVideo?: SceneVideoItem;
+  proposals: {
+    start: { filename: string; path: string; label: string; version: number }[];
+    end: { filename: string; path: string; label: string; version: number }[];
+  };
+  previousFrame: string | null;
+  previousStory?: { name: string; title: string };
+  previousPart?: number;
+  nextFrame: string | null;
+  nextStory?: { name: string; title: string };
+  nextPart?: number;
+  priorSegment: SceneVideoItem | null;
+  nextSegment: SceneVideoItem | null;
+  priorProposals: {
+    start: { filename: string; path: string; label: string; version: number }[];
+    end: { filename: string; path: string; label: string; version: number }[];
+  } | null;
+  nextProposals: {
+    start: { filename: string; path: string; label: string; version: number }[];
+    end: { filename: string; path: string; label: string; version: number }[];
+  } | null;
+}
+
+const {
+  film,
+  name,
+  part,
+  index,
+  partsCount,
+  script,
+  segVideo,
+  proposals,
+  previousFrame,
+  previousStory,
+  previousPart,
+  nextFrame,
+  nextStory,
+  nextPart,
+  priorSegment,
+  nextSegment,
+  priorProposals,
+  nextProposals,
+} = Astro.props;
+
+const timeRange = (p: number) =>
+  `${Math.floor((p * 10) / 60)}:${String((p * 10) % 60).padStart(2, "0")}-${Math.floor(((p + 1) * 10) / 60)}:${String(((p + 1) * 10) % 60).padStart(2, "0")}`;
+
+const hasStartProposal = proposals.start.length > 0;
+const hasEndProposal = proposals.end.length > 0;
+const canUsePreviousSceneFrame = index === 0 && previousFrame;
+const canUseNextSceneFrame = index === partsCount - 1 && nextFrame;
+---
+
+<section class="rounded-xl border border-line bg-panel shadow-lg shadow-black/20">
+  <header class="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
+    <div>
+      <h2 class="font-display text-xl text-amber-soft">
+        Part {part}
+      </h2>
+      <p class="mt-0.5 text-xs text-muted">
+        {timeRange(part)} ·{" "}
+        <code>
+          scripts/{name}_part{part}.md
+        </code>
+      </p>
+    </div>
+    <div class="flex items-center gap-2">
+      {script ? (
+        <button
+          type="button"
+          data-generate-part
+          data-film={film}
+          data-name={name}
+          data-part={part}
+          class="rounded-md bg-teal-shadow/10 px-3.5 py-2 text-xs font-mono font-semibold text-teal-shadow ring-1 ring-teal-shadow/30 transition-colors hover:bg-teal-shadow/20"
+        >
+          GENERATE
+        </button>
+      ) : (
+        <span class="rounded-full bg-amber-key/10 px-2.5 py-1 text-xs text-amber-soft ring-1 ring-amber-key/30">
+          script missing
+        </span>
+      )}
+    </div>
+  </header>
+
+  <div class="space-y-5 px-5 py-5">
+    {/* Rendered Videos Row */}
+    {segVideo && segVideo.versions.length > 0 && (
+      <div>
+        <h3 class="mb-2 text-xs font-medium uppercase tracking-wider text-muted">
+          Rendered Video
+        </h3>
+        <div class="flex flex-wrap items-end gap-3">
+          {segVideo.versions.map((ver) => {
+            const isLatest = ver.version === segVideo.versions[segVideo.versions.length - 1].version;
+            const videoSlug = ver.version > 0 ? `${name}_part_${part}_v${ver.version}` : `${name}_part_${part}`;
+            return (
+              <div class="group relative block w-[280px] overflow-hidden rounded-lg border border-line bg-ink/40 transition-colors hover:border-amber-key/50">
+                <button
+                  type="button"
+                  data-delete-video
+                  data-film={film}
+                  data-name={name}
+                  data-part={part}
+                  data-filename={ver.filename}
+                  title={`Delete ${ver.filename}`}
+                  class="absolute top-1.5 right-1.5 z-10 flex h-6 w-6 items-center justify-center rounded bg-black/70 text-slate-300 backdrop-blur-sm transition-colors hover:bg-rose-900/80 hover:text-rose-200 cursor-pointer"
+                >
+                  <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                </button>
+                <a
+                  href={`/${film}/video/${videoSlug}`}
+                  title={`View Part ${part} ${ver.label}`}
+                  class="block"
+                >
+                  {ver.thumb ? (
+                    <img
+                      src={animationFileUrl(film, name, ver.thumb)}
+                      alt={`Part ${part} ${ver.label} thumbnail`}
+                      class="aspect-video w-full object-cover transition-transform group-hover:scale-105"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div class="flex aspect-video items-center justify-center px-3 text-center text-xs text-muted">
+                      Part {part} {ver.label}
+                    </div>
+                  )}
+                  <figcaption class="border-t border-line px-2.5 py-2">
+                    <div class="flex items-center justify-between">
+                      <span class="block truncate text-xs text-slate-200 font-medium">
+                        Part {part} {ver.label}
+                      </span>
+                      {isLatest && segVideo.versions.length > 1 && (
+                        <span class="rounded bg-teal-shadow/20 px-1.5 py-0.5 font-mono text-[9px] text-teal-shadow">
+                          Latest
+                        </span>
+                      )}
+                    </div>
+                    <span class="mt-0.5 block truncate font-mono text-[10px] text-muted">
+                      {ver.filename}
+                    </span>
+                  </figcaption>
+                </a>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    )}
+
+    {/* Modular Start and Last Frame Selectors Component */}
+    <PartFrameSelectors
+      film={film}
+      name={name}
+      part={part}
+      index={index}
+      partsCount={partsCount}
+      proposals={proposals}
+      hasStartProposal={hasStartProposal}
+      hasEndProposal={hasEndProposal}
+      canUsePreviousSceneFrame={!!canUsePreviousSceneFrame}
+      canUseNextSceneFrame={!!canUseNextSceneFrame}
+      previousFrame={previousFrame}
+      previousStory={previousStory}
+      previousPart={previousPart}
+      nextFrame={nextFrame}
+      nextStory={nextStory}
+      nextPart={nextPart}
+      priorSegment={priorSegment}
+      nextSegment={nextSegment}
+      priorProposals={priorProposals}
+      nextProposals={nextProposals}
+    />
+
+    {/* Collapsible script viewer */}
+    <details class="group rounded-lg border border-line bg-ink/25">
+      <summary class="cursor-pointer px-3.5 py-2.5 text-sm text-slate-300 marker:text-amber-key">
+        View part script
+      </summary>
+      {script ? (
+        <pre class="max-h-[34rem] overflow-auto border-t border-line p-4 font-mono text-xs leading-relaxed text-slate-300 whitespace-pre-wrap">
+          {script}
+        </pre>
+      ) : (
+        <p class="border-t border-line p-4 text-sm italic text-muted">
+          Generate this scene's scripts before animating.
+        </p>
+      )}
+    </details>
+  </div>
+</section>

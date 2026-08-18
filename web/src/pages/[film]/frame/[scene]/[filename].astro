@@ -1,0 +1,249 @@
+---
+/**
+ * Frame Preview Page
+ * 
+ * Dedicated full-screen viewer for keyframe proposal images and scene frames.
+ * Displays:
+ * 1. High-resolution frame preview image.
+ * 2. Companion CLI command invocation & execution logs (<OUTPUT>) via CommandMetadata component.
+ * 3. Quick navigation grid to other proposals and frames in this scene.
+ * 4. Proposal deletion action with confirmation.
+ * 
+ * NOTE: As per design requirements, the "Select frame" button is intentionally omitted
+ * on this preview page so that frame selection remains exclusively on the animate console page.
+ */
+import Layout from "../../../../layouts/Base.astro";
+import CommandMetadata from "../../../../components/CommandMetadata.astro";
+import {
+  animationFileUrl,
+  isValidFilm,
+  loadMovie,
+  partProposals,
+  readMediaMetadata,
+  scriptPartIndices,
+} from "../../../../lib/movie";
+import fs from "node:fs";
+import path from "node:path";
+import { animationsDir } from "../../../../lib/movie";
+
+export const prerender = false;
+
+const film = Astro.params.film ?? "";
+const scene = Astro.params.scene ?? "";
+let filename = Astro.params.filename ?? "";
+
+if (!isValidFilm(film)) {
+  return Astro.redirect("/");
+}
+
+const movie = loadMovie(film);
+const story = movie.story.find((s) => s.name === scene);
+if (!story) {
+  return Astro.redirect(`/${film}`);
+}
+
+// Support requests with or without extension
+const dir = path.join(animationsDir(film), scene);
+let actualFile = filename;
+if (!fs.existsSync(path.join(dir, actualFile))) {
+  if (fs.existsSync(path.join(dir, `${filename}.jpg`))) {
+    actualFile = `${filename}.jpg`;
+  } else {
+    return Astro.redirect(`/${film}/animate/${scene}`);
+  }
+}
+
+const imageUrl = animationFileUrl(film, scene, actualFile);
+const metadata = readMediaMetadata(film, scene, actualFile);
+
+// Parse proposal metadata from filename
+const propMatch = actualFile.match(/^part-(\d+)-(start|end)-proposal(?:-v(\d+))?\.jpg$/i);
+const isProposal = !!propMatch;
+const partNum = propMatch ? Number(propMatch[1]) : null;
+const kind = propMatch ? (propMatch[2].toLowerCase() as "start" | "end") : null;
+const versionNum = propMatch && propMatch[3] ? Number(propMatch[3]) : propMatch ? 0 : null;
+
+// Determine human readable title
+let frameTitle = actualFile;
+if (isProposal && partNum !== null && kind) {
+  const versionLabel = versionNum && versionNum > 0 ? ` (v${versionNum})` : "";
+  frameTitle = `Part ${partNum} ${kind === "start" ? "Start" : "End"} Proposal${versionLabel}`;
+} else if (actualFile.match(/^part-(\d+)-(start|end)\.jpg$/i)) {
+  const m = actualFile.match(/^part-(\d+)-(start|end)\.jpg$/i)!;
+  frameTitle = `Part ${m[1]} ${m[2] === "start" ? "Start" : "End"} Video Frame`;
+}
+
+// Collect related proposal images in this scene for navigation
+const parts = scriptPartIndices(film, scene);
+const relatedFrames: { href: string; label: string; thumb: string; active: boolean }[] = [];
+for (const p of parts) {
+  const pProposals = partProposals(film, scene, p);
+  for (const sp of pProposals.start) {
+    relatedFrames.push({
+      href: `/${film}/frame/${scene}/${sp.filename}`,
+      label: `Part ${p} Start ${sp.label}`,
+      thumb: animationFileUrl(film, scene, sp.filename),
+      active: sp.filename === actualFile,
+    });
+  }
+  for (const ep of pProposals.end) {
+    relatedFrames.push({
+      href: `/${film}/frame/${scene}/${ep.filename}`,
+      label: `Part ${p} End ${ep.label}`,
+      thumb: animationFileUrl(film, scene, ep.filename),
+      active: ep.filename === actualFile,
+    });
+  }
+}
+---
+
+<Layout film={film} title={`${frameTitle} · ${story.title}`}>
+  <nav class="mb-4 text-sm text-muted">
+    <a
+      href={`/${film}/animate/${scene}`}
+      class="inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium text-muted ring-1 ring-line hover:text-amber-soft hover:ring-amber-key/40 transition-colors"
+    >
+      &larr; Back to {story.title} Animation Console
+    </a>
+  </nav>
+
+  <div class="mb-6 flex flex-wrap items-start justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-2">
+        <span class="h-2 w-2 rounded-full bg-teal-shadow"></span>
+        <span class="text-xs uppercase tracking-[0.2em] text-teal-shadow">
+          Keyframe Proposal Preview
+        </span>
+      </div>
+      <h1 class="mt-1 font-display text-3xl text-amber-soft">{frameTitle}</h1>
+      <p class="mt-1 font-mono text-sm text-muted">
+        {story.title} · films/{film}/out/animations/{scene}/{actualFile}
+      </p>
+    </div>
+
+    <div class="flex items-center gap-3">
+      <a
+        href={imageUrl}
+        target="_blank"
+        rel="noreferrer"
+        class="inline-flex items-center gap-1.5 rounded-md bg-panel px-3 py-1.5 text-xs font-medium text-slate-300 ring-1 ring-line hover:text-amber-soft hover:ring-amber-key/40 transition-colors"
+        title="Open original image in new tab"
+      >
+        Open raw ↗
+      </a>
+
+      {isProposal && partNum !== null && kind && (
+        <button
+          type="button"
+          id="delete-proposal-btn"
+          data-film={film}
+          data-name={scene}
+          data-part={partNum}
+          data-kind={kind}
+          data-filename={actualFile}
+          class="inline-flex items-center gap-1.5 rounded-md bg-rose-600/15 px-3 py-1.5 text-xs font-semibold text-rose-300 ring-1 ring-rose-500/40 hover:bg-rose-600/25 transition-colors cursor-pointer"
+          title={`Delete proposal ${actualFile}`}
+        >
+          <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          Delete proposal
+        </button>
+      )}
+    </div>
+  </div>
+
+  {/* Full Image Display */}
+  <figure class="overflow-hidden rounded-xl border border-line bg-panel shadow-lg shadow-black/30">
+    <img
+      src={imageUrl}
+      alt={`${story.title} ${frameTitle}`}
+      class="w-full max-h-[1366px] object-contain"
+    />
+  </figure>
+
+  {/* Reusable Collapsible CLI Command & Execution Logs Inspector */}
+  <CommandMetadata metadata={metadata} title="Keyframe CLI Command" />
+
+  {/* Related Frame Proposals in this Scene */}
+  {relatedFrames.length > 1 && (
+    <section class="mt-8">
+      <div class="mb-3 flex items-center justify-between">
+        <h2 class="text-xs font-medium uppercase tracking-wider text-muted">
+          All Proposals for this Scene
+        </h2>
+        <span class="font-mono text-xs text-muted">
+          {relatedFrames.length} keyframes
+        </span>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        {relatedFrames.map((f) => (
+          <a
+            href={f.href}
+            class:list={[
+              "group block w-44 overflow-hidden rounded-lg ring-1 transition",
+              f.active
+                ? "ring-amber-key/60 shadow-md shadow-amber-key/10"
+                : "ring-line hover:ring-amber-key/40",
+            ]}
+            title={f.label}
+          >
+            <img
+              src={f.thumb}
+              alt={f.label}
+              class="aspect-video w-full object-cover transition-transform group-hover:scale-105"
+            />
+            <span
+              class:list={[
+                "block truncate px-2.5 py-1.5 text-[11px] font-medium tracking-wide",
+                f.active
+                  ? "bg-amber-key/15 text-amber-soft"
+                  : "bg-panel-2 text-muted group-hover:text-amber-soft",
+              ]}
+            >
+              {f.label}
+            </span>
+          </a>
+        ))}
+      </div>
+    </section>
+  )}
+</Layout>
+
+<script>
+  import { confirmModal } from "../../../../components/confirm-modal";
+
+  const deleteBtn = document.getElementById("delete-proposal-btn") as HTMLButtonElement | null;
+  deleteBtn?.addEventListener("click", async () => {
+    const film = deleteBtn.dataset.film!;
+    const name = deleteBtn.dataset.name!;
+    const part = Number(deleteBtn.dataset.part);
+    const kind = deleteBtn.dataset.kind as "start" | "end";
+    const filename = deleteBtn.dataset.filename!;
+
+    const confirmed = await confirmModal({
+      title: "Delete Keyframe Proposal",
+      message: `Are you sure you want to delete "${filename}"?`,
+      details: "This will remove the generated proposal image, its saved prompt file, and its execution metadata.",
+      confirmLabel: "Delete Proposal",
+      variant: "danger",
+    });
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch("/api/delete-proposal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ film, name, part, kind, filename }),
+      });
+      if (res.ok) {
+        location.href = `/${film}/animate/${name}`;
+      } else {
+        const err = await res.json().catch(() => ({}));
+        alert(`Failed to delete proposal: ${err.error || res.statusText}`);
+      }
+    } catch (err) {
+      alert(`Failed to delete proposal: ${(err as Error).message}`);
+    }
+  });
+</script>

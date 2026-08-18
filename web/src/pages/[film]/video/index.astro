@@ -1,11 +1,13 @@
 ---
 import Layout from "../../../layouts/Base.astro";
+import CommandMetadata from "../../../components/CommandMetadata.astro";
 import {
   animationFileUrl,
   filmAnimationFileUrl,
   filmVideo,
   isValidFilm,
   loadMovie,
+  readVideoMetadata,
   sceneVideos,
 } from "../../../lib/movie";
 
@@ -20,6 +22,7 @@ const mergedFilm = filmVideo(film);
 if (!mergedFilm) {
   return Astro.redirect(`/${film}`);
 }
+const metadata = readVideoMetadata(film, "", mergedFilm.file);
 const scenes = movie.story.flatMap((story) => {
   const full = sceneVideos(film, story.name).full;
   return full ? [{ story, thumb: full.thumb }] : [];
@@ -42,6 +45,9 @@ const scenes = movie.story.flatMap((story) => {
   <figure class="overflow-hidden rounded-xl border border-line bg-panel shadow-lg shadow-black/30">
     <video controls class="w-full max-h-[1366px] object-contain" src={filmAnimationFileUrl(film, mergedFilm.file)} poster={filmAnimationFileUrl(film, mergedFilm.thumb)}></video>
   </figure>
+
+  {/* Collapsible command & logs metadata viewer */}
+  <CommandMetadata metadata={metadata} title="CLI Command" />
 
   <section class="mt-7">
     <h2 class="mb-3 text-xs font-medium uppercase tracking-wider text-muted">Scene full videos</h2>

@@ -1,15 +1,11 @@
 """Format generated scenes into per-segment base prompts in :mod:`scriptgen`.
 
-The saved part file IS the video-generation prompt, so every character of the
-fixed template competes with the actual shooting plan for the ~6,000 character
-budget (the animator tacks ~1,000 more characters of reference instructions on
-top before sending, under a 7,000 absolute ceiling). The template keeps only
-the anchors other tools parse ("Characters appearing:", the SHARED SETTING
-marker) plus the three labeled core fields the MiniMax prompt guide requires:
+Follows the official MiniMax H3 Video Prompt Writing Guides:
+- base-en.txt (§2.2 Three Core Fields, §4.1 [Shot 1] Structure, §4.4 Dialogue Formatting)
+- ref-en.txt (§2 Reference Labels, §5.4 Speaker IDs & Physical Delivery, §6 Sound Separation)
 
-    integrated_multimodal_description: [Shot 1] ...
-    overall_soundscape: ...
-    non_diegetic_music: ...
+The saved part file is the video-generation prompt. Total prompt length (static template
++ segment body + animator reference tags) must stay strictly under 1,700 characters.
 """
 
 from __future__ import annotations
@@ -27,13 +23,14 @@ def format_segment_base_prompt(
 ) -> str:
     """Build the base prompt document for a single scene segment.
 
-    ``segment_body`` must already contain the three MiniMax core fields
-    (``integrated_multimodal_description:`` / ``overall_soundscape:`` /
-    ``non_diegetic_music:``). ``span`` is accepted for interface stability but
-    is no longer rendered — the animator controls clip duration.
-    """
-    movie_info = get_movie_info()
+    Follows MiniMax H3 Video Prompt Writing Guidelines:
+    - base-en.txt (§2.2 Three Core Fields, §4.1 [Shot 1] Structure, §4.4 Dialogue Formatting)
+    - ref-en.txt (§2 Reference Labels, §5.4 Speaker IDs & Physical Delivery, §6 Sound Separation)
 
+    The saved part file is the video-generation prompt. Total prompt length (static template
+    + segment body + animator reference tags) must stay strictly under 1,700 characters.
+    """
+    # ref-en.txt §5.4: Character voice descriptions attached to character roster headers
     char_items: list[str] = []
     for char in characters:
         name_str = standardize_name(char)
@@ -45,19 +42,9 @@ def format_segment_base_prompt(
         char_items.append(f"{name_str}{voice_tag}")
     char_header_str = ", ".join(char_items)
 
-    setting_block = (
-        f"=== SHARED SETTING & LIGHT (constant across scene) ===\n{setting}\n\n"
-        if setting
-        else ""
-    )
-
-    return f"""Style: {movie_info.style}
-Camera: {movie_info.camera_rules}
-
-Scene: "{scene_name}" — {logline or 'see script below.'}
-Characters appearing: {char_header_str}.
+    # base-en.txt §4.1-4.4 & ref-en.txt §5.4: Compact preamble & strict mandates
+    return f"""Characters appearing: {char_header_str}.
 Match designs EXACTLY to reference images; never use references as opening frames.
+MANDATES: One unbroken continuous shot — strictly NO cuts, jump cuts, or zoom jumps. Expressive theatrical acting with dynamic gestures and changing facial expressions for all visible characters. Declared speaker moves mouth; all others keep mouths closed.
 
-MANDATES: One unbroken continuous shot — no cuts, only smooth camera motion. No teleporting, position pops, fades, or duplicate characters — all position/facing changes are continuous physical locomotion. Only the declared speaker moves mouth/lips; all others keep mouths CLOSED and react with body language. Every character stays alive with continuous secondary motion (breathing, weight shifts, posture shifts, tactile interactions); never freeze, idle, or stand rigid.
-
-{setting_block}{segment_body}"""
+{segment_body}"""

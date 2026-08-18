@@ -1,4 +1,21 @@
-"""Prompt builders that turn an abridged story beat into a scene design request."""
+"""Prompt builders that turn an abridged story beat into a scene design request.
+
+Incorporates official MiniMax H3 Video Prompt Writing Guidelines:
+- base-en.txt:
+    * §2.2 Part Two Contains the Three Core Fields
+    * §3.1-§3.2 Keyframe Development Paths (I2VA / FL2VA continuous motion path)
+    * §4.1 Multimodal Description Timeline & [Shot 1] Opening Style/Framing
+    * §4.2 Shots, Cuts & Continuous Camera Takes
+    * §4.3 Camera Motion 3-Dimension Formula (Motion Type + Amplitude + Speed)
+    * §4.4 Speakers, Audio Sources & Dialogue Formatting (<d>[Language] ...</d>, lip closure)
+    * §4.5 On-Screen Text Formatting
+    * §4.6 overall_soundscape (1-4 sentences ambient/physical/non-verbal audio)
+    * §4.7 non_diegetic_music (1-3 sentences instrumentation/tempo/dynamics score)
+- ref-en.txt:
+    * §2 Reference Labels & Subject Definitions (<Subject N>, <Picture N>)
+    * §5.4 Speakers, Audio Sources & Observable Physical/Facial Delivery
+    * §6 Audio Layer Separation (Diegetic vs Soundscape vs Non-Diegetic Music)
+"""
 
 from __future__ import annotations
 
@@ -13,7 +30,11 @@ from scriptgen.config import MAX_SCRIPT_PROMPT_CHARS, segment_span
 
 
 def build_system_instruction(part_count: int) -> str:
-    """System instruction for the per-part shooting-plan generation calls."""
+    """System instruction for the per-part shooting-plan generation calls.
+
+    Embeds MiniMax H3 Video Prompt Writing techniques (base-en.txt & ref-en.txt)
+    and enforces dense, theatrical scripting within the <1700 character budget.
+    """
     movie_info = get_movie_info()
     roster_names = list_character_names()
     roster = ", ".join(roster_names)
@@ -52,71 +73,60 @@ CHARACTER VOICES:
 {char_voices}
 
 ATTENTION ENGINEERING & DYNAMIC ANIMATION (required — every frame must feel alive and gripping):
-- HOOK: a segment must open on something already in motion, in danger, or visually striking — NEVER on an empty room, an establishing wide, or a character standing still. The first described second is the scroll-stopper.
-- CONTINUOUS CHARACTER VITALITY: characters must NEVER freeze, stand limp, or idle with hands at their sides. Every character on screen stays in continuous, expressive physical motion (breathing, weight shifts, posture changes, tactile touch, adjusting props, head and eyeline tracking).
-- DYNAMIC STAGING & SILHOUETTES: stage characters with expressive full-body silhouettes, contrasting heights (leaning down to child eye level, crouching, stepping forward into the light), and tactile physical interaction (holding a hand, supporting a back, soothing, gripping a prop).
-- ONE FOCAL POINT PER BEAT: state where the viewer's eye must go and why — the brightest point in frame, the primary physical action, a character's eyeline pointing at it, or the story object. Never let two things compete for attention.
-- ESCALATION ACROSS PARTS: each part must be MORE than the previous one — closer camera, higher stakes, a shift in light or sound. The treatment's ladder is law.
-- PLANT AND PAY OFF: plant a micro-question early (a glance, an unseen sound, an unopened object) and pay it off within the scene.
-- THE TURN: when the emotion pivots, camera distance, light, sound, and music must all shift together in the same beat.
-- THE UNFORGETTABLE IMAGE: build a held beat (1-2 seconds of still camera) around the single frame a viewer would remember, exactly where the treatment places it.
+- HOOK (base-en.txt §4.1): open on action already in progress or visually arresting motion — never an empty room or a standing-still character. The first second is the scroll-stopper.
+- THEATRICAL ACTING & CONTINUOUS VITALITY (ref-en.txt §5.4): characters must NEVER freeze, stand limp, or move like stiff plastic toys with static features. Characters act out their roles like master theatre actors giving a full stage performance. In EVERY beat, explicitly describe what EVERY visible character is doing physically AND what their face is expressing (eyes wide/narrowed, eyebrows furrowed/raised, mouth/jaw tense/softened, reactive smiles, breathing). Never leave any character blank or static.
+- DYNAMIC STAGING & SILHOUETTES: stage characters with expressive silhouettes, contrasting heights, and tactile physical interaction (holding a hand, supporting a back, soothing, gripping a prop).
+- ONE FOCAL POINT PER BEAT: direct the viewer's eye to the primary physical action, eyeline, or story object.
+- ESCALATION ACROSS PARTS: each part must raise stakes, intimacy, or intensity beyond the previous one.
+- THE UNFORGETTABLE IMAGE: land a held beat (1-2 seconds of still camera) around the scene's iconic moment.
 
-LITERAL DIRECTION LANGUAGE (required):
-- Write only observable physical facts: who is where, what moves, where the camera is and where it goes. The video model animates exactly this and nothing it must infer.
-- Express emotion ONLY through visible body action: trembling fingers, furrowed brows, a sharp intake of breath, a hand tightening its grip, shoulders relaxing, leaning in with urgent focus. Never write a bare emotion label ("she feels sad", "naked reverence").
-- Never write invented numbers — no degrees, kelvin, inches, or percentages; the model ignores them.
-- One camera move per segment (a hold counts). Stillness is a deliberate choice; use it for the held beats.
+LITERAL DIRECTION LANGUAGE (required — base-en.txt §4.1, ref-en.txt §5.4):
+- Write only observable physical facts: who is where, what moves, where the camera is and where it goes.
+- Express emotion ONLY through visible, specific physical and facial actions: trembling fingers, furrowed brows, flared nostrils, sharp inhalation, warm smiles, nodding. Never write bare emotion labels ("she feels sad").
+- Never write invented numbers — no degrees, kelvin, inches, or percentages.
+- ONE CONTINUOUS CAMERA MOTION PER SEGMENT (base-en.txt §3.2, §4.2): strictly ONE unbroken sequence shot. Strictly NO cuts, NO jump cuts, NO angle switches, and NO sudden zoom or focal length jumps. Declare a single continuous smooth camera motion (e.g. slow push in, static hold, slow tracking shot) across the 10 seconds.
 
-CAMERA MOTION VOCABULARY (required — the video model understands ONLY these motion types, each optionally qualified with an amplitude and/or speed):
-- Motion types: Zoom In / Zoom Out (focal length changes, camera body still), Push In / Pull Out (camera moves forward/backward), Pan Left / Pan Right (camera pivots horizontally in place), Truck Left / Truck Right (camera translates horizontally), Tilt Up / Tilt Down (camera pivots vertically in place), Pedestal Up / Pedestal Down (whole camera rises/lowers), Arc Shot (camera arcs around the subject), Tracking Shot (camera follows a moving subject), Static Shot (camera completely still), Shake Slightly / Shake Strongly, POV, Roll Clockwise / Roll Counterclockwise.
-- Amplitude (only when meaningful, medium is omitted): "with small amplitude", "with large amplitude".
-- Speed (only when meaningful, normal is omitted): "at slow speed", "at fast speed".
-- Write camera motion as a natural English action inside the beat, never as stacked labels: "The camera pushes in with small amplitude at slow speed toward the folded letter in her hands." / "The camera holds a static shot as she exits the frame."
+CAMERA MOTION VOCABULARY (required — base-en.txt §4.3: Motion Type + Amplitude + Speed):
+- Motion types: Zoom In / Zoom Out, Push In / Pull Out, Pan Left / Pan Right, Truck Left / Truck Right, Tilt Up / Tilt Down, Pedestal Up / Pedestal Down, Arc Shot, Tracking Shot, Static Shot, Shake Slightly / Shake Strongly, POV, Roll Clockwise / Roll Counterclockwise.
+- Amplitude: "with small amplitude", "with large amplitude" (medium omitted).
+- Speed: "at slow speed", "at fast speed" (normal omitted).
+- STRICTLY NO CUTS OR ZOOM JUMPS: declare camera motion at the opening of [Shot 1] (e.g. "The camera pushes in with small amplitude at slow speed toward..."). Do NOT write separate, conflicting camera moves for sub-beats.
 
-SPEAKERS & DIALOGUE ENCODING (required — the video model's exact dialogue format):
-- Assign each speaking character a stable speaker ID in the order of the Characters in Scene list: (S1), (S2). A character keeps the same ID for the entire scene; characters who never speak get no ID.
-- When a speaker first appears, establish their identity from visual and audio context (character type, age, pitch, timbre, speaking rate, accent — from the character's <VOICE> description).
-- Place the speaker's identifying phrase, ID, physical action, and delivery OUTSIDE the dialogue tags. Inside <d> put ONLY the language tag and the spoken words verbatim: `{sample_speaker1}, a soft, breathless speaker (S1), leans forward with trembling hands and says: <d>[English] We must act now.</d>`
-- Preserve every word and punctuation mark of each line verbatim; never translate or rewrite.
+SPEAKERS & DIALOGUE ENCODING (required — base-en.txt §4.4, ref-en.txt §5.4):
+- Assign stable speaker IDs in order of appearance: (S1), (S2).
+- Place identifying phrase, ID, physical action, and delivery OUTSIDE dialogue tags: `{sample_speaker1}, a soft, breathless speaker (S1), leans forward with trembling hands and says: <d>[English] We must act now.</d>`
+- Inside <d> put ONLY `<d>[Language] verbatim line</d>`. Non-speakers and finished speakers keep lips closed (e.g. `She closes her lips and...`).
+- For voiceover: `says in an off-screen voiceover: <d>[English] ...</d> while lips remain completely closed.`
 
-SOUND ARCHITECTURE (required — the video model expects sound split across fields):
-- Synchronized diegetic sounds that belong to a specific visible action (a latch clicking, fabric rustling, a gasp) stay inline in that beat of the multimodal description.
-- overall_soundscape (1-4 sentences): summarize the scene's ambient sound, physical action sounds, and non-verbal human sounds across the whole segment — wind, rain, fire crackle, footsteps, fabric, breathing. Do NOT repeat dialogue or music here.
-- non_diegetic_music (1-3 sentences): the score only the audience hears. Describe instrumentation, tempo, rhythm, and dynamics ONLY — no abstract mood words, no emotional explanations ("sparse acoustic guitar notes at a slow tempo, joined by a low cello that swells before fading"). Use N/A if there is no score.
-- Diegetic music the characters hear belongs in the multimodal description, not in non_diegetic_music.
+SOUND ARCHITECTURE (required — base-en.txt §4.6-§4.7, ref-en.txt §6):
+- Synchronized diegetic sounds belong inline within the multimodal description beats.
+- overall_soundscape (1-4 sentences): ambient sound, physical action sounds, and non-verbal human sounds (wind, rain, paper rustle, breathing). Do NOT repeat dialogue or music here.
+- non_diegetic_music (1-3 sentences): audience-only score describing instrumentation, tempo, rhythm, and dynamics ONLY (no abstract mood words). Use N/A if no score.
 
-SPATIAL & PHYSICAL LAWS (required):
-- First sentence of every segment: a semicolon-separated list placing every character, key prop, and light source relative to the camera (left, right, center, foreground, background).
-- One continuous unbroken shot per segment — no cuts, no angle jumps.
-- Every position or facing change is continuous physical locomotion (step, walk, turn, pivot, climb). No teleporting, no position pops, no duplicate characters.
-- Characters never stand on furniture unless the beat calls for climbing; feet stay on the floor.
-- Interacting characters share one depth plane so both faces read in 3/4 or profile.
-- Every character is alive every second: continuous secondary motion (breathing, weight shifts, reactive facial shifts, tactile interactions). Nobody stands rigid or frozen.
-- Characters look at each other or at scene objects — NEVER into the lens (no fourth-wall breaks). Only the declared speaker moves their mouth.
+SPATIAL & PHYSICAL LAWS (required — base-en.txt §4.1, ref-en.txt §2.1):
+- First sentence of [Shot 1]: state style token, then a semicolon-separated list placing every character, key prop, and light source relative to camera.
+- One continuous unbroken sequence shot — strictly NO cuts, jump cuts, or sudden zoom changes.
+- In EVERY beat, specify the physical actions AND changing facial expressions of ALL visible characters.
+- Characters look at each other or at scene objects — NEVER into the lens. Only the declared speaker moves their mouth.
 
-DIALOGUE CRAFT — the Instagram dialogue guide (required — dialogue is the engine of short-form video; every word must fight for its life):
-- VOLUME: across the whole scene, roughly 50-70 spoken words total split into 5-8 short lines. Enough to feel snappy, few enough that every line gets a physical performance.
-- LINE LENGTH: max 8-10 words per line; one idea per line. The scene's FINAL line is the shortest and hardest-hitting — it is the punch.
-- THE DELETION TEST: if removing a line would not change the scene, the line does not exist. Ban greetings, filler, small talk, and any line that merely describes what the picture already shows.
-- ONE JOB PER LINE: every line either ASKs, ANSWERs, DEFLECTs, WARNs, or REVEALs. Every exchange must shift the power or emotional balance between the characters.
-- GROUNDED IN THE STORY BEAT: lines come only from the beat's actions, emotions, and talking points — never invent backstory, past events, or implications the beat does not state.
-- SPEAK IN ACTION: pair every spoken line with a visible physical act (leaning down, guiding a prop, supporting a shoulder). While one character speaks, the other reacts physically — the listener's body is half the scene.
-- SUBTEXT OVER EXPOSITION: convey feeling through what a character almost says, not through stating facts. No TV scolding tropes ("I told you...", "calm down"), no melodrama, no modern slang.
-- ATTRIBUTE dialogue using the SPEAKERS & DIALOGUE ENCODING format above (identifying phrase + (S-ID) + physical action + `says: <d>[English] line</d>`).
+DIALOGUE CRAFT (Instagram pacing):
+- Max 8-10 words per line; one idea per line. Final line is the shortest punch.
+- Pair every spoken line with a visible physical act. The listener reacts with facial/body language.
 
-TIME-CODED BEATS (required): open each chronological paragraph with a bracketed timecode, e.g. `[0:00-0:03]`. The timecodes must tile the full 10 seconds with no gaps or overlaps. Every distinct change of action, position, or expression gets its own beat.
+TIME-CODED BEATS (required): open each chronological paragraph with a bracketed timecode, e.g. `[0:00-0:03]`. The timecodes must tile the full 10 seconds with no gaps. In EVERY beat, describe what EVERY character on screen is doing physically AND what their face is expressing.
 
-OUTPUT FORMAT — return Markdown with EXACTLY these headers, in this order:
+OUTPUT FORMAT (for the specific single Segment requested in the prompt) — return Markdown with EXACTLY these headers:
 # <evocative scene title>
 ## Logline
-(one or two sentences: protagonist, want, dramatic question)
+(one short sentence under 60 chars: protagonist, action, dramatic question)
 ## Characters in Scene
-(one bullet per character in scene order: "- NAME <VOICE>voice description</VOICE>". Scene order fixes the speaker IDs: first-listed speaker = (S1), second = (S2).)
+(one bullet per character in scene order: "- NAME <VOICE>voice description</VOICE>". First-listed speaker = (S1), second = (S2).)
 ## Setting & Light
-(the shared stage kept tight: environment, the ONE story object if any, the single dominant practical light source, depth planes — everything constant across parts)
-{segment_headers}
+(one short sentence under 80 chars: environment, key prop, dominant practical light source)
+## Segment <index> (<span: e.g. 0:00-0:10>)
 
-SEGMENT RULES — each Segment section is a self-contained shooting plan written as the three labeled core fields the video model expects, EXACTLY in this form:
+SEGMENT RULES (base-en.txt §2.2):
+Each Segment section is written as the three labeled core fields:
 
 integrated_multimodal_description: [Shot 1] 2D-animated, <style token>, <opening spatial mapping sentence>. <timecoded beat paragraphs...>
 
@@ -125,11 +135,10 @@ overall_soundscape: <1-4 sentences>
 non_diegetic_music: <1-3 sentences, or N/A>
 
 Each Segment section must also:
-- Use the exact headers shown above so tooling can parse the 10-second boundaries.
-- Open [Shot 1] with the style token, then the spatial mapping sentence, then timecoded beat paragraphs separated ONLY by double line breaks (no ### headers or bullets inside segments).
-- State the opening pose/composition that matches the previous Segment's final frame so clips concatenate seamlessly.
-- Be FULLY SELF-CONTAINED: everything the video model needs lives inside this Segment. Never reference another Segment or a section that will not travel with it.
-- MAXIMUM CONCISION: every sentence must earn its place; no padding, no repeats. HARD LIMIT: each Segment body MUST stay at or under {MAX_SCRIPT_PROMPT_CHARS} characters.
+- Write ONLY the single Segment requested in the prompt.
+- Open [Shot 1] with style token, spatial mapping, and continuous camera motion.
+- Be FULLY SELF-CONTAINED.
+- MAXIMUM CONCISION: every sentence must be lean, dense, and punchy. HARD LIMIT: each Segment body MUST stay at or under {MAX_SCRIPT_PROMPT_CHARS} characters so the total saved prompt stays strictly under 1,350 characters (leaving safety margin under the 1,700 character ceiling).
 """
 
 
@@ -147,7 +156,7 @@ Hard direction rules (the treatment must respect them):
 
 Character roster (spell names exactly, ALL CAPS): {roster}
 
-The scene is divided into {part_count} x 10-second segments. Plan ALL of them as one escalating arc.
+The scene is divided into {part_count} x 10-second segments. Plan ALL of them as one escalating arc. Every segment must feature active theatrical character acting with expressive facial shifts and continuous unbroken camera motion.
 
 OUTPUT FORMAT — return Markdown with EXACTLY these headers, nothing else:
 ## Hook
@@ -212,7 +221,12 @@ def build_part0_prompt(
     part_count: int,
     treatment: str,
 ) -> str:
-    """Prompt for segment 0, which also establishes the shared scene sections."""
+    """Prompt for segment 0, establishing shared scene sections and MiniMax core fields.
+
+    References:
+    - base-en.txt §2.2 (Three core fields), §3.1 (I2VA development), §4.1 (Opening framing)
+    - ref-en.txt §5.4 (Theatrical acting & speaker encoding)
+    """
     span = segment_span(0)
     return (
         build_scene_context(story, scene)
@@ -231,8 +245,12 @@ def build_part0_prompt(
         "non_diegetic_music>\n\n"
         "Write Segment 0 ONLY. Later parts are generated separately and will "
         "reference this output, so keep the shared sections self-contained and "
-        "maximally concise. Obey every direction rule. HARD LIMIT: the Segment 0 "
-        f"body must stay at or under {MAX_SCRIPT_PROMPT_CHARS} characters."
+        "maximally concise. Obey every direction rule. In every timecoded beat, "
+        "spell out what EVERY character on screen is doing physically AND what their "
+        "face is expressing (theatrical acting; no plastic/static features). Keep camera "
+        "motion continuous and unbroken with strictly NO cuts or sudden zoom jumps. "
+        f"HARD LIMIT: the Segment 0 body must stay at or under {MAX_SCRIPT_PROMPT_CHARS} characters "
+        "so the total prompt remains under 1,350 characters."
     )
 
 
@@ -246,7 +264,12 @@ def build_next_part_prompt(
     characters: list[str],
     treatment: str,
 ) -> str:
-    """Prompt for a later segment, chaining the previous segment and treatment."""
+    """Prompt for a later segment, chaining the previous segment and treatment.
+
+    References:
+    - base-en.txt §3.2 (FL2VA single-shot continuity path between keyframes)
+    - ref-en.txt §5.4 & §6 (Observable character acting and audio separation)
+    """
     span = segment_span(part_index)
     shared = (
         f"Logline: {logline}\n"
@@ -270,31 +293,39 @@ def build_next_part_prompt(
         "plan as the three labeled core fields:\n"
         f"## Segment {part_index} ({span})\n<segment body>\n\n"
         "Do NOT restate the title, Logline, Characters, or Setting & Light. "
-        "Follow all direction rules and MAXIMUM CONCISION. HARD LIMIT: the "
-        f"segment body must stay at or under {MAX_SCRIPT_PROMPT_CHARS} characters."
+        "Follow all direction rules and MAXIMUM CONCISION. In every timecoded beat, "
+        "spell out what EVERY character on screen is doing physically AND what their "
+        "face is expressing (theatrical acting; no plastic/static features). Keep camera "
+        "motion continuous and unbroken with strictly NO cuts or sudden zoom jumps. "
+        f"HARD LIMIT: the segment body must stay at or under {MAX_SCRIPT_PROMPT_CHARS} characters "
+        "so the total prompt remains under 1,350 characters."
     )
 
 
 def build_critique_prompt(treatment: str, document: str) -> str:
-    """Prompt for the quality-critique pass over one generated part."""
+    """Prompt for the quality-critique pass over one generated part.
+
+    Evaluates compliance with MiniMax H3 rules (base-en.txt & ref-en.txt).
+    """
     return (
         "You are a brutally honest short-form video director reviewing a scene "
         "segment written for a LITERAL video-generation model. Score each axis "
         "1-10 and give ONE concrete fix per axis scoring below 8. Do NOT rewrite "
         "the segment.\n\n"
         "AXES:\n"
-        "- HOOK (does the first second stop a scrolling thumb?)\n"
+        "- HOOK (does the first second stop a scrolling thumb? base-en.txt §4.1)\n"
         "- ESCALATION (is this segment more than the last, per the treatment ladder?)\n"
         "- ATTENTION CONTROL (is there one clear focal point per beat?)\n"
-        "- DYNAMISM & ACTING (are all characters continuously alive with expressive physical acting, dynamic postures, tactile contact, and zero standing still/frozen mannequins?)\n"
-        "- DIALOGUE ECONOMY (every line <=10 words, one job each, no deletable lines?)\n"
-        "- LITERALNESS (only physical facts; no emotion labels, no invented numbers?)\n"
-        "- FILMABILITY (one camera move, continuous locomotion, no teleporting?)\n"
-        "- LENGTH (body at or under the stated character limit?)\n\n"
+        "- DYNAMISM & THEATRICAL ACTING (are all characters on screen continuously alive with expressive physical acting and changing facial expressions in EVERY beat, acting like great theatre actors with zero plastic/stiff doll-like stillness? ref-en.txt §5.4)\n"
+        "- CAMERA CONTINUITY & NO CUTS (is it strictly one continuous unbroken shot with zero cuts, zero jump cuts, and zero sudden zoom jumps across beats? base-en.txt §3.2, §4.2-§4.3)\n"
+        "- DIALOGUE ECONOMY (every line <=10 words, one job each, no deletable lines? base-en.txt §4.4)\n"
+        "- LITERALNESS (only physical facts; no emotion labels, no invented numbers? ref-en.txt §5.4)\n"
+        "- FILMABILITY (one camera move, continuous locomotion, no teleporting? base-en.txt §4.3)\n"
+        "- LENGTH (body at or under the stated character limit so total is under 1,350 characters?)\n\n"
         f"DIRECTOR'S TREATMENT:\n{treatment}\n\n"
         f"SEGMENT UNDER REVIEW:\n{document}\n\n"
         "Return ONLY:\n"
-        "SCORES: hook=N, escalation=N, attention=N, dynamism=N, dialogue=N, literalness=N, filmability=N, length=N\n"
+        "SCORES: hook=N, escalation=N, attention=N, dynamism=N, camera=N, dialogue=N, literalness=N, filmability=N, length=N\n"
         "FIXES: numbered list, one line per fix."
     )
 
@@ -314,8 +345,10 @@ def build_condense_prompt(previous_doc: str, current_chars: int, target_chars: i
     """Prompt to rewrite the previous document shorter while keeping its structure."""
     reduce_by = current_chars - target_chars
     return (
-        f"Your previous document is {current_chars} characters; the limit is "
-        f"{target_chars} characters. Rewrite it, cutting at least {reduce_by} "
-        "characters while keeping the same section structure and story beats. "
+        f"Your previous rendered script is {current_chars} characters; the hard cap is "
+        f"1350 characters (total prompt must stay under 1700 characters). Rewrite the document, cutting at least "
+        f"{reduce_by} characters. Keep the Logline (1 sentence <60 chars) and Setting & Light (1 sentence <80 chars) "
+        f"extremely compact. Make the multimodal description dense and punchy (target {target_chars} characters for the segment body), "
+        "retaining timecoded beats, theatrical character acting, and the three core fields. "
         f"Return ONLY the rewritten document.\n\n{previous_doc}"
     )

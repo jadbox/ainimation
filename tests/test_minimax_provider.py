@@ -30,11 +30,11 @@ class FakeResp:
 KEY = "test-key"
 
 
-def build_req(continuity=True, closing=False):
+def build_req(continuity=True, closing=False, duration=5):
     img = b"\xff\xd8fakejpeg"
     return VideoRequest(
         prompt="P",
-        duration=10,
+        duration=duration,
         character_references=(ReferenceImage("MRS BRISBY", img),),
         background_reference=ReferenceImage("background", img),
         continuity_frame=ReferenceImage("continuity", img) if continuity else None,
@@ -51,10 +51,15 @@ class TestMiniMax(unittest.TestCase):
         self.assertEqual(payload["model"], "MiniMax-H3")
         self.assertEqual(payload["resolution"], "768P")
         self.assertEqual(payload["ratio"], "16:9")
-        self.assertEqual(payload["duration"], 10)
+        self.assertEqual(payload["duration"], 5)
         types = [c["type"] for c in payload["content"]]
         self.assertEqual(types, ["text", "image_url"])
         self.assertEqual(payload["content"][1]["role"], "first_frame")
+
+    def test_payload_custom_duration(self):
+        p = MiniMaxVideoProvider(api_key=KEY)
+        payload = p._build_payload(build_req(continuity=True, duration=12))
+        self.assertEqual(payload["duration"], 12)
 
     def test_payload_reference_mode_without_continuity(self):
         p = MiniMaxVideoProvider(api_key=KEY)

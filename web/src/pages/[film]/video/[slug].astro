@@ -14,7 +14,7 @@ if (!isValidFilm(film)) {
 const partMatch = slug.match(/^(.+)_part_(\d+)(?:_v(\d+))?$/);
 const sceneName = partMatch ? partMatch[1] : slug;
 const part = partMatch ? Number(partMatch[2]) : null;
-const reqVersion = partMatch && partMatch[3] !== undefined ? Number(partMatch[3]) : null;
+const reqVersion = partMatch ? (partMatch[3] !== undefined ? Number(partMatch[3]) : 0) : null;
 
 const movie = loadMovie(film);
 const story = movie.story.find((s) => s.name === sceneName);
@@ -58,11 +58,7 @@ if (videos.full) {
 }
 for (const s of videos.segments) {
   for (const v of s.versions) {
-    const isThisActive =
-      part === s.part &&
-      (reqVersion !== null
-        ? v.version === reqVersion
-        : v.version === s.versions[s.versions.length - 1].version);
+    const isThisActive = part === s.part && reqVersion !== null && v.version === reqVersion;
     related.push({
       href: `/${film}/video/${sceneName}_part_${s.part}${v.version > 0 ? `_v${v.version}` : ""}`,
       label: `Part ${s.part} ${v.label}`,

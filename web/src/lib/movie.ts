@@ -162,8 +162,8 @@ export function readScript(
   return fs.readFileSync(file, "utf8");
 }
 
-export function animatorCommand(film: string, name: string): string {
-  return `uv run animator --film ${film} --scene ${name}`;
+export function animatorCommand(film: string, name: string, duration = 5): string {
+  return `uv run animator --film ${film} --scene ${name} --duration ${duration}`;
 }
 
 export function scriptgenCommand(

@@ -451,7 +451,7 @@ def main() -> None:
         pre.error(str(error))
     parser = argparse.ArgumentParser(
         description=(
-            f"Generate 10-second {DEFAULT_RESOLUTION} 24fps animated clips for a scene script "
+            f"Generate {DEFAULT_DURATION_SECONDS}-second {DEFAULT_RESOLUTION} 24fps animated clips for a scene script "
             "using a configurable video provider (default: MiniMax H3 via the MiniMax API "
             "at 768P; alternative: OpenRouter minimax/hailuo-3 at 768p), with the scene's final "
             "character blueprints as reference images. Each script segment becomes "

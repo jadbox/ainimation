@@ -13,18 +13,17 @@ DEFAULT_MODEL = "google/gemini-3.7-flash"
 REASONING_EFFORT = "high"
 
 # Budget model (measured in characters):
-#   7,000  absolute maximum the video model will accept for one prompt
-#  -1,000  reserved for what the animator tacks onto the prompt head
-#          (IMAGE_REF tags, FIRST_FRAME/LAST_FRAME headers, continuity and
-#          background-plate instructions)
+# MiniMax H3 prompt guidelines (base-en.txt & ref-en.txt) require lean, dense prompts.
+# Total prompt sent to the video generator (static header + segment body + animator reference tags)
+# must remain strictly under 1,700 characters.
+#   1,700  absolute maximum total prompt for the video generator
+#    -350  safety margin reserved for animator reference tags (<IMAGE_REF_N> & alignment header)
 #  ------
-#   6,000  hard cap for each saved part file — anything over is rejected
-MAX_SCRIPT_CHARS = 6000
-# The segment-body limit the model is *told* to hit. Models consistently
-# overshoot a stated limit by ~1,000-2,000 characters, so the stated number
-# is set well below the real budget; the render/retry loop measures the true
-# total against MAX_SCRIPT_CHARS regardless.
-MAX_SCRIPT_PROMPT_CHARS = MAX_SCRIPT_CHARS - 2000
+#   1,350  hard cap for each saved part file — anything over is rejected
+MAX_SCRIPT_CHARS = 1350
+# Target segment-body budget (~600-650 chars) so that
+# header (~300-350 chars) + body easily fits within MAX_SCRIPT_CHARS (1,350 chars).
+MAX_SCRIPT_PROMPT_CHARS = 650
 MAX_RETRIES = 3
 
 DEFAULT_PARTS = 3

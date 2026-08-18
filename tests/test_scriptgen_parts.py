@@ -50,8 +50,8 @@ class TestScriptgenParts(unittest.TestCase):
         self.assertEqual(segment_span(5), "0:50-1:00")
 
     def test_budget_constants_reserve_video_model_headroom(self) -> None:
-        self.assertEqual(MAX_SCRIPT_CHARS, 6000)
-        self.assertEqual(MAX_SCRIPT_PROMPT_CHARS, MAX_SCRIPT_CHARS - 2000)
+        self.assertEqual(MAX_SCRIPT_CHARS, 1350)
+        self.assertEqual(MAX_SCRIPT_PROMPT_CHARS, 650)
 
     @patch("scriptgen.cli.build_part0_prompt", return_value="part-zero prompt")
     @patch("scriptgen.cli._generate")
@@ -259,9 +259,14 @@ class TestResumeBehavior(unittest.TestCase):
         self.assertEqual(generate_part.call_args_list[1].args[0], 1)
 
     @patch.dict("os.environ", {"OPENROUTER_API_KEY": "test"})
+    @patch("scriptgen.cli.resolve_openrouter_model", return_value="test")
+    @patch("scriptgen.cli._generate_part")
+    @patch("scriptgen.cli._generate_treatment", return_value="treatment")
     @patch("scriptgen.cli.get_scene", return_value=_scene())
     @patch("scriptgen.cli.get_story_scene", return_value=_story())
-    def test_non_contiguous_parts_raise(self, story, scene) -> None:
+    def test_non_contiguous_parts_raise(
+        self, story, scene, treatment, generate_part, resolve
+    ) -> None:
         self.part0.unlink()
         (self.out / "example_part1.md").write_text(
             PART_FILE_TEMPLATE.format(idx=1), encoding="utf-8"
@@ -269,6 +274,77 @@ class TestResumeBehavior(unittest.TestCase):
 
         with self.assertRaises(RuntimeError):
             run(self._args(parts=2))
+
+    @patch("sys.argv", ["scriptgen", "--name", "example", "--parts", "1", "--force"])
+    @patch.dict("os.environ", {"OPENROUTER_API_KEY": "test"})
+    @patch("scriptgen.cli.resolve_openrouter_model", return_value="test")
+    @patch("scriptgen.cli._generate_part")
+    @patch("scriptgen.cli._generate_treatment", return_value="treatment")
+    @patch("scriptgen.cli.get_scene", return_value=_scene())
+    @patch("scriptgen.cli.get_story_scene", return_value=_story())
+    def test_metadata_file_written_for_generated_parts(
+        self, story, scene, treatment, generate_part, resolve
+    ) -> None:
+        generate_part.return_value = ("script content", "body", ("l", "s", ["MOUSE"]))
+        args = self._args(parts=1)
+        args.force = True
+
+        result = run(args)
+
+        self.assertEqual(result, 0)
+        md_file = self.out / "example_part0.md"
+        txt_file = self.out / "example_part0.txt"
+        self.assertTrue(md_file.exists())
+        self.assertTrue(txt_file.exists())
+        txt_content = txt_file.read_text(encoding="utf-8")
+        self.assertIn("uv run scriptgen", txt_content)
+        self.assertIn("<OUTPUT>", txt_content)
+        self.assertIn("</OUTPUT>", txt_content)
+
+    @patch.dict("os.environ", {"OPENROUTER_API_KEY": "test"})
+    @patch("scriptgen.cli.resolve_openrouter_model", return_value="test")
+    @patch("scriptgen.cli._generate_part")
+    @patch("scriptgen.cli._generate_treatment", return_value="treatment")
+    @patch("scriptgen.cli.get_scene", return_value=_scene())
+    @patch("scriptgen.cli.get_story_scene", return_value=_story())
+    def test_backup_created_when_overwriting_existing_parts(
+        self, story, scene, treatment, generate_part, resolve
+    ) -> None:
+        old_content = self.part0.read_text(encoding="utf-8")
+        generate_part.return_value = ("new content", "body", ("l", "s", ["MOUSE"]))
+        args = self._args(parts=1)
+        args.force = True
+
+        run(args)
+
+        backup_dir = self.out / "part0_backup"
+        self.assertTrue(backup_dir.exists())
+        backup_file = backup_dir / "example_part0.md"
+        self.assertTrue(backup_file.exists())
+        self.assertEqual(backup_file.read_text(encoding="utf-8"), old_content)
+
+    @patch.dict("os.environ", {"OPENROUTER_API_KEY": "test"})
+    @patch("scriptgen.cli.resolve_openrouter_model", return_value="test")
+    @patch("scriptgen.cli._generate_part")
+    @patch("scriptgen.cli._generate_treatment", return_value="treatment")
+    @patch("scriptgen.cli.get_scene", return_value=_scene())
+    @patch("scriptgen.cli.get_story_scene", return_value=_story())
+    def test_existing_backup_deleted_and_recreated(
+        self, story, scene, treatment, generate_part, resolve
+    ) -> None:
+        backup_dir = self.out / "part0_backup"
+        backup_dir.mkdir(parents=True, exist_ok=True)
+        stale_file = backup_dir / "stale.txt"
+        stale_file.write_text("stale backup data", encoding="utf-8")
+
+        generate_part.return_value = ("new content", "body", ("l", "s", ["MOUSE"]))
+        args = self._args(parts=1)
+        args.force = True
+
+        run(args)
+
+        self.assertFalse(stale_file.exists())
+        self.assertTrue((backup_dir / "example_part0.md").exists())
 
 
 class TestCritiqueScoring(unittest.TestCase):

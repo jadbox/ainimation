@@ -43,6 +43,28 @@ class TestAnimatorCli(unittest.TestCase):
         args = run.call_args.args[0]
         self.assertEqual(args.frame_start, "start.jpg")
         self.assertEqual(args.frame_end, "end.jpg")
+        self.assertEqual(args.duration, 5)
+
+    def test_duration_cli_argument(self) -> None:
+        with (
+            patch(
+                "sys.argv",
+                [
+                    "animator",
+                    "--scene",
+                    "test-scene",
+                    "--duration",
+                    "8",
+                ],
+            ),
+            patch("animator.cli.run", return_value=0) as run,
+            self.assertRaises(SystemExit) as exit_context,
+        ):
+            main()
+
+        self.assertEqual(exit_context.exception.code, 0)
+        args = run.call_args.args[0]
+        self.assertEqual(args.duration, 8)
 
     def test_next_part_paths_and_latest(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

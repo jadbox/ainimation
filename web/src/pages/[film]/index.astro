@@ -228,7 +228,7 @@ const rows = movie.story.map((story, index) => {
                     )}
                     {row.videos.segments.map((seg) => (
                       <a
-                        href={`/${film}/video/${row.story.name}_part_${seg.part}`}
+                        href={`/${film}/video/${row.story.name}_part_${seg.part}${seg.versions.length > 0 && seg.versions[seg.versions.length - 1].version > 0 ? `_v${seg.versions[seg.versions.length - 1].version}` : ""}`}
                         title={`Part ${seg.part} · films/${film}/out/animations/${row.story.name}/${seg.video}`}
                         class:list={[
                           "relative block overflow-hidden rounded-md ring-1 ring-line transition hover:ring-amber-key/50",

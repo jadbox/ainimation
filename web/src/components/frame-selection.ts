@@ -304,7 +304,82 @@ export function initDeleteHandlers(): void {
 }
 
 /**
- * Initialize GENERATE video buttons per scene part with active frame selections.
+ * Default duration in seconds for video generation.
+ */
+export const DEFAULT_VIDEO_DURATION = 5;
+
+/**
+ * Return the unique localStorage key for duration scoped to the film, scene, and part.
+ */
+export function getDurationStorageKey(film: string, scene: string, part: number): string {
+  return `selected_video_duration:${film}:${scene}:${part}`;
+}
+
+/**
+ * Load the saved duration from localStorage for a given part.
+ */
+export function loadSavedDuration(
+  film: string,
+  scene: string,
+  part: number,
+  fallback = DEFAULT_VIDEO_DURATION,
+): number {
+  try {
+    const raw = localStorage.getItem(getDurationStorageKey(film, scene, part));
+    if (raw) {
+      const parsed = parseInt(raw, 10);
+      if (!Number.isNaN(parsed) && parsed >= 1 && parsed <= 15) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to load saved duration from localStorage", e);
+  }
+  return fallback;
+}
+
+/**
+ * Save the duration to localStorage for a given part.
+ */
+export function saveDuration(
+  film: string,
+  scene: string,
+  part: number,
+  duration: number,
+): void {
+  try {
+    const key = getDurationStorageKey(film, scene, part);
+    localStorage.setItem(key, String(duration));
+  } catch (e) {
+    console.warn("Failed to save duration to localStorage", e);
+  }
+}
+
+/**
+ * Initialize duration selectors for all parts from saved localStorage values.
+ */
+export function initDurationSelectors(film: string, scene: string): void {
+  document.querySelectorAll<HTMLSelectElement>("[data-duration-select]").forEach((select) => {
+    const container = select.closest<HTMLElement>("[data-generate-details]");
+    const partAttr = container?.dataset.part ?? select.dataset.part;
+    if (partAttr === undefined) return;
+    const part = Number(partAttr);
+    if (Number.isNaN(part)) return;
+
+    const savedDuration = loadSavedDuration(film, scene, part);
+    select.value = String(savedDuration);
+
+    select.addEventListener("change", () => {
+      const val = parseInt(select.value, 10);
+      if (!Number.isNaN(val) && val >= 1 && val <= 15) {
+        saveDuration(film, scene, part, val);
+      }
+    });
+  });
+}
+
+/**
+ * Initialize GENERATE video buttons per scene part with active frame selections and duration.
  */
 export function initGeneratePartHandlers(): void {
   document.querySelectorAll<HTMLButtonElement>("[data-generate-part]").forEach((button) => {
@@ -314,8 +389,23 @@ export function initGeneratePartHandlers(): void {
       const part = Number(button.dataset.part);
       const state = getPartFrameState(part);
 
+      const durationSelect = button
+        .closest("[data-generate-details]")
+        ?.querySelector<HTMLSelectElement>("[data-duration-select]");
+      const duration = durationSelect
+        ? parseInt(durationSelect.value, 10) || loadSavedDuration(film, name, part)
+        : loadSavedDuration(film, name, part);
+
+      saveDuration(film, name, part, duration);
+
+      // Close the dropdown popup
+      const details = button.closest<HTMLDetailsElement>("details");
+      if (details) {
+        details.removeAttribute("open");
+      }
+
       const command = [
-        `uv run animator --film ${film} --scene ${name} --parts ${part}`,
+        `uv run animator --film ${film} --scene ${name} --parts ${part} --duration ${duration}`,
         state.frameStart ? `--frame_start ${state.frameStart}` : "",
         state.frameEnd ? `--frame_end ${state.frameEnd}` : "",
       ]
@@ -328,11 +418,22 @@ export function initGeneratePartHandlers(): void {
           film,
           name,
           parts: part,
+          duration,
           frameStart: state.frameStart,
           frameEnd: state.frameEnd,
         },
         command,
       });
     });
+  });
+
+  // Close details dropdown when clicking outside
+  document.addEventListener("click", (event) => {
+    const target = event.target as HTMLElement;
+    if (!target.closest("[data-generate-details]")) {
+      document.querySelectorAll<HTMLDetailsElement>("[data-generate-details][open]").forEach((el) => {
+        el.removeAttribute("open");
+      });
+    }
   });
 }

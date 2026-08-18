@@ -115,7 +115,22 @@ class TestPromptTagging(unittest.TestCase):
         )
         self.assertIn("How the reference pictures align with the target video", tagged)
         self.assertIn("<IMAGE_REF_1> (from [Shot 1]) aligns with the 0.00-second mark", tagged)
-        self.assertIn("<IMAGE_REF_2> (from [Shot 1]) aligns with the 10.00-second mark", tagged)
+        self.assertIn("<IMAGE_REF_2> (from [Shot 1]) aligns with the 5.00-second mark", tagged)
+
+    def test_add_reference_tags_custom_duration(self) -> None:
+        base = (
+            "Match designs EXACTLY to reference images; never use references "
+            "as opening frames.\n"
+            "MRS BRISBY hurries across the floor."
+        )
+        tagged = add_reference_tags(
+            base_prompt=base,
+            characters=["Mrs. Brisby"],
+            has_continuity=True,
+            has_closing_continuity=True,
+            duration=8,
+        )
+        self.assertIn("<IMAGE_REF_2> (from [Shot 1]) aligns with the 8.00-second mark", tagged)
 
     def test_add_reference_tags_closing_only_drops_held_pose(self) -> None:
         tagged = add_reference_tags(
@@ -124,7 +139,7 @@ class TestPromptTagging(unittest.TestCase):
             has_closing_continuity=True,
         )
         self.assertIn(
-            "<IMAGE_REF_1> (from [Shot 1]) aligns with the 10.00-second mark",
+            "<IMAGE_REF_1> (from [Shot 1]) aligns with the 5.00-second mark",
             tagged,
         )
         self.assertIn("Begin from starting pose/composition in script.", tagged)

@@ -4,7 +4,14 @@ import { PROJECT_ROOT, isValidFilm, isValidStoryName } from "../../lib/movie";
 export const prerender = false;
 
 export async function POST({ request }: { request: Request }) {
-  let body: { film?: string; name?: string; parts?: number; frameStart?: string; frameEnd?: string };
+  let body: {
+    film?: string;
+    name?: string;
+    parts?: number;
+    duration?: number;
+    frameStart?: string;
+    frameEnd?: string;
+  };
   try {
     body = await request.json();
   } catch {
@@ -17,6 +24,13 @@ export async function POST({ request }: { request: Request }) {
   const film = typeof body.film === "string" ? body.film.trim() : "";
   const name = typeof body.name === "string" ? body.name.trim() : "";
   const parts = typeof body.parts === "number" ? body.parts : Number.NaN;
+  const duration =
+    typeof body.duration === "number" &&
+    Number.isInteger(body.duration) &&
+    body.duration >= 1 &&
+    body.duration <= 15
+      ? body.duration
+      : 5;
   const frameStart = typeof body.frameStart === "string" ? body.frameStart.trim() : "";
   const frameEnd = typeof body.frameEnd === "string" ? body.frameEnd.trim() : "";
 
@@ -40,11 +54,22 @@ export async function POST({ request }: { request: Request }) {
     );
   }
 
-  const args = ["run", "animator", "--film", film, "--scene", name, "--parts", String(parts)];
+  const args = [
+    "run",
+    "animator",
+    "--film",
+    film,
+    "--scene",
+    name,
+    "--parts",
+    String(parts),
+    "--duration",
+    String(duration),
+  ];
   if (frameStart) args.push("--frame_start", frameStart);
   if (frameEnd) args.push("--frame_end", frameEnd);
 
-  const command = `uv run animator --film ${film} --scene ${name} --parts ${parts}` +
+  const command = `uv run animator --film ${film} --scene ${name} --parts ${parts} --duration ${duration}` +
     (frameStart ? ` --frame_start ${frameStart}` : "") +
     (frameEnd ? ` --frame_end ${frameEnd}` : "");
 

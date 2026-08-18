@@ -195,6 +195,7 @@ const nextFrame =
 <script>
   import {
     initDeleteHandlers,
+    initDurationSelectors,
     initFrameSelectors,
     initGeneratePartHandlers,
   } from "../../../components/frame-selection";
@@ -209,8 +210,9 @@ const nextFrame =
     document.querySelector<HTMLElement>("[data-name]")?.dataset.name ||
     "";
 
-  // Initialize frame selections from localStorage & attach all action handlers
+  // Initialize frame selections and duration from localStorage & attach all action handlers
   initFrameSelectors(currentFilm, currentSceneName);
+  initDurationSelectors(currentFilm, currentSceneName);
   initDeleteHandlers();
   initGeneratePartHandlers();
 </script>

@@ -14,3 +14,5 @@ screeenshots/
 
 *.depricated
 *.tmp
+**/out/*
+**/out_old/*

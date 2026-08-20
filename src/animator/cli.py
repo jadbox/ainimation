@@ -344,12 +344,7 @@ def run(args: argparse.Namespace) -> int:
                         frame_end,
                     )
                 background_plate = None
-                if (
-                    scene_slug
-                    and segment.index == segments[0].index
-                    and continuity_frame is None
-                    and closing_frame is None
-                ):
+                if scene_slug and continuity_frame is None and closing_frame is None:
                     background_plate = ensure_background_plate(scene_slug, blueprint_dir, segment.body)
                     logger.info(
                         "Background plate reference for segment %d: %s",

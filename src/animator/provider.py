@@ -281,15 +281,10 @@ class MiniMaxVideoProvider(VideoProvider):
     ``GET /v2/query/video_generation/{task_id}`` until it succeeds, then
     downloads the finished MP4 from the returned ``content.url``.
 
-    MiniMax distinguishes two mutually exclusive input modes:
-    * **Reference mode** — character and background blueprints are sent as
-      ``reference_image`` entries (used when no continuity frames exist).
-    * **Frame mode** — a continuity frame is sent with ``role=first_frame``
-      and/or a closing frame with ``role=last_frame`` so frame 0 (and/or the
-      final frame) is the exact neighboring shot's frame. Because MiniMax
-      forbids mixing ``reference_image`` with ``first_frame``/``last_frame``,
-      the character references are omitted here — the locked frames already
-      pin down the character designs and background.
+    Multimodal inputs are provided as content items:
+    * Character and background blueprint references are sent with ``role=reference_image``.
+    * Continuity frames are sent with ``role=first_frame`` (opening continuity)
+      and/or ``role=last_frame`` (closing continuity).
     """
 
     name = "minimax"
@@ -391,40 +386,38 @@ class MiniMaxVideoProvider(VideoProvider):
             {"type": "text", "text": request.prompt}
         ]
 
-        if request.continuity_frame is not None or request.closing_frame is not None:
-            if request.continuity_frame is not None:
-                content.append(
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": request.continuity_frame.data_uri()},
-                        "role": "first_frame",
-                    }
-                )
-            if request.closing_frame is not None:
-                content.append(
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": request.closing_frame.data_uri()},
-                        "role": "last_frame",
-                    }
-                )
-        else:
-            for ref in request.character_references:
-                content.append(
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": ref.data_uri()},
-                        "role": "reference_image",
-                    }
-                )
-            if request.background_reference is not None:
-                content.append(
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": request.background_reference.data_uri()},
-                        "role": "reference_image",
-                    }
-                )
+        for ref in request.character_references:
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": ref.data_uri()},
+                    "role": "reference_image",
+                }
+            )
+        if request.background_reference is not None:
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": request.background_reference.data_uri()},
+                    "role": "reference_image",
+                }
+            )
+        if request.continuity_frame is not None:
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": request.continuity_frame.data_uri()},
+                    "role": "reference_image",
+                }
+            )
+        if request.closing_frame is not None:
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": request.closing_frame.data_uri()},
+                    "role": "reference_image",
+                }
+            )
 
         has_images = bool(
             request.continuity_frame is not None
@@ -454,11 +447,15 @@ class MiniMaxVideoProvider(VideoProvider):
         payload = self._build_payload(request)
 
         modes: list[str] = []
+        if request.character_references:
+            modes.append("character-ref")
+        if request.background_reference is not None:
+            modes.append("bg-ref")
         if request.continuity_frame is not None:
-            modes.append("first-frame")
+            modes.append("continuity-ref")
         if request.closing_frame is not None:
-            modes.append("last-frame")
-        in_mode = "+".join(modes) if modes else "reference"
+            modes.append("closing-ref")
+        in_mode = "+".join(modes) if modes else "text-only"
         logger.info(
             "Submitting MiniMax video request (model=%s, mode=%s, resolution=%s, "
             "duration=%ss, ratio=%s) ...",

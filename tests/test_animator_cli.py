@@ -103,6 +103,160 @@ class TestAnimatorCli(unittest.TestCase):
             self.assertEqual(latest_part_path(scene_dir, 1), legacy_part1)
             self.assertIsNone(latest_part_path(scene_dir, 2))
 
+    def test_run_with_frame_start_includes_character_and_omits_bg_reference(self) -> None:
+        import argparse
+        from unittest.mock import MagicMock
+        from animator.cli import run
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            scene_dir = temp_path / "animations" / "test_scene"
+            scene_dir.mkdir(parents=True)
+            scripts_dir = temp_path / "scripts"
+            scripts_dir.mkdir(parents=True)
+            blueprint_dir = temp_path / "blueprint"
+            blueprint_dir.mkdir(parents=True)
+
+            part0_file = scripts_dir / "test_scene_part0.md"
+            part0_file.write_text(
+                "Characters appearing: Mrs. Brisby\n\n[Shot 1] Mrs. Brisby walks.",
+                encoding="utf-8",
+            )
+
+            frame_start_file = temp_path / "start_frame.jpg"
+            frame_start_file.write_bytes(b"start_bytes")
+            char_ref_file = blueprint_dir / "mrs_brisby.jpg"
+            char_ref_file.write_bytes(b"char_bytes")
+            bg_ref_file = blueprint_dir / "barn.jpg"
+            bg_ref_file.write_bytes(b"bg_bytes")
+
+            mock_provider = MagicMock()
+            mock_provider.name = "minimax"
+            mock_provider.generate.return_value = b"fake_mp4"
+
+            args = argparse.Namespace(
+                scene="test_scene",
+                parts=0,
+                duration=5,
+                frame_start=str(frame_start_file),
+                frame_end=None,
+                output=str(scene_dir),
+                scripts_dir=str(scripts_dir),
+                blueprint_dir=str(blueprint_dir),
+                compose_only=False,
+                provider="minimax",
+                video_model=None,
+                timeout=600,
+            )
+
+            from movie_config import set_film
+            set_film("rats")
+
+            with (
+                patch("animator.cli.get_film", return_value="rats"),
+                patch("animator.cli.resolve_scene_slug", return_value="barn"),
+                patch("animator.cli.ensure_character_reference", return_value=char_ref_file),
+                patch("animator.cli.ensure_background_plate", return_value=bg_ref_file) as mock_ensure_bg,
+                patch("animator.cli.create_video_provider", return_value=mock_provider),
+                patch("animator.cli.build_video_request") as mock_build_req,
+                patch("animator.cli.extract_first_frame"),
+                patch("animator.cli.extract_last_frame"),
+                patch("animator.cli.combine_parts", return_value=None),
+            ):
+                mock_build_req.return_value = MagicMock()
+                ret = run(args)
+
+            self.assertEqual(ret, 0)
+            mock_ensure_bg.assert_not_called()
+            mock_build_req.assert_called_once()
+            call_args = mock_build_req.call_args[0]
+            direction = call_args[0]
+            references = call_args[1]
+            continuity_frame = call_args[2]
+            background_plate = call_args[3]
+
+            self.assertEqual(references, [("Mrs Brisby", char_ref_file)])
+            self.assertEqual(continuity_frame, frame_start_file)
+            self.assertIsNone(background_plate)
+            self.assertIn("Mrs. Brisby <IMAGE_REF_0>", direction)
+            self.assertIn("<IMAGE_REF_1> (from [Shot 1]) is fully referenced", direction)
+            self.assertNotIn("matches background reference", direction)
+
+    def test_run_without_frames_includes_character_and_bg_reference(self) -> None:
+        import argparse
+        from unittest.mock import MagicMock
+        from animator.cli import run
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            scene_dir = temp_path / "animations" / "test_scene"
+            scene_dir.mkdir(parents=True)
+            scripts_dir = temp_path / "scripts"
+            scripts_dir.mkdir(parents=True)
+            blueprint_dir = temp_path / "blueprint"
+            blueprint_dir.mkdir(parents=True)
+
+            part0_file = scripts_dir / "test_scene_part0.md"
+            part0_file.write_text(
+                "Characters appearing: Mrs. Brisby\n\n[Shot 1] Mrs. Brisby walks.",
+                encoding="utf-8",
+            )
+
+            char_ref_file = blueprint_dir / "mrs_brisby.jpg"
+            char_ref_file.write_bytes(b"char_bytes")
+            bg_ref_file = blueprint_dir / "barn.jpg"
+            bg_ref_file.write_bytes(b"bg_bytes")
+
+            mock_provider = MagicMock()
+            mock_provider.name = "minimax"
+            mock_provider.generate.return_value = b"fake_mp4"
+
+            args = argparse.Namespace(
+                scene="test_scene",
+                parts=0,
+                duration=5,
+                frame_start=None,
+                frame_end=None,
+                output=str(scene_dir),
+                scripts_dir=str(scripts_dir),
+                blueprint_dir=str(blueprint_dir),
+                compose_only=False,
+                provider="minimax",
+                video_model=None,
+                timeout=600,
+            )
+
+            from movie_config import set_film
+            set_film("rats")
+
+            with (
+                patch("animator.cli.get_film", return_value="rats"),
+                patch("animator.cli.resolve_scene_slug", return_value="barn"),
+                patch("animator.cli.ensure_character_reference", return_value=char_ref_file),
+                patch("animator.cli.ensure_background_plate", return_value=bg_ref_file),
+                patch("animator.cli.create_video_provider", return_value=mock_provider),
+                patch("animator.cli.build_video_request") as mock_build_req,
+                patch("animator.cli.extract_first_frame"),
+                patch("animator.cli.extract_last_frame"),
+                patch("animator.cli.combine_parts", return_value=None),
+            ):
+                mock_build_req.return_value = MagicMock()
+                ret = run(args)
+
+            self.assertEqual(ret, 0)
+            mock_build_req.assert_called_once()
+            call_args = mock_build_req.call_args[0]
+            direction = call_args[0]
+            references = call_args[1]
+            continuity_frame = call_args[2]
+            background_plate = call_args[3]
+
+            self.assertEqual(references, [("Mrs Brisby", char_ref_file)])
+            self.assertIsNone(continuity_frame)
+            self.assertEqual(background_plate, bg_ref_file)
+            self.assertIn("<IMAGE_REF_0>", direction)
+            self.assertIn("The environment set of this video matches background reference <IMAGE_REF_1> exactly.", direction)
+
 
 if __name__ == "__main__":
     unittest.main()

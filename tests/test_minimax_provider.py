@@ -45,7 +45,7 @@ def build_req(continuity=True, closing=False, duration=5):
 
 
 class TestMiniMax(unittest.TestCase):
-    def test_payload_first_frame_mode(self):
+    def test_payload_continuity_reference_mode(self):
         p = MiniMaxVideoProvider(api_key=KEY)
         payload = p._build_payload(build_req(continuity=True))
         self.assertEqual(payload["model"], "MiniMax-H3")
@@ -53,8 +53,9 @@ class TestMiniMax(unittest.TestCase):
         self.assertEqual(payload["ratio"], "16:9")
         self.assertEqual(payload["duration"], 5)
         types = [c["type"] for c in payload["content"]]
-        self.assertEqual(types, ["text", "image_url"])
-        self.assertEqual(payload["content"][1]["role"], "first_frame")
+        self.assertEqual(types, ["text", "image_url", "image_url", "image_url"])
+        roles = [c.get("role") for c in payload["content"] if c["type"] == "image_url"]
+        self.assertEqual(roles, ["reference_image", "reference_image", "reference_image"])
 
     def test_payload_custom_duration(self):
         p = MiniMaxVideoProvider(api_key=KEY)
@@ -72,17 +73,20 @@ class TestMiniMax(unittest.TestCase):
             if item["type"] == "image_url":
                 self.assertTrue(item["image_url"]["url"].startswith("data:image/jpeg;base64,"))
 
-    def test_payload_last_frame_only_mode(self):
+    def test_payload_closing_continuity_mode(self):
         p = MiniMaxVideoProvider(api_key=KEY)
         payload = p._build_payload(build_req(continuity=False, closing=True))
         roles = [c.get("role") for c in payload["content"] if c["type"] == "image_url"]
-        self.assertEqual(roles, ["last_frame"])
+        self.assertEqual(roles, ["reference_image", "reference_image", "reference_image"])
 
-    def test_payload_first_and_last_frame_mode(self):
+    def test_payload_opening_and_closing_continuity_mode(self):
         p = MiniMaxVideoProvider(api_key=KEY)
         payload = p._build_payload(build_req(continuity=True, closing=True))
         roles = [c.get("role") for c in payload["content"] if c["type"] == "image_url"]
-        self.assertEqual(roles, ["first_frame", "last_frame"])
+        self.assertEqual(
+            roles,
+            ["reference_image", "reference_image", "reference_image", "reference_image"],
+        )
 
     def test_generate_flow(self):
         p = MiniMaxVideoProvider(api_key=KEY)

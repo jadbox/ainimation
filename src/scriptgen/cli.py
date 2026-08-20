@@ -25,6 +25,7 @@ from scriptgen.config import (
     MAX_SCRIPT_PROMPT_CHARS,
     MIN_PARTS,
     resolve_openrouter_model,
+    segment_span,
 )
 from scriptgen.format import format_segment_base_prompt
 from scriptgen.parse import (
@@ -34,10 +35,12 @@ from scriptgen.parse import (
     part_index_from_path,
     parse_section,
     parse_segments_from_document,
+    parse_tagged_parts,
     part_file_path,
     slugify_name,
 )
 from scriptgen.prompts import (
+    build_all_parts_prompt,
     build_condense_prompt,
     build_critique_prompt,
     build_next_part_prompt,
@@ -168,39 +171,34 @@ def run(args: argparse.Namespace) -> int:
             story, scene, args.parts, system_instruction, model, openrouter_key, args.verbose
         )
 
-        shared: tuple[str, str, list[str]] | None = None
-        prev_body: str | None = None
-
+        existing_parts: dict[int, str] = {}
         if start_idx > 0:
-            logline, setting, characters, prev_body = parse_part_file(
-                part_file_path(base_path, 0).read_text(encoding="utf-8")
-            )
-            shared = (logline, setting, characters or list(story.characters))
-            for idx in range(1, start_idx):
-                prev_body = extract_segment_body(
-                    part_file_path(base_path, idx).read_text(encoding="utf-8")
-                )
+            for idx in range(start_idx):
+                part_p = part_file_path(base_path, idx)
+                if part_p.exists():
+                    existing_parts[idx] = extract_segment_body(part_p.read_text(encoding="utf-8"))
             logger.info(
                 "Resuming: parts 0-%d already exist, generating parts %d-%d.",
                 start_idx - 1, start_idx, args.parts - 1,
             )
 
+        generated = _generate_parts(
+            story=story,
+            scene=scene,
+            scene_name=scene_name,
+            part_count=args.parts,
+            start_idx=start_idx,
+            treatment=treatment,
+            existing_parts=existing_parts,
+            header=header,
+            system_instruction=system_instruction,
+            model=model,
+            openrouter_key=openrouter_key,
+            verbose=args.verbose,
+        )
+
         for idx in range(start_idx, args.parts):
-            content, prev_body, shared = _generate_part(
-                idx,
-                story=story,
-                scene=scene,
-                scene_name=scene_name,
-                part_count=args.parts,
-                treatment=treatment,
-                shared=shared,
-                prev_body=prev_body,
-                header=header,
-                system_instruction=system_instruction,
-                model=model,
-                openrouter_key=openrouter_key,
-                verbose=args.verbose,
-            )
+            content, _body = generated[idx]
             part_file = part_file_path(base_path, idx)
             backup_part_file(scripts_dir, part_file, idx)
             part_file.write_text(content, encoding="utf-8")
@@ -249,14 +247,22 @@ def _generate_treatment(
     return treatment
 
 
-def _render_part(scene_name, logline, setting, chars, span, body, header) -> str:
+def _render_part(
+    scene_name: str,
+    characters: list[str] | tuple[str, ...],
+    span: str = "",
+    body: str = "",
+    header: str = "",
+    logline: str = "",
+    setting: str = "",
+) -> str:
     return (
         header
         + format_segment_base_prompt(
             scene_name=scene_name,
             logline=logline,
             setting=setting,
-            characters=chars,
+            characters=characters,
             span=span,
             segment_body=body,
         )
@@ -297,11 +303,12 @@ def _critique(
     system_instruction: str,
     openrouter_key: str,
     verbose: bool,
+    part_count: int = 1,
 ) -> str:
     """Score the document against the treatment; return fixes for weak axes."""
     critique = _generate(
         model,
-        build_critique_prompt(treatment, doc),
+        build_critique_prompt(treatment, doc, part_count=part_count),
         system_instruction,
         openrouter_key,
         verbose,
@@ -318,40 +325,42 @@ def _critique(
     return fixes
 
 
-def _generate_part(
-    idx: int,
+def _generate_parts(
     *,
     story,
     scene,
     scene_name: str,
     part_count: int,
+    start_idx: int,
     treatment: str,
-    shared: tuple[str, str, list[str]] | None,
-    prev_body: str | None,
+    existing_parts: dict[int, str] | None,
     header: str,
     system_instruction: str,
     model: str,
     openrouter_key: str,
     verbose: bool,
-) -> tuple[str, str, tuple[str, str, list[str]]]:
-    """Generate one part, critiquing once and condensing until it fits.
+) -> dict[int, tuple[str, str]]:
+    """Generate all requested parts simultaneously, critique and polish them together,
 
-    Returns (rendered content, segment body, shared sections). Raises
-    RuntimeError if the part cannot be squeezed under MAX_SCRIPT_CHARS,
-    rather than silently writing an oversized prompt the video model would
-    reject after ~1,000 characters of animator instructions are prepended.
+    and ensure each part fits within MAX_SCRIPT_CHARS.
+    Returns a dict mapping part_index -> (rendered_content, segment_body).
     """
-    assert idx == 0 or shared is not None
-    prompt = (
-        build_part0_prompt(story, scene, part_count, treatment)
-        if idx == 0
-        else build_next_part_prompt(story, scene, idx, prev_body, *shared, treatment)
+    expected_indices = list(range(start_idx, part_count))
+    prompt = build_all_parts_prompt(
+        story=story,
+        scene=scene,
+        part_count=part_count,
+        treatment=treatment,
+        existing_parts=existing_parts,
+        start_part=start_idx,
     )
     doc = _generate(model, prompt, system_instruction, openrouter_key, verbose)
 
-    fixes = _critique(treatment, doc, model, system_instruction, openrouter_key, verbose)
+    fixes = _critique(
+        treatment, doc, model, system_instruction, openrouter_key, verbose, part_count=part_count
+    )
     if fixes:
-        logger.info("Applying critique fixes to part %d.", idx)
+        logger.info("Applying critique fixes across generated parts.")
         doc = _generate(
             model,
             build_polish_prompt(doc, fixes),
@@ -360,35 +369,95 @@ def _generate_part(
             verbose,
         )
 
-    for attempt in range(MAX_RETRIES + 1):
-        span, body = _extract_segment(idx, doc)
-        if idx == 0:
-            shared = (
-                parse_section(doc, r"Logline"),
-                parse_section(doc, r"Setting[^\n]*"),
-                parse_characters_in_scene(doc) or story.characters,
-            )
-        logline, setting, chars = shared
-        content = _render_part(scene_name, logline, setting, chars, span, body, header)
-        if len(content) <= MAX_SCRIPT_CHARS:
-            return content, body, shared
-        if attempt == MAX_RETRIES:
-            break
-        target_body_budget = max(350, MAX_SCRIPT_PROMPT_CHARS - attempt * 60)
-        logger.warning(
-            "Part %d too long (%d chars, limit %d, target body %d chars); condensing (%d/%d).",
-            idx, len(content), MAX_SCRIPT_CHARS, target_body_budget, attempt + 1, MAX_RETRIES,
-        )
-        prompt = build_condense_prompt(
-            doc, len(content), target_body_budget, part_index=idx, span=span
-        )
-        doc = _generate(model, prompt, system_instruction, openrouter_key, verbose)
+    parsed_parts = parse_tagged_parts(doc, expected_indices=expected_indices)
 
-    raise RuntimeError(
-        f"Part {idx} is still {len(content)} characters after {MAX_RETRIES} "
-        f"condense attempts (limit {MAX_SCRIPT_CHARS}). Aborting without "
-        "writing — rerun or regenerate with --force."
+    results: dict[int, tuple[str, str]] = {}
+    for idx in expected_indices:
+        if idx not in parsed_parts:
+            # Fallback if tag was omitted
+            _, fallback_body = _extract_segment(idx, doc)
+            parsed_parts[idx] = fallback_body
+
+        body = parsed_parts[idx]
+        span = segment_span(idx)
+        content = _render_part(
+            scene_name=scene_name,
+            characters=story.characters,
+            span=span,
+            body=body,
+            header=header,
+        )
+
+        # Validate character budget and condense if needed
+        if len(content) > MAX_SCRIPT_CHARS:
+            for attempt in range(MAX_RETRIES):
+                target_body_budget = max(350, MAX_SCRIPT_PROMPT_CHARS - attempt * 60)
+                logger.warning(
+                    "Part %d too long (%d chars, limit %d, target body %d chars); condensing (%d/%d).",
+                    idx, len(content), MAX_SCRIPT_CHARS, target_body_budget, attempt + 1, MAX_RETRIES,
+                )
+                condense_p = build_condense_prompt(
+                    body, len(content), target_body_budget, part_index=idx, span=span
+                )
+                condensed_doc = _generate(
+                    model, condense_p, system_instruction, openrouter_key, verbose
+                )
+                body = extract_segment_body(condensed_doc)
+                content = _render_part(
+                    scene_name=scene_name,
+                    characters=story.characters,
+                    span=span,
+                    body=body,
+                    header=header,
+                )
+                if len(content) <= MAX_SCRIPT_CHARS:
+                    break
+            else:
+                raise RuntimeError(
+                    f"Part {idx} is still {len(content)} characters after {MAX_RETRIES} "
+                    f"condense attempts (limit {MAX_SCRIPT_CHARS}). Aborting without "
+                    "writing — rerun or regenerate with --force."
+                )
+
+        results[idx] = (content, body)
+
+    return results
+
+
+def _generate_part(
+    idx: int,
+    *,
+    story,
+    scene,
+    scene_name: str,
+    part_count: int,
+    treatment: str,
+    shared: tuple[str, str, list[str]] | None = None,
+    prev_body: str | None = None,
+    header: str = "",
+    system_instruction: str = "",
+    model: str = "",
+    openrouter_key: str = "",
+    verbose: bool = False,
+) -> tuple[str, str, tuple[str, str, list[str]]]:
+    """Compatibility helper to generate a single part."""
+    existing_parts = {idx - 1: prev_body} if prev_body and idx > 0 else None
+    parts = _generate_parts(
+        story=story,
+        scene=scene,
+        scene_name=scene_name,
+        part_count=idx + 1 if idx >= part_count else part_count,
+        start_idx=idx,
+        treatment=treatment,
+        existing_parts=existing_parts,
+        header=header,
+        system_instruction=system_instruction,
+        model=model,
+        openrouter_key=openrouter_key,
+        verbose=verbose,
     )
+    content, body = parts[idx]
+    return content, body, ("", "", list(story.characters))
 
 
 def main() -> None:

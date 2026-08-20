@@ -9,8 +9,9 @@ from pathlib import Path
 from unittest.mock import patch
 
 from movie_config import BackgroundSpec, SceneSpec, StorySceneSpec
-from scriptgen.cli import _build_parser, _generate_part, run
+from scriptgen.cli import _build_parser, _generate_parts, _generate_part, run
 from scriptgen.config import MAX_SCRIPT_CHARS, MAX_SCRIPT_PROMPT_CHARS, segment_span
+from scriptgen.parse import parse_tagged_parts
 
 
 def _story() -> StorySceneSpec:
@@ -34,9 +35,17 @@ def _scene() -> SceneSpec:
     )
 
 
-PART_ZERO_DOC = (
-    "# Title\n## Logline\nA logline.\n## Characters in Scene\nMOUSE\n"
-    "## Setting & Light\nA setting.\n## Segment 0 (0:00-0:10)\nA beat."
+MULTI_PART_DOC = (
+    "<PART0>\n"
+    "integrated_multimodal_description: [Shot 1] 2D-animated; MOUSE in midground. [0:00-0:03] MOUSE starts. [0:03-0:07] MOUSE stops. [0:07-0:10] MOUSE leaps.\n\n"
+    "overall_soundscape: Soft grass rustle.\n\n"
+    "non_diegetic_music: N/A\n"
+    "</PART0>\n\n"
+    "<PART1>\n"
+    "integrated_multimodal_description: [Shot 1] 2D-animated; MOUSE continuing motion. [0:00-0:03] MOUSE runs. [0:03-0:07] MOUSE slides. [0:07-0:10] MOUSE enters burrow.\n\n"
+    "overall_soundscape: Quick pawsteps.\n\n"
+    "non_diegetic_music: N/A\n"
+    "</PART1>"
 )
 
 
@@ -50,56 +59,65 @@ class TestScriptgenParts(unittest.TestCase):
         self.assertEqual(segment_span(5), "0:50-1:00")
 
     def test_budget_constants_reserve_video_model_headroom(self) -> None:
-        self.assertEqual(MAX_SCRIPT_CHARS, 1450)
-        self.assertEqual(MAX_SCRIPT_PROMPT_CHARS, 600)
+        self.assertEqual(MAX_SCRIPT_CHARS, 1600)
+        self.assertEqual(MAX_SCRIPT_PROMPT_CHARS, 800)
 
-    @patch("scriptgen.cli.build_part0_prompt", return_value="part-zero prompt")
+    @patch("scriptgen.cli.build_all_parts_prompt", return_value="multi-part prompt")
     @patch("scriptgen.cli._generate")
-    def test_part_zero_receives_requested_part_count_and_treatment(
+    def test_all_parts_generated_together(
         self, generate, build_prompt
     ) -> None:
-        generate.return_value = PART_ZERO_DOC
+        generate.return_value = MULTI_PART_DOC
 
-        _generate_part(
-            0,
+        parts = _generate_parts(
             story=_story(),
             scene=_scene(),
             scene_name="example",
             part_count=2,
+            start_idx=0,
             treatment="## Hook\nA hook.",
-            shared=None,
-            prev_body=None,
-            header="",
+            existing_parts=None,
+            header="<!-- Header -->\n",
             system_instruction="",
             model="test",
             openrouter_key="test",
             verbose=False,
         )
 
-        build_prompt.assert_called_once_with(_story(), _scene(), 2, "## Hook\nA hook.")
+        build_prompt.assert_called_once_with(
+            story=_story(),
+            scene=_scene(),
+            part_count=2,
+            treatment="## Hook\nA hook.",
+            existing_parts=None,
+            start_part=0,
+        )
+        self.assertEqual(len(parts), 2)
+        self.assertIn(0, parts)
+        self.assertIn(1, parts)
+        # Verify static instructions prefix in rendered output
+        self.assertIn("Characters appearing: MOUSE", parts[0][0])
+        self.assertIn("MANDATES: One unbroken continuous shot", parts[0][0])
+        self.assertIn("Characters appearing: MOUSE", parts[1][0])
 
     @patch("scriptgen.cli._critique", return_value="")
-    @patch("scriptgen.cli.build_part0_prompt", return_value="part-zero prompt")
+    @patch("scriptgen.cli.build_all_parts_prompt", return_value="multi-part prompt")
     @patch("scriptgen.cli._generate")
     def test_oversized_part_raises_instead_of_writing(
         self, generate, build_prompt, critique
     ) -> None:
-        huge_body = "x" * (MAX_SCRIPT_CHARS + 100)
-        generate.return_value = (
-            "# Title\n## Logline\nA logline.\n## Characters in Scene\nMOUSE\n"
-            f"## Setting & Light\nA setting.\n## Segment 0 (0:00-0:10)\n{huge_body}"
-        )
+        huge_body = "x" * (MAX_SCRIPT_CHARS + 200)
+        generate.return_value = f"<PART0>\n{huge_body}\n</PART0>"
 
         with self.assertRaises(RuntimeError):
-            _generate_part(
-                0,
+            _generate_parts(
                 story=_story(),
                 scene=_scene(),
                 scene_name="example",
                 part_count=1,
+                start_idx=0,
                 treatment="## Hook\nA hook.",
-                shared=None,
-                prev_body=None,
+                existing_parts=None,
                 header="",
                 system_instruction="",
                 model="test",
@@ -109,22 +127,21 @@ class TestScriptgenParts(unittest.TestCase):
 
     @patch("scriptgen.cli.build_polish_prompt", return_value="polish prompt")
     @patch("scriptgen.cli._critique", return_value="1. Tighten the hook.")
-    @patch("scriptgen.cli.build_part0_prompt", return_value="part-zero prompt")
+    @patch("scriptgen.cli.build_all_parts_prompt", return_value="multi-part prompt")
     @patch("scriptgen.cli._generate")
-    def test_critique_fixes_trigger_one_polish_rewrite(
+    def test_critique_fixes_trigger_combined_polish_rewrite(
         self, generate, build_prompt, critique, polish_prompt
     ) -> None:
-        generate.return_value = PART_ZERO_DOC
+        generate.return_value = MULTI_PART_DOC
 
-        _generate_part(
-            0,
+        _generate_parts(
             story=_story(),
             scene=_scene(),
             scene_name="example",
-            part_count=1,
+            part_count=2,
+            start_idx=0,
             treatment="## Hook\nA hook.",
-            shared=None,
-            prev_body=None,
+            existing_parts=None,
             header="",
             system_instruction="",
             model="test",
@@ -133,29 +150,27 @@ class TestScriptgenParts(unittest.TestCase):
         )
 
         polish_prompt.assert_called_once()
-        # First generate: part 0 prompt; second generate: polish prompt.
         self.assertEqual(generate.call_count, 2)
         self.assertEqual(generate.call_args.args[1], "polish prompt")
 
     @patch("scriptgen.cli.build_polish_prompt", return_value="polish prompt")
     @patch("scriptgen.cli._critique")
-    @patch("scriptgen.cli.build_part0_prompt", return_value="part-zero prompt")
+    @patch("scriptgen.cli.build_all_parts_prompt", return_value="multi-part prompt")
     @patch("scriptgen.cli._generate")
     def test_passing_critique_skips_polish(
         self, generate, build_prompt, critique, polish_prompt
     ) -> None:
         critique.return_value = ""
-        generate.return_value = PART_ZERO_DOC
+        generate.return_value = MULTI_PART_DOC
 
-        _generate_part(
-            0,
+        _generate_parts(
             story=_story(),
             scene=_scene(),
             scene_name="example",
-            part_count=1,
+            part_count=2,
+            start_idx=0,
             treatment="## Hook\nA hook.",
-            shared=None,
-            prev_body=None,
+            existing_parts=None,
             header="",
             system_instruction="",
             model="test",
@@ -168,10 +183,10 @@ class TestScriptgenParts(unittest.TestCase):
 
 
 PART_FILE_TEMPLATE = (
-    'Scene: "Example" — A logline.\n'
+    "<!-- Generated by scriptgen: example -->\n\n"
     "Characters appearing: MOUSE.\n"
-    "=== SHARED SETTING & LIGHT ===\n"
-    "A setting.\n"
+    "Match designs EXACTLY to reference images; never use references as opening frames.\n"
+    "MANDATES: One unbroken continuous shot — strictly NO cuts, jump cuts, or zoom jumps. Lively character animation in every frame with dynamic gestures and continuously evolving facial expressions (expressions are never flat, dull, or static). Declared speaker moves mouth; all others keep mouths closed.\n\n"
     "integrated_multimodal_description: part {idx} body\n"
 )
 
@@ -198,37 +213,34 @@ class TestResumeBehavior(unittest.TestCase):
 
     @patch.dict("os.environ", {"OPENROUTER_API_KEY": "test"})
     @patch("scriptgen.cli.resolve_openrouter_model", return_value="test")
-    @patch("scriptgen.cli._generate_part")
+    @patch("scriptgen.cli._generate_parts")
     @patch("scriptgen.cli._generate_treatment", return_value="treatment")
     @patch("scriptgen.cli.get_scene", return_value=_scene())
     @patch("scriptgen.cli.get_story_scene", return_value=_story())
     def test_resume_generates_only_missing_parts(
-        self, story, scene, treatment, generate_part, resolve
+        self, story, scene, treatment, generate_parts, resolve
     ) -> None:
-        generate_part.return_value = ("content", "body", ("l", "s", ["MOUSE"]))
+        generate_parts.return_value = {1: ("content part 1", "body part 1")}
 
         result = run(self._args(parts=2))
 
         self.assertEqual(result, 0)
-        generate_part.assert_called_once()
-        self.assertEqual(generate_part.call_args.args[0], 1)
+        generate_parts.assert_called_once()
+        self.assertEqual(generate_parts.call_args.kwargs["start_idx"], 1)
         self.assertEqual(
-            generate_part.call_args.kwargs["prev_body"],
+            generate_parts.call_args.kwargs["existing_parts"][0],
             "integrated_multimodal_description: part 0 body",
-        )
-        self.assertEqual(
-            generate_part.call_args.kwargs["shared"], ("A logline.", "A setting.", ["MOUSE"])
         )
         self.assertTrue((self.out / "example_part1.md").exists())
 
     @patch.dict("os.environ", {"OPENROUTER_API_KEY": "test"})
     @patch("scriptgen.cli.resolve_openrouter_model", return_value="test")
-    @patch("scriptgen.cli._generate_part")
+    @patch("scriptgen.cli._generate_parts")
     @patch("scriptgen.cli._generate_treatment", return_value="treatment")
     @patch("scriptgen.cli.get_scene", return_value=_scene())
     @patch("scriptgen.cli.get_story_scene", return_value=_story())
     def test_all_parts_present_does_nothing(
-        self, story, scene, treatment, generate_part, resolve
+        self, story, scene, treatment, generate_parts, resolve
     ) -> None:
         (self.out / "example_part1.md").write_text(
             PART_FILE_TEMPLATE.format(idx=1), encoding="utf-8"
@@ -237,35 +249,38 @@ class TestResumeBehavior(unittest.TestCase):
         result = run(self._args(parts=2))
 
         self.assertEqual(result, 0)
-        generate_part.assert_not_called()
+        generate_parts.assert_not_called()
 
     @patch.dict("os.environ", {"OPENROUTER_API_KEY": "test"})
     @patch("scriptgen.cli.resolve_openrouter_model", return_value="test")
-    @patch("scriptgen.cli._generate_part")
+    @patch("scriptgen.cli._generate_parts")
     @patch("scriptgen.cli._generate_treatment", return_value="treatment")
     @patch("scriptgen.cli.get_scene", return_value=_scene())
     @patch("scriptgen.cli.get_story_scene", return_value=_story())
     def test_force_regenerates_from_part_zero(
-        self, story, scene, treatment, generate_part, resolve
+        self, story, scene, treatment, generate_parts, resolve
     ) -> None:
-        generate_part.return_value = ("content", "body", ("l", "s", ["MOUSE"]))
+        generate_parts.return_value = {
+            0: ("content part 0", "body part 0"),
+            1: ("content part 1", "body part 1"),
+        }
         args = self._args(parts=2)
         args.force = True
 
         run(args)
 
-        self.assertEqual(generate_part.call_count, 2)
-        self.assertEqual(generate_part.call_args_list[0].args[0], 0)
-        self.assertEqual(generate_part.call_args_list[1].args[0], 1)
+        generate_parts.assert_called_once()
+        self.assertEqual(generate_parts.call_args.kwargs["start_idx"], 0)
+        self.assertEqual(generate_parts.call_args.kwargs["part_count"], 2)
 
     @patch.dict("os.environ", {"OPENROUTER_API_KEY": "test"})
     @patch("scriptgen.cli.resolve_openrouter_model", return_value="test")
-    @patch("scriptgen.cli._generate_part")
+    @patch("scriptgen.cli._generate_parts")
     @patch("scriptgen.cli._generate_treatment", return_value="treatment")
     @patch("scriptgen.cli.get_scene", return_value=_scene())
     @patch("scriptgen.cli.get_story_scene", return_value=_story())
     def test_non_contiguous_parts_raise(
-        self, story, scene, treatment, generate_part, resolve
+        self, story, scene, treatment, generate_parts, resolve
     ) -> None:
         self.part0.unlink()
         (self.out / "example_part1.md").write_text(
@@ -278,14 +293,14 @@ class TestResumeBehavior(unittest.TestCase):
     @patch("sys.argv", ["scriptgen", "--name", "example", "--parts", "1", "--force"])
     @patch.dict("os.environ", {"OPENROUTER_API_KEY": "test"})
     @patch("scriptgen.cli.resolve_openrouter_model", return_value="test")
-    @patch("scriptgen.cli._generate_part")
+    @patch("scriptgen.cli._generate_parts")
     @patch("scriptgen.cli._generate_treatment", return_value="treatment")
     @patch("scriptgen.cli.get_scene", return_value=_scene())
     @patch("scriptgen.cli.get_story_scene", return_value=_story())
     def test_metadata_file_written_for_generated_parts(
-        self, story, scene, treatment, generate_part, resolve
+        self, story, scene, treatment, generate_parts, resolve
     ) -> None:
-        generate_part.return_value = ("script content", "body", ("l", "s", ["MOUSE"]))
+        generate_parts.return_value = {0: ("script content", "body")}
         args = self._args(parts=1)
         args.force = True
 
@@ -303,15 +318,15 @@ class TestResumeBehavior(unittest.TestCase):
 
     @patch.dict("os.environ", {"OPENROUTER_API_KEY": "test"})
     @patch("scriptgen.cli.resolve_openrouter_model", return_value="test")
-    @patch("scriptgen.cli._generate_part")
+    @patch("scriptgen.cli._generate_parts")
     @patch("scriptgen.cli._generate_treatment", return_value="treatment")
     @patch("scriptgen.cli.get_scene", return_value=_scene())
     @patch("scriptgen.cli.get_story_scene", return_value=_story())
     def test_backup_created_when_overwriting_existing_parts(
-        self, story, scene, treatment, generate_part, resolve
+        self, story, scene, treatment, generate_parts, resolve
     ) -> None:
         old_content = self.part0.read_text(encoding="utf-8")
-        generate_part.return_value = ("new content", "body", ("l", "s", ["MOUSE"]))
+        generate_parts.return_value = {0: ("new content", "body")}
         args = self._args(parts=1)
         args.force = True
 
@@ -323,29 +338,6 @@ class TestResumeBehavior(unittest.TestCase):
         self.assertTrue(backup_file.exists())
         self.assertEqual(backup_file.read_text(encoding="utf-8"), old_content)
 
-    @patch.dict("os.environ", {"OPENROUTER_API_KEY": "test"})
-    @patch("scriptgen.cli.resolve_openrouter_model", return_value="test")
-    @patch("scriptgen.cli._generate_part")
-    @patch("scriptgen.cli._generate_treatment", return_value="treatment")
-    @patch("scriptgen.cli.get_scene", return_value=_scene())
-    @patch("scriptgen.cli.get_story_scene", return_value=_story())
-    def test_existing_backup_deleted_and_recreated(
-        self, story, scene, treatment, generate_part, resolve
-    ) -> None:
-        backup_dir = self.out / "part0_backup"
-        backup_dir.mkdir(parents=True, exist_ok=True)
-        stale_file = backup_dir / "stale.txt"
-        stale_file.write_text("stale backup data", encoding="utf-8")
-
-        generate_part.return_value = ("new content", "body", ("l", "s", ["MOUSE"]))
-        args = self._args(parts=1)
-        args.force = True
-
-        run(args)
-
-        self.assertFalse(stale_file.exists())
-        self.assertTrue((backup_dir / "example_part0.md").exists())
-
 
 class TestCritiqueScoring(unittest.TestCase):
     @patch("scriptgen.cli._generate")
@@ -353,88 +345,95 @@ class TestCritiqueScoring(unittest.TestCase):
         from scriptgen.cli import _critique
 
         generate.return_value = (
-            "SCORES: hook=5, escalation=8, show_dont_tell=7, pacing_rhythm=9, "
+            "SCORES: hook=5, escalation=8, continuity=8, show_dont_tell=7, pacing_rhythm=9, "
             "dynamism_acting=8, atmosphere_audio=8, camera_continuity=9, literalness=9, length=9\n"
-            "FIXES:\n1. Open on the vial glow.\n2. Remove self-narration line."
+            "FIXES:\n1. <PART0>: Open on the vial glow.\n2. <PART1>: Remove self-narration line."
         )
-        fixes = _critique("treatment", "doc", "m", "sys", "key", False)
-        self.assertIn("Open on the vial glow", fixes)
-        self.assertIn("Remove self-narration line", fixes)
+        fixes = _critique("treatment", "doc", "m", "sys", "key", False, part_count=2)
+        self.assertIn("<PART0>: Open on the vial glow", fixes)
+        self.assertIn("<PART1>: Remove self-narration line", fixes)
 
     @patch("scriptgen.cli._generate")
     def test_all_passing_scores_yield_no_fixes(self, generate) -> None:
         from scriptgen.cli import _critique
 
         generate.return_value = (
-            "SCORES: hook=9, escalation=8, show_dont_tell=9, pacing_rhythm=9, "
+            "SCORES: hook=9, escalation=8, continuity=9, show_dont_tell=9, pacing_rhythm=9, "
             "dynamism_acting=9, atmosphere_audio=8, camera_continuity=9, literalness=8, length=9\n"
             "FIXES:\nn/a"
         )
-        fixes = _critique("treatment", "doc", "m", "sys", "key", False)
+        fixes = _critique("treatment", "doc", "m", "sys", "key", False, part_count=2)
         self.assertEqual(fixes, "")
 
 
+class TestParseTaggedParts(unittest.TestCase):
+    def test_parse_tagged_parts_extracts_correctly(self) -> None:
+        doc = (
+            "<PART0>\n"
+            "integrated_multimodal_description: [Shot 1] p0 desc\n"
+            "overall_soundscape: s0\n"
+            "non_diegetic_music: m0\n"
+            "</PART0>\n"
+            "<PART1>\n"
+            "integrated_multimodal_description: [Shot 1] p1 desc\n"
+            "overall_soundscape: s1\n"
+            "non_diegetic_music: m1\n"
+            "</PART1>"
+        )
+        parts = parse_tagged_parts(doc)
+        self.assertEqual(len(parts), 2)
+        self.assertIn(0, parts)
+        self.assertIn(1, parts)
+        self.assertIn("p0 desc", parts[0])
+        self.assertIn("p1 desc", parts[1])
+
+    def test_parse_tagged_parts_fallback_to_segment_headers(self) -> None:
+        doc = (
+            "## Segment 0 (0:00-0:10)\n"
+            "integrated_multimodal_description: [Shot 1] p0\n\n"
+            "## Segment 1 (0:10-0:20)\n"
+            "integrated_multimodal_description: [Shot 1] p1\n"
+        )
+        parts = parse_tagged_parts(doc)
+        self.assertEqual(len(parts), 2)
+        self.assertIn(0, parts)
+        self.assertIn(1, parts)
+
+
 class TestPromptBuilders(unittest.TestCase):
-    def test_solo_character_treatment_prompt_enforces_show_dont_tell(self) -> None:
-        from scriptgen.prompts import build_treatment_prompt
+    def test_build_all_parts_prompt_contains_tags(self) -> None:
+        from scriptgen.prompts import build_all_parts_prompt
 
-        solo_story = StorySceneSpec(
-            name="solo_walk",
-            title="Solo Walk",
-            scene="field",
-            characters=("Mrs Brisby",),
-            emotions=(),
-            actions=(),
-            looks=(),
-        )
-        prompt = build_treatment_prompt(solo_story, _scene(), 3)
-        self.assertIn("SOLO CHARACTER scene", prompt)
-        self.assertIn("SHOW, DON'T TELL", prompt)
-        self.assertIn("NO self-narration", prompt)
+        prompt = build_all_parts_prompt(_story(), _scene(), 3, "## Treatment\nTreatment text.")
+        self.assertIn("<PART0>", prompt)
+        self.assertIn("<PART1>", prompt)
+        self.assertIn("<PART2>", prompt)
+        self.assertIn("all 3 parts", prompt)
 
-    def test_multi_character_treatment_prompt_specifies_dialogue(self) -> None:
-        from scriptgen.prompts import build_treatment_prompt
+    def test_build_critique_prompt_reviews_all_parts(self) -> None:
+        from scriptgen.prompts import build_critique_prompt
 
-        multi_story = StorySceneSpec(
-            name="meeting",
-            title="Meeting",
-            scene="field",
-            characters=("Mrs Brisby", "Mr Ages"),
-            emotions=(),
-            actions=(),
-            looks=(),
-        )
-        prompt = build_treatment_prompt(multi_story, _scene(), 3)
-        self.assertIn("MULTI-CHARACTER scene", prompt)
-        self.assertIn("subtextual dialogue", prompt)
+        critique_p = build_critique_prompt("treatment", "<PART0>p0</PART0><PART1>p1</PART1>", part_count=2)
+        self.assertIn("<PART0>", critique_p)
+        self.assertIn("CONTINUITY", critique_p)
+        self.assertIn("PARTS UNDER REVIEW", critique_p)
 
-    def test_system_instruction_contains_mandates(self) -> None:
-        from scriptgen.prompts import build_system_instruction
+    def test_build_polish_prompt_preserves_tags(self) -> None:
+        from scriptgen.prompts import build_polish_prompt
 
-        instruction = build_system_instruction(3)
-        self.assertIn("SHOW, DON'T TELL & CINEMATIC DIALOGUE RULES", instruction)
-        self.assertIn("ZERO SELF-NARRATION", instruction)
-        self.assertIn("3-BEAT STORYBOARDING RHYTHM", instruction)
-        self.assertIn("Hook & Kinetic Setup", instruction)
-        self.assertIn("Complication / Sensory Event", instruction)
-        self.assertIn("Kinetic Reaction / Propulsion", instruction)
+        polish_p = build_polish_prompt("<PART0>doc</PART0>", "Fix something")
+        self.assertIn("<PART0>", polish_p)
+        self.assertIn("Fix something", polish_p)
 
     def test_build_condense_prompt_structure(self) -> None:
         from scriptgen.prompts import build_condense_prompt
 
-        # Part 0 condensation prompt
-        p0_prompt = build_condense_prompt("doc content", 1400, 550, part_index=0, span="0:00-0:10")
-        self.assertIn("## Segment 0 (0:00-0:10)", p0_prompt)
-        self.assertIn("strictly under 550 characters", p0_prompt)
-        self.assertIn("CONDENSATION RULES", p0_prompt)
-
-        # Part 1 condensation prompt
-        p1_prompt = build_condense_prompt("doc content", 1400, 480, part_index=1, span="0:10-0:20")
-        self.assertIn("## Segment 1 (0:10-0:20)", p1_prompt)
-        self.assertIn("Do NOT include title, logline", p1_prompt)
-        self.assertIn("strictly under 480 characters", p1_prompt)
+        prompt = build_condense_prompt("doc content", 1700, 600, part_index=0, span="0:00-0:10")
+        self.assertIn("Part 0", prompt)
+        self.assertIn("strictly under 600 characters", prompt)
 
 
 if __name__ == "__main__":
     unittest.main()
+
 

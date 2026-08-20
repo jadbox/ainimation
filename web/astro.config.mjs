@@ -10,5 +10,8 @@ export default defineConfig({
   },
   vite: {
     plugins: [tailwindcss()],
+    server: {
+      allowedHosts: ["dev.jonathandunlap.com"],
+    },
   },
 });

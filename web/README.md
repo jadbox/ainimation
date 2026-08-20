@@ -25,7 +25,7 @@ bun install
 bun run dev
 ```
  
-Then open http://localhost:4321.
+Then open http://localhost:8080.
  
 The server resolves the pipeline root by walking up from `web/` until it finds the `films/` directory. Override with `ANIMATION_ROOT=/path/to/animation bun run dev` if needed. The default film is the first folder under `films/` that has a `movie.yml` (override with `FILM=<slug>`). `uv` must be on `PATH`, and the API keys required by `scriptgen` (`OPENROUTER_API_KEY`) must be set in the environment the dev server runs in.
  
@@ -33,7 +33,7 @@ The server resolves the pipeline root by walking up from `web/` until it finds t
  
 ```bash
 bun run build
-bun dist/server/entry.mjs            # default: http://localhost:4321
+bun dist/server/entry.mjs            # default: http://localhost:8080
 PORT=8080 HOST=127.0.0.1 bun dist/server/entry.mjs
 ```
 

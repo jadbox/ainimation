@@ -262,7 +262,7 @@ A local Astro + Tailwind web UI over the pipeline tools — no authentication, i
 
 * **Running**:
   ```bash
-  ./start_web.sh   # installs web dependencies if needed, then serves http://127.0.0.1:4321
+  ./start_web.sh   # installs web dependencies if needed, then serves http://127.0.0.1:8080 (pass --port to change)
   ```
 
 * **Features**:

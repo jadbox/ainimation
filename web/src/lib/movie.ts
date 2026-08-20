@@ -172,7 +172,7 @@ export function scriptgenCommand(
   force = false,
   parts = 3,
 ): string {
-  return `uv run scriptgen --film ${film} --name ${name} --parts ${parts}${force ? " --force" : ""}`;
+  return `uv run scriptgen -v --film ${film} --name ${name} --parts ${parts}${force ? " --force" : ""}`;
 }
 
 export function isValidStoryName(film: string, name: string): boolean {

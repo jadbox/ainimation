@@ -50,8 +50,8 @@ class TestScriptgenParts(unittest.TestCase):
         self.assertEqual(segment_span(5), "0:50-1:00")
 
     def test_budget_constants_reserve_video_model_headroom(self) -> None:
-        self.assertEqual(MAX_SCRIPT_CHARS, 1350)
-        self.assertEqual(MAX_SCRIPT_PROMPT_CHARS, 650)
+        self.assertEqual(MAX_SCRIPT_CHARS, 1450)
+        self.assertEqual(MAX_SCRIPT_PROMPT_CHARS, 600)
 
     @patch("scriptgen.cli.build_part0_prompt", return_value="part-zero prompt")
     @patch("scriptgen.cli._generate")
@@ -353,24 +353,88 @@ class TestCritiqueScoring(unittest.TestCase):
         from scriptgen.cli import _critique
 
         generate.return_value = (
-            "SCORES: hook=5, escalation=8, attention=9, dialogue=8, "
-            "literalness=9, filmability=8, length=9\n"
-            "FIXES:\n1. Open on the vial glow."
+            "SCORES: hook=5, escalation=8, show_dont_tell=7, pacing_rhythm=9, "
+            "dynamism_acting=8, atmosphere_audio=8, camera_continuity=9, literalness=9, length=9\n"
+            "FIXES:\n1. Open on the vial glow.\n2. Remove self-narration line."
         )
         fixes = _critique("treatment", "doc", "m", "sys", "key", False)
         self.assertIn("Open on the vial glow", fixes)
+        self.assertIn("Remove self-narration line", fixes)
 
     @patch("scriptgen.cli._generate")
     def test_all_passing_scores_yield_no_fixes(self, generate) -> None:
         from scriptgen.cli import _critique
 
         generate.return_value = (
-            "SCORES: hook=9, escalation=8, attention=9, dialogue=9, "
-            "literalness=8, filmability=9, length=9\nFIXES:\nn/a"
+            "SCORES: hook=9, escalation=8, show_dont_tell=9, pacing_rhythm=9, "
+            "dynamism_acting=9, atmosphere_audio=8, camera_continuity=9, literalness=8, length=9\n"
+            "FIXES:\nn/a"
         )
         fixes = _critique("treatment", "doc", "m", "sys", "key", False)
         self.assertEqual(fixes, "")
 
 
+class TestPromptBuilders(unittest.TestCase):
+    def test_solo_character_treatment_prompt_enforces_show_dont_tell(self) -> None:
+        from scriptgen.prompts import build_treatment_prompt
+
+        solo_story = StorySceneSpec(
+            name="solo_walk",
+            title="Solo Walk",
+            scene="field",
+            characters=("Mrs Brisby",),
+            emotions=(),
+            actions=(),
+            looks=(),
+        )
+        prompt = build_treatment_prompt(solo_story, _scene(), 3)
+        self.assertIn("SOLO CHARACTER scene", prompt)
+        self.assertIn("SHOW, DON'T TELL", prompt)
+        self.assertIn("NO self-narration", prompt)
+
+    def test_multi_character_treatment_prompt_specifies_dialogue(self) -> None:
+        from scriptgen.prompts import build_treatment_prompt
+
+        multi_story = StorySceneSpec(
+            name="meeting",
+            title="Meeting",
+            scene="field",
+            characters=("Mrs Brisby", "Mr Ages"),
+            emotions=(),
+            actions=(),
+            looks=(),
+        )
+        prompt = build_treatment_prompt(multi_story, _scene(), 3)
+        self.assertIn("MULTI-CHARACTER scene", prompt)
+        self.assertIn("subtextual dialogue", prompt)
+
+    def test_system_instruction_contains_mandates(self) -> None:
+        from scriptgen.prompts import build_system_instruction
+
+        instruction = build_system_instruction(3)
+        self.assertIn("SHOW, DON'T TELL & CINEMATIC DIALOGUE RULES", instruction)
+        self.assertIn("ZERO SELF-NARRATION", instruction)
+        self.assertIn("3-BEAT STORYBOARDING RHYTHM", instruction)
+        self.assertIn("Hook & Kinetic Setup", instruction)
+        self.assertIn("Complication / Sensory Event", instruction)
+        self.assertIn("Kinetic Reaction / Propulsion", instruction)
+
+    def test_build_condense_prompt_structure(self) -> None:
+        from scriptgen.prompts import build_condense_prompt
+
+        # Part 0 condensation prompt
+        p0_prompt = build_condense_prompt("doc content", 1400, 550, part_index=0, span="0:00-0:10")
+        self.assertIn("## Segment 0 (0:00-0:10)", p0_prompt)
+        self.assertIn("strictly under 550 characters", p0_prompt)
+        self.assertIn("CONDENSATION RULES", p0_prompt)
+
+        # Part 1 condensation prompt
+        p1_prompt = build_condense_prompt("doc content", 1400, 480, part_index=1, span="0:10-0:20")
+        self.assertIn("## Segment 1 (0:10-0:20)", p1_prompt)
+        self.assertIn("Do NOT include title, logline", p1_prompt)
+        self.assertIn("strictly under 480 characters", p1_prompt)
+
+
 if __name__ == "__main__":
     unittest.main()
+

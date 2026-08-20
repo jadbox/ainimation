@@ -374,11 +374,14 @@ def _generate_part(
             return content, body, shared
         if attempt == MAX_RETRIES:
             break
+        target_body_budget = max(350, MAX_SCRIPT_PROMPT_CHARS - attempt * 60)
         logger.warning(
-            "Part %d too long (%d chars, limit %d); condensing (%d/%d).",
-            idx, len(content), MAX_SCRIPT_CHARS, attempt + 1, MAX_RETRIES,
+            "Part %d too long (%d chars, limit %d, target body %d chars); condensing (%d/%d).",
+            idx, len(content), MAX_SCRIPT_CHARS, target_body_budget, attempt + 1, MAX_RETRIES,
         )
-        prompt = build_condense_prompt(doc, len(content), MAX_SCRIPT_PROMPT_CHARS)
+        prompt = build_condense_prompt(
+            doc, len(content), target_body_budget, part_index=idx, span=span
+        )
         doc = _generate(model, prompt, system_instruction, openrouter_key, verbose)
 
     raise RuntimeError(

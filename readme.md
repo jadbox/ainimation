@@ -268,7 +268,7 @@ A local Astro + Tailwind web UI over the pipeline tools — no authentication, i
 * **Features**:
   * Multi-film support: routes by film (`/<film>`, `/<film>/scene/...`); `/` redirects to the default film (first folder under `films/`, or `$FILM`). A film switcher appears in the header when more than one film exists, and the header title always reflects the selected film's `movie.yml` title.
   * Scene table driven by the `story:` section of the film's `movie.yml`, with live script/blueprint/video status from `films/<film>/out/`.
-  * **View scripts** page renders all segment scripts with a sticky index, and hosts script generation: a **Generate scripts** button (when no scripts exist) or **Regenerate scripts** button (when they do), each with a number-of-parts selector, that runs `uv run scriptgen --film <film> --name <scene>` on the server and streams output into a terminal panel.
+  * **View scripts** page renders all segment scripts with a sticky index, and hosts script generation: a **Generate scripts** button (when no scripts exist) or **Regenerate scripts** button (when they do), each with a number-of-parts selector, that runs `uv run scriptgen -v --film <film> --name <scene>` on the server and streams output into a terminal panel.
   * **Blueprint pages** view character and background design sheets and can trigger `generate-blueprint`.
   * **Animate page** presents one command per part and opens the CLI terminal modal to run it (streaming output) or copy it to your terminal; the scene page's **copy animator cmd** copies `uv run animator --film <film> --scene <scene>` to the clipboard.
 

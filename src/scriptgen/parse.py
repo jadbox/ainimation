@@ -85,6 +85,38 @@ def parse_segments_from_document(document: str) -> list[tuple[int, str, str]]:
     return segments
 
 
+def parse_tagged_parts(
+    document: str, expected_indices: list[int] | None = None
+) -> dict[int, str]:
+    """Extract segment bodies for each part from a multi-part document.
+
+    Looks for `<PART(\d+)>...</PART\1>` tags (case-insensitive). If missing or partial,
+    falls back to `## Segment N` headers or full document extraction.
+    Returns a dict mapping part_index -> segment_body.
+    """
+    parts: dict[int, str] = {}
+    tag_re = re.compile(
+        r"<PART(\d+)>(.*?)(?:</PART\1>|(?=<PART\d+>)|$)",
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+    for match in tag_re.finditer(document):
+        idx = int(match.group(1))
+        body = match.group(2).strip()
+        if body:
+            parts[idx] = extract_segment_body(body)
+
+    if not parts:
+        # Fallback to ## Segment N headers
+        for idx, _span, body in parse_segments_from_document(document):
+            parts[idx] = extract_segment_body(body)
+
+    if not parts and expected_indices and len(expected_indices) == 1:
+        # If only 1 part was expected and no tags were used, treat whole document as that part
+        parts[expected_indices[0]] = extract_segment_body(document)
+
+    return parts
+
+
 def part_index_from_path(path: Path) -> int:
     """Extract the segment index from a ``<base>_part<N>.md`` path."""
     match = re.search(r"_part(\d+)\.md$", path.name)

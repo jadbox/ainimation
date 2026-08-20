@@ -105,7 +105,7 @@ const timeRange = (part: number) => `${Math.floor(part * 10 / 60)}:${String(part
         Part {missing.map((m) => m + 1).join(" and ")}{" "}
         {missing.length > 1 ? "are" : "is"} missing. Use the{" "}
         <span class="font-medium text-amber-key">{hasScripts ? "Regenerate scripts" : "Generate scripts"}</span> button above or run{" "}
-        <code class="text-teal-shadow">uv run scriptgen --film {film} --name {story.name}</code>.
+        <code class="text-teal-shadow">uv run scriptgen -v --film {film} --name {story.name}</code>.
       </div>
     )
   }
@@ -194,7 +194,7 @@ const timeRange = (part: number) => `${Math.floor(part * 10 / 60)}:${String(part
     openCLITerminal({
       url: "/api/generate",
       body: { film, name, force, parts },
-      command: `uv run scriptgen --film ${film} --name ${name} --parts ${parts}${force ? " --force" : ""}`,
+      command: `uv run scriptgen -v --film ${film} --name ${name} --parts ${parts}${force ? " --force" : ""}`,
     });
   });
 

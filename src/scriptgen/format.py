@@ -10,16 +10,16 @@ The saved part file is the video-generation prompt. Total prompt length (static 
 
 from __future__ import annotations
 
-from movie_config import get_character, get_movie_info, standardize_name
+from movie_config import get_character, standardize_name
 
 
 def format_segment_base_prompt(
-    scene_name: str,
-    logline: str,
-    setting: str,
-    characters: list[str],
-    span: str,
-    segment_body: str,
+    scene_name: str = "",
+    logline: str = "",
+    setting: str = "",
+    characters: list[str] | tuple[str, ...] = (),
+    span: str = "",
+    segment_body: str = "",
 ) -> str:
     """Build the base prompt document for a single scene segment.
 

@@ -12,18 +12,8 @@ DEFAULT_MODEL = "google/gemini-3.7-flash"
 # default model).
 REASONING_EFFORT = "high"
 
-# Budget model (measured in characters):
-# MiniMax H3 prompt guidelines (base-en.txt & ref-en.txt) require lean, dense prompts.
-# Total prompt sent to the video generator (static header + segment body + animator reference tags)
-# must remain strictly under 1,700 characters.
-#   1,700  absolute maximum total prompt for the video generator
-#    -350  safety margin reserved for animator reference tags (<IMAGE_REF_N> & alignment header)
-#  ------
-#   1,350  hard cap for each saved part file — anything over is rejected
-MAX_SCRIPT_CHARS = 1350
-# Target segment-body budget (~600-650 chars) so that
-# header (~300-350 chars) + body easily fits within MAX_SCRIPT_CHARS (1,350 chars).
-MAX_SCRIPT_PROMPT_CHARS = 650
+MAX_SCRIPT_CHARS = 1600
+MAX_SCRIPT_PROMPT_CHARS = 800
 MAX_RETRIES = 3
 
 DEFAULT_PARTS = 3

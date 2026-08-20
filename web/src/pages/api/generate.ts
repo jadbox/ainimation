@@ -39,7 +39,7 @@ export async function POST({ request }: { request: Request }) {
     });
   }
 
-  const args = ["run", "scriptgen", "--film", film, "--name", name, "--parts", String(parts)];
+  const args = ["run", "scriptgen", "-v", "--film", film, "--name", name, "--parts", String(parts)];
   if (force) args.push("--force");
 
   const encoder = new TextEncoder();

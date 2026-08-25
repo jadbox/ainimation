@@ -6,7 +6,7 @@ vendor API. Concrete providers wrap different backends:
 * :class:`~animator.api.GeminiVideoProvider` — Google Gemini Omni Flash (the
   original ``interactions``-based backend; selected as ``google``).
 * :class:`OpenRouterVideoProvider` — OpenRouter's asynchronous ``/api/v1/videos``
-  endpoint (e.g. ``minimax/hailuo-3``).
+  endpoint (e.g. ``alibaba/wan-3.0``).
 * :class:`MiniMaxVideoProvider` — the MiniMax API directly (``MiniMax-H3``).
 
 A :class:`VideoRequest` normalises the pipeline's inputs (prompt text, character
@@ -112,6 +112,24 @@ class VideoProvider(ABC):
         """
 
 
+OPENROUTER_MODELS_SUPPORTING_LAST_FRAME: frozenset[str] = frozenset({
+    "bytedance/seedance-2.0-mini",
+    "bytedance/seedance-2.5",
+    "black-forest-labs/flux-3-video",
+    "minimax/hailuo-3",
+    "kwaivgi/kling-v3.0-pro",
+    "kwaivgi/kling-v3.0-std",
+    "google/veo-3.1-fast",
+    "google/veo-3.1-lite",
+    "kwaivgi/kling-video-o1",
+    "bytedance/seedance-2.0",
+    "bytedance/seedance-2.0-fast",
+    "alibaba/wan-2.7",
+    "bytedance/seedance-1-5-pro",
+    "google/veo-3.1",
+})
+
+
 class OpenRouterVideoProvider(VideoProvider):
     """Generate video via OpenRouter's asynchronous videos API.
 
@@ -119,8 +137,8 @@ class OpenRouterVideoProvider(VideoProvider):
     until completion, then downloads the finished MP4. Character and background
     references are sent as ``input_references``; a continuity frame is sent as a
     ``first_frame`` image for exact frame-0 continuity and a closing frame as a
-    ``last_frame`` image for exact final-frame continuity. MiniMax H3
-    (``minimax/hailuo-3``) is the default model at 768p.
+    ``last_frame`` image for exact final-frame continuity. Alibaba Wan 3.0
+    (``alibaba/wan-3.0``) is the default model at 480p.
     """
 
     name = "openrouter"
@@ -182,13 +200,19 @@ class OpenRouterVideoProvider(VideoProvider):
                 }
             )
         if request.closing_frame is not None:
-            frame_images.append(
-                {
-                    "type": "image_url",
-                    "image_url": {"url": request.closing_frame.data_uri()},
-                    "frame_type": "last_frame",
-                }
-            )
+            if self.model in OPENROUTER_MODELS_SUPPORTING_LAST_FRAME:
+                frame_images.append(
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": request.closing_frame.data_uri()},
+                        "frame_type": "last_frame",
+                    }
+                )
+            else:
+                logger.info(
+                    "Model %s does not support 'last_frame'; omitting closing frame reference.",
+                    self.model,
+                )
         if frame_images:
             payload["frame_images"] = frame_images
 
@@ -266,7 +290,7 @@ class OpenRouterVideoProvider(VideoProvider):
             time.sleep(POLL_INTERVAL_SECONDS)
 
     def _download(self, content_url: str, timeout: int) -> bytes:
-        response = requests.get(content_url, timeout=timeout)
+        response = requests.get(content_url, headers=self._headers(), timeout=timeout)
         if response.status_code != 200:
             raise RuntimeError(
                 f"Could not download generated video ({response.status_code})."

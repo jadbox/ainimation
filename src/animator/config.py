@@ -34,11 +34,11 @@ VIDEO_PROVIDERS = ("google", "openrouter", "minimax", "gemini")
 """Valid video provider names usable with the ``--provider`` CLI flag.
 'gemini' is a backward-compatible alias for 'google'."""
 
-DEFAULT_OPENROUTER_VIDEO_MODEL = "minimax/hailuo-3"
-"""Default OpenRouter video model (MiniMax H3)."""
+DEFAULT_OPENROUTER_VIDEO_MODEL = "alibaba/wan-3.0"
+"""Default OpenRouter video model (Alibaba Wan 3.0)."""
 
-DEFAULT_OPENROUTER_RESOLUTION = "768p"
-"""Output resolution requested for the OpenRouter video provider (MiniMax H3)."""
+DEFAULT_OPENROUTER_RESOLUTION = "480p"
+"""Output resolution requested for the OpenRouter video provider (Alibaba Wan 3.0 at 480p)."""
 
 DEFAULT_MINIMAX_VIDEO_MODEL = "MiniMax-H3"
 """Default MiniMax video model (H3), used directly via the MiniMax API."""

@@ -36,25 +36,18 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if command -v bun >/dev/null 2>&1; then
-  JS_RUNNER="bun"
-else
-  JS_RUNNER="npm"
+if ! command -v bun >/dev/null 2>&1; then
+  echo "Error: Bun is required but not installed." >&2
+  exit 1
 fi
+
+JS_RUNNER="bun"
 
 if [ ! -d "$WEB_DIR/node_modules" ]; then
-  echo "Installing web dependencies using $JS_RUNNER..."
-  if [ "$JS_RUNNER" = "bun" ]; then
-    (cd "$WEB_DIR" && bun install)
-  else
-    npm --prefix "$WEB_DIR" install
-  fi
+  echo "Installing web dependencies using bun..."
+  (cd "$WEB_DIR" && bun install)
 fi
 
-echo "Starting Astro dev server with $JS_RUNNER at http://127.0.0.1:$PORT"
-if [ "$JS_RUNNER" = "bun" ]; then
-  (cd "$WEB_DIR" && exec bun run dev -- --host 127.0.0.1 --port "$PORT" ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"})
-else
-  exec npm --prefix "$WEB_DIR" run dev -- --host 127.0.0.1 --force --port "$PORT" ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
-fi
+echo "Starting Astro dev server with bun at http://127.0.0.1:$PORT"
+(cd "$WEB_DIR" && exec bun run dev -- --host 127.0.0.1 --force --port "$PORT" ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"})
 

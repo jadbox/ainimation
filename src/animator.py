@@ -5,7 +5,7 @@ Reads the scene segment prompt files at ``films/<film>/out/scripts/<scene>_part<
 (produced by ``src/scriptgen.py``), collects the final character blueprint
 images for the characters appearing in the scene, and sends the prompt plus
 reference images to a configured video provider (MiniMax H3 via the MiniMax
-API by default, or OpenRouter's async videos API e.g. ``minimax/hailuo-3``).
+API by default, or OpenRouter's async videos API e.g. ``alibaba/wan-3.0``).
 
 Each segment prompt file is mostly complete and self-contained; ``animator`` adds
 the necessary image reference tags (<IMAGE_REF_N>), opening/closing continuity

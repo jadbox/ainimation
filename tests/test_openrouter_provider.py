@@ -30,33 +30,56 @@ class FakeResp:
 KEY = "test-key"
 
 
-def build_req(closing=False):
+def build_req(closing=False, duration=10):
     img = b"\xff\xd8fakejpeg"
     return VideoRequest(
         prompt="P",
-        duration=10,
+        duration=duration,
         character_references=(ReferenceImage("MRS BRISBY", img),),
         background_reference=ReferenceImage("background", img),
         continuity_frame=ReferenceImage("continuity", img),
         closing_frame=ReferenceImage("closing", img) if closing else None,
-        resolution="768p",
+        resolution="480p",
         aspect_ratio="16:9",
     )
 
 
 class TestOpenRouter(unittest.TestCase):
-    def test_payload_shape(self):
-        p = OpenRouterVideoProvider(api_key=KEY, model="minimax/hailuo-3")
+    def test_default_model_and_resolution(self):
+        p = OpenRouterVideoProvider(api_key=KEY)
+        self.assertEqual(p.model, "alibaba/wan-3.0")
+        self.assertEqual(p.resolution, "480p")
         payload = p._build_payload(build_req())
-        self.assertEqual(payload["model"], "minimax/hailuo-3")
-        self.assertEqual(payload["resolution"], "768p")
+        self.assertEqual(payload["model"], "alibaba/wan-3.0")
+        self.assertEqual(payload["resolution"], "480p")
+        self.assertEqual(payload["duration"], 10)
+
+    def test_payload_custom_duration(self):
+        p = OpenRouterVideoProvider(api_key=KEY)
+        payload = p._build_payload(build_req(duration=8))
+        self.assertEqual(payload["duration"], 8)
+
+    def test_payload_shape(self):
+        p = OpenRouterVideoProvider(api_key=KEY, model="alibaba/wan-3.0")
+        payload = p._build_payload(build_req())
+        self.assertEqual(payload["model"], "alibaba/wan-3.0")
+        self.assertEqual(payload["resolution"], "480p")
         self.assertEqual(payload["aspect_ratio"], "16:9")
         self.assertEqual(payload["duration"], 10)
         self.assertEqual(len(payload["input_references"]), 2)
         self.assertTrue(payload["input_references"][0]["image_url"]["url"].startswith("data:image/jpeg;base64,"))
         self.assertEqual(payload["frame_images"][0]["frame_type"], "first_frame")
 
-    def test_payload_frame_images_with_closing(self):
+    def test_payload_frame_images_with_closing_unsupported(self):
+        p = OpenRouterVideoProvider(api_key=KEY, model="alibaba/wan-3.0")
+        payload = p._build_payload(build_req(closing=True))
+        # alibaba/wan-3.0 only supports first_frame, so last_frame is omitted
+        self.assertEqual(
+            [frame["frame_type"] for frame in payload["frame_images"]],
+            ["first_frame"],
+        )
+
+    def test_payload_frame_images_with_closing_supported(self):
         p = OpenRouterVideoProvider(api_key=KEY, model="minimax/hailuo-3")
         payload = p._build_payload(build_req(closing=True))
         self.assertEqual(
@@ -65,7 +88,7 @@ class TestOpenRouter(unittest.TestCase):
         )
 
     def test_generate_flow(self):
-        p = OpenRouterVideoProvider(api_key=KEY, model="minimax/hailuo-3")
+        p = OpenRouterVideoProvider(api_key=KEY, model="alibaba/wan-3.0")
         submit = FakeResp({"id": "job1", "polling_url": "https://openrouter.ai/api/v1/videos/job1", "status": "pending"})
         poll = FakeResp({"status": "in_progress"})
         completed = FakeResp({"status": "completed", "unsigned_urls": ["https://cdn/x.mp4"], "usage": {"cost": 0.1}})
@@ -82,7 +105,8 @@ class TestOpenRouter(unittest.TestCase):
         self.assertEqual(urls[0], "https://openrouter.ai/api/v1/videos/job1")
         self.assertEqual(urls[1], "https://openrouter.ai/api/v1/videos/job1")
         self.assertEqual(urls[2], "https://cdn/x.mp4")
-        self.assertEqual(mp.call_args[1]["json"]["model"], "minimax/hailuo-3")
+        self.assertEqual(mg.call_args_list[2].kwargs["headers"]["Authorization"], f"Bearer {KEY}")
+        self.assertEqual(mp.call_args[1]["json"]["model"], "alibaba/wan-3.0")
 
     def test_raises_when_no_key(self):
         with mock.patch.dict("os.environ", {}, clear=True):

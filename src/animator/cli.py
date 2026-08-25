@@ -30,7 +30,6 @@ from animator.media import (
     extract_first_frame,
     extract_last_frame,
     latest_part_path,
-    next_frame,
     next_part_paths,
     previous_frame,
 )
@@ -330,7 +329,7 @@ def run(args: argparse.Namespace) -> int:
                     prompt_dst,
                 )
                 continuity_frame = frame_start or previous_frame(scene_dir, segment)
-                closing_frame = frame_end or next_frame(scene_dir, segment)
+                closing_frame = frame_end
                 if frame_start is not None:
                     logger.info(
                         "Using --frame-start override for segment %d: %s",
@@ -448,7 +447,7 @@ def main() -> None:
         description=(
             f"Generate {DEFAULT_DURATION_SECONDS}-second {DEFAULT_RESOLUTION} 24fps animated clips for a scene script "
             "using a configurable video provider (default: MiniMax H3 via the MiniMax API "
-            "at 768P; alternative: OpenRouter minimax/hailuo-3 at 768p), with the scene's final "
+            "at 768P; alternative: OpenRouter alibaba/wan-3.0 at 480p), with the scene's final "
             "character blueprints as reference images. Each script segment becomes "
             "films/<film>/out/animations/<scene>/part-<N>.mp4 (or -v1.mp4, -v2.mp4); the existing parts are then "
             "combined with 0.2s crossfade transitions into "
@@ -463,8 +462,7 @@ def main() -> None:
             "  %(prog)s --scene frisby_visits_mr_ages --parts 2\n"
             "      Generate only segment 2 (the third 10-second part). If\n"
             "      part-1-end.jpg exists it is used as the mandatory opening\n"
-            "      frame, and part-3-start.jpg (when present) as the mandatory\n"
-            "      closing frame.\n"
+            "      frame.\n"
             "\n"
             "  %(prog)s --scene frisby_visits_mr_ages --parts 1\n"
             "      Generate a new version of segment 1 (e.g. part-1-v1.mp4).\n"
@@ -524,8 +522,7 @@ def main() -> None:
         default=None,
         metavar="PATH",
         help=(
-            "Image to use as the mandatory closing frame for every generated part. "
-            "Overrides the automatically discovered next-part start frame."
+            "Image to use as the mandatory closing frame for every generated part."
         ),
     )
     parser.add_argument(
@@ -548,9 +545,9 @@ def main() -> None:
         help=(
             "Video generation provider (default: %(default)s, MiniMax H3 via the "
             "MiniMax API at 768P). 'google' (alias 'gemini') uses the Gemini API. "
-            "'openrouter' uses the async OpenRouter videos API with the "
-            "OpenRouter API key. 'minimax' uses the MiniMax API directly "
-            "(MiniMax H3, 768P default) with the MINIMAX_API_KEY."
+            "'openrouter' uses the async OpenRouter videos API (alibaba/wan-3.0, "
+            "480p default) with the OpenRouter API key. 'minimax' uses the MiniMax "
+            "API directly (MiniMax H3, 768P default) with the MINIMAX_API_KEY."
         ),
     )
     parser.add_argument(

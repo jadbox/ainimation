@@ -257,6 +257,75 @@ class TestAnimatorCli(unittest.TestCase):
             self.assertIn("<IMAGE_REF_0>", direction)
             self.assertIn("The environment set of this video matches background reference <IMAGE_REF_1> exactly.", direction)
 
+    def test_run_does_not_auto_discover_closing_frame_when_next_part_exists(self) -> None:
+        import argparse
+        from unittest.mock import MagicMock
+        from animator.cli import run
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            scene_dir = temp_path / "animations" / "test_scene"
+            scene_dir.mkdir(parents=True)
+            scripts_dir = temp_path / "scripts"
+            scripts_dir.mkdir(parents=True)
+            blueprint_dir = temp_path / "blueprint"
+            blueprint_dir.mkdir(parents=True)
+
+            part0_file = scripts_dir / "test_scene_part0.md"
+            part0_file.write_text(
+                "Characters appearing: Mrs. Brisby\n\n[Shot 1] Mrs. Brisby walks.",
+                encoding="utf-8",
+            )
+            # Create next part start frame to simulate existing next part
+            (scene_dir / "part-1-start.jpg").write_bytes(b"next_start")
+
+            char_ref_file = blueprint_dir / "mrs_brisby.jpg"
+            char_ref_file.write_bytes(b"char_bytes")
+            bg_ref_file = blueprint_dir / "barn.jpg"
+            bg_ref_file.write_bytes(b"bg_bytes")
+
+            mock_provider = MagicMock()
+            mock_provider.name = "minimax"
+            mock_provider.generate.return_value = b"fake_mp4"
+
+            args = argparse.Namespace(
+                scene="test_scene",
+                parts=0,
+                duration=5,
+                frame_start=None,
+                frame_end=None,
+                output=str(scene_dir),
+                scripts_dir=str(scripts_dir),
+                blueprint_dir=str(blueprint_dir),
+                compose_only=False,
+                provider="minimax",
+                video_model=None,
+                timeout=600,
+            )
+
+            from movie_config import set_film
+            set_film("rats")
+
+            with (
+                patch("animator.cli.get_film", return_value="rats"),
+                patch("animator.cli.resolve_scene_slug", return_value="barn"),
+                patch("animator.cli.ensure_character_reference", return_value=char_ref_file),
+                patch("animator.cli.ensure_background_plate", return_value=bg_ref_file),
+                patch("animator.cli.create_video_provider", return_value=mock_provider),
+                patch("animator.cli.build_video_request") as mock_build_req,
+                patch("animator.cli.extract_first_frame"),
+                patch("animator.cli.extract_last_frame"),
+                patch("animator.cli.combine_parts", return_value=None),
+            ):
+                mock_build_req.return_value = MagicMock()
+                ret = run(args)
+
+            self.assertEqual(ret, 0)
+            mock_build_req.assert_called_once()
+            call_args = mock_build_req.call_args[1] if mock_build_req.call_args[1] else {}
+            closing_frame = mock_build_req.call_args.kwargs.get("closing_frame")
+            self.assertIsNone(closing_frame)
+
 
 if __name__ == "__main__":
     unittest.main()

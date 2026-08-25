@@ -12,7 +12,7 @@ This project automates the multi-stage visual development and animation generati
 2. **Scene Background Plates**: Generates clean, character-free 16:9 production background plates for cel compositing.
 3. **30-Second Scene Scripts**: Expands abridged story beats from the `story:` section of `movie.yml` into structured 30-second scene design documents divided into three 10-second segments.
 4. **Keyframe Proposals**: Generates start and closing keyframe proposal images (`part-<N>-start-proposal.jpg` / `part-<N>-end-proposal.jpg`) ahead of video generation, referencing character blueprints, background plates, and prior keyframes to lock framing and character poses.
-5. **Animated Clips (Pluggable Video Provider)**: Generates 720p 24fps video clips per segment with first/last-frame continuity locking (MiniMax H3 via the MiniMax API directly at 768P by default, Google Gemini Omni Flash, or OpenRouter MiniMax H3 at 768p), exports each clip's first and last frames as `part-<N>-start.jpg` / `part-<N>-end.jpg`, then concatenates the clips into full scene videos with seamless crossfade transitions.
+5. **Animated Clips (Pluggable Video Provider)**: Generates 720p 24fps video clips per segment with first/last-frame continuity locking (MiniMax H3 via the MiniMax API directly at 768P by default, Google Gemini Omni Flash, or OpenRouter Alibaba Wan 3.0 at 480p), exports each clip's first and last frames as `part-<N>-start.jpg` / `part-<N>-end.jpg`, then concatenates the clips into full scene videos with seamless crossfade transitions.
 6. **Film Assembly**: The web console can merge available scene `full.mp4` files in story order into `films/<film>/out/animations/film.mp4` and export a midpoint `film-thumb.jpg`.
 7. **Web Console**: A local browser UI over the pipeline (scene tables, script generation, blueprint viewing, animator command copy) — see section 4.E.
 
@@ -162,14 +162,14 @@ Expands an abridged story scene from the `story:` section of the film's `movie.y
 
 ### C. Animator (`animator` / `src/animator.py`)
 
-Generates animated 720p 24fps video clips for each segment prompt in `films/<film>/out/scripts/<scene>_part<N>.md` using a pluggable video provider — MiniMax H3 via the MiniMax API directly (`MiniMax-H3`) at 768P by default, or Google Gemini Omni Flash (`gemini-omni-flash-preview`) or OpenRouter's async videos API with MiniMax H3 (`minimax/hailuo-3`) at 768p — maintaining frame-0 visual continuity between segments, and combining them into a full video with crossfade transitions.
+Generates animated 720p 24fps video clips for each segment prompt in `films/<film>/out/scripts/<scene>_part<N>.md` using a pluggable video provider — MiniMax H3 via the MiniMax API directly (`MiniMax-H3`) at 768P by default, or Google Gemini Omni Flash (`gemini-omni-flash-preview`) or OpenRouter's async videos API with Alibaba Wan 3.0 (`alibaba/wan-3.0`) at 480p — maintaining frame-0 visual continuity between segments, and combining them into a full video with crossfade transitions.
 
 * **CLI Commands**:
   ```bash
   # Generate all missing segment clips and combine into full.mp4 (MiniMax H3)
   uv run animator --scene <story_scene_name>
 
-  # Generate using the OpenRouter provider (MiniMax H3 at 768p)
+  # Generate using the OpenRouter provider (Alibaba Wan 3.0 at 480p)
   uv run animator --scene <story_scene_name> --provider openrouter
 
   # Generate using the MiniMax API directly (MiniMax H3 at 768P)
@@ -194,9 +194,9 @@ Generates animated 720p 24fps video clips for each segment prompt in `films/<fil
   * `--parts N`: Generate only segment index `N` (0-indexed). Automatically creates a new version (`-v1`, `-v2`, ...) if the base clip already exists. Default: generate all missing segments.
   * `--compose-only`: Skip API calls and combine the highest version of each existing `part-*.mp4` clip into `full.mp4`.
    * `--frame_start PATH` / `--frame-start PATH`: Use an image as the mandatory opening frame for every generated part, overriding automatically discovered prior-part continuity frames.
-   * `--frame_end PATH` / `--frame-end PATH`: Use an image as the mandatory closing frame for every generated part, overriding automatically discovered next-part continuity frames.
-  * `--provider NAME`: Video generation provider (`google`, `openrouter` or `minimax`; `gemini` is an alias for `google`). Default: `minimax` (MiniMax H3 via the MiniMax API). The `openrouter` provider uses `OPENROUTER_API_KEY` and defaults to `minimax/hailuo-3` at `768p`. The `minimax` provider uses `MINIMAX_API_KEY` and defaults to `MiniMax-H3` at `768P`.
-  * `--video-model MODEL`: Video generation model ID (default: `MiniMax-H3` for `minimax`; `gemini-omni-flash-preview` for `google`; OpenRouter e.g. `minimax/hailuo-3`; MiniMax e.g. `MiniMax-H3`).
+   * `--frame_end PATH` / `--frame-end PATH`: Use an image as the mandatory closing frame for every generated part.
+  * `--provider NAME`: Video generation provider (`google`, `openrouter` or `minimax`; `gemini` is an alias for `google`). Default: `minimax` (MiniMax H3 via the MiniMax API). The `openrouter` provider uses `OPENROUTER_API_KEY` and defaults to `alibaba/wan-3.0` at `480p`. The `minimax` provider uses `MINIMAX_API_KEY` and defaults to `MiniMax-H3` at `768P`.
+  * `--video-model MODEL`: Video generation model ID (default: `MiniMax-H3` for `minimax`; `gemini-omni-flash-preview` for `google`; OpenRouter e.g. `alibaba/wan-3.0`; MiniMax e.g. `MiniMax-H3`).
   * `--duration SECONDS`: Duration per segment (default: 10).
   * `--timeout SECONDS`: Polling timeout per video request (default: 600).
   * `--scripts-dir DIR`: Directory containing scene scripts (default: `films/<film>/out/scripts`).
@@ -208,7 +208,7 @@ Generates animated 720p 24fps video clips for each segment prompt in `films/<fil
   2. Loads latest blueprint images (`attempt-*.jpg`) from `films/<film>/out/blueprint/<character-slug>/` as character reference inputs. Missing blueprints are generated automatically via `generate-blueprint` (the exact command is echoed as `CREATING BLUEPRINT: ...`).
   3. For the first segment (index 0), attaches the scene location's background plate (`films/<film>/out/blueprint/<scene-slug>/attempt-*.jpg`, auto-generated if missing) as an environment reference so the set layout and depth layering stay anchored. The script name is mapped to a scene location via the `story:` section of the film's `movie.yml`.
    4. For segment `N > 0`, locates the latest last frame of segment `N-1` (`part-<N-1>-end.jpg` or `part-<N-1>-v<V>-end.jpg`, falling back to extracting it from the latest clip via `ffmpeg`) and sends it as a mandatory opening frame reference for exact visual/background continuity (no background plate is attached to these segments).
-   5. When generating a specific part (`--parts N`), also locates the first frame of segment `N+1` (`part-<N+1>-start.jpg` or `part-<N+1>-v<V>-start.jpg`) when it exists and sends it as a mandatory closing frame reference, so the clip's final frame lines up with the next shot.
+   5. If `--frame-end` is supplied, attaches it as a mandatory closing frame reference so the clip's final frame lines up with that image.
    6. Tacks reference image tags (<IMAGE_REF_N>) and continuity/opening/closing frame instructions onto the segment prompt, saving the final tagged prompt to `films/<film>/out/animations/<scene>/part-<N>-prompt.md` (or `-v<V>-prompt.md`).
    7. Generates `part-<N>.mp4` (or `-v1.mp4`, `-v2.mp4`) for each segment and exports its first and last frames as `part-<N>-start.jpg` and `part-<N>-end.jpg`.
    8. Combines all parts (using the highest available version for each part) into `films/<film>/out/animations/<scene>/full.mp4` with a 0.2s crossfade transition using `ffmpeg`.

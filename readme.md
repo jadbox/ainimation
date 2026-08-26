@@ -215,7 +215,7 @@ Generates animated 720p 24fps video clips for each segment prompt in `films/<fil
 
 * **Module Layout**:
   * `src/animator.py`: Executable CLI launcher script.
-  * `src/animator/`: Package containing submodules for config (`config.py`), provider abstraction (`provider.py`), Gemini API client (`api.py`), script parsing (`script.py`), prompt building (`prompt.py`), video media & ffmpeg processing (`media.py`), and CLI orchestration (`cli.py`).
+  * `src/animator/`: Package containing submodules for config (`config.py`), modular video providers (`providers/` — `base.py`, `minimax.py`, `openrouter.py`, `gemini.py`, `factory.py`), script parsing (`script.py`), prompt building (`prompt.py`), video media & ffmpeg processing (`media.py`), and CLI orchestration (`cli.py`).
 
 ---
 

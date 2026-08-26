@@ -3,7 +3,8 @@ import itertools
 import unittest
 from unittest import mock
 
-from animator.provider import MiniMaxVideoProvider, ReferenceImage, VideoRequest
+from animator.providers import ReferenceImage, VideoRequest, create_video_provider
+from animator.providers.minimax import MiniMaxVideoProvider
 
 
 def seq():
@@ -95,10 +96,10 @@ class TestMiniMax(unittest.TestCase):
         succeeded = FakeResp({"task": {"status": "succeeded", "content": {"url": "https://cdn/x.mp4"}}})
         dl = FakeResp({})
         dl.content = b"MP4BYTES"
-        with mock.patch("animator.provider.requests.post", return_value=submit) as mp, \
-             mock.patch("animator.provider.requests.get") as mg, \
-             mock.patch("animator.provider.time.sleep"), \
-             mock.patch("animator.provider.time.monotonic", side_effect=seq()):
+        with mock.patch("animator.providers.minimax.requests.post", return_value=submit) as mp, \
+             mock.patch("animator.providers.minimax.requests.get") as mg, \
+             mock.patch("animator.providers.minimax.time.sleep"), \
+             mock.patch("animator.providers.minimax.time.monotonic", side_effect=seq()):
             mg.side_effect = [polling, succeeded, dl]
             out = p.generate(build_req(), timeout=600)
         self.assertEqual(out, b"MP4BYTES")
@@ -120,16 +121,15 @@ class TestMiniMax(unittest.TestCase):
         p = MiniMaxVideoProvider(api_key=KEY)
         submit = FakeResp({"task_id": "job2"})
         failed = FakeResp({"task": {"status": "failed", "error": "content policy"}})
-        with mock.patch("animator.provider.requests.post", return_value=submit), \
-             mock.patch("animator.provider.requests.get", return_value=failed), \
-             mock.patch("animator.provider.time.sleep"), \
-             mock.patch("animator.provider.time.monotonic", side_effect=seq()):
+        with mock.patch("animator.providers.minimax.requests.post", return_value=submit), \
+             mock.patch("animator.providers.minimax.requests.get", return_value=failed), \
+             mock.patch("animator.providers.minimax.time.sleep"), \
+             mock.patch("animator.providers.minimax.time.monotonic", side_effect=seq()):
             with self.assertRaises(RuntimeError) as ctx:
                 p.generate(build_req(), timeout=600)
         self.assertIn("content policy", str(ctx.exception))
 
     def test_unknown_provider_defaults(self):
-        from animator.provider import create_video_provider
         with mock.patch.dict("os.environ", {"MINIMAX_API_KEY": KEY}, clear=True):
             prov = create_video_provider("minimax")
         self.assertIsInstance(prov, MiniMaxVideoProvider)
@@ -137,7 +137,7 @@ class TestMiniMax(unittest.TestCase):
     def test_cancel_sends_delete(self):
         p = MiniMaxVideoProvider(api_key=KEY)
         ok = FakeResp({"task_id": "jobX", "action": "cancelled", "status": "cancelled"})
-        with mock.patch("animator.provider.requests.delete", return_value=ok) as md:
+        with mock.patch("animator.providers.minimax.requests.delete", return_value=ok) as md:
             p.cancel("jobX", reason="test")
         url = md.call_args[0][0]
         self.assertEqual(
@@ -148,14 +148,14 @@ class TestMiniMax(unittest.TestCase):
     def test_cancel_ignores_http_error(self):
         p = MiniMaxVideoProvider(api_key=KEY)
         err = FakeResp({"error": "nope"}, status=400)
-        with mock.patch("animator.provider.requests.delete", return_value=err):
+        with mock.patch("animator.providers.minimax.requests.delete", return_value=err):
             p.cancel("jobY", reason="test")  # should not raise
 
     def test_cancel_active_tasks_on_signal(self):
         p = MiniMaxVideoProvider(api_key=KEY)
         p._active_tasks.update({"job1", "job2"})
         ok = FakeResp({"task_id": "job1", "action": "cancelled", "status": "cancelled"})
-        with mock.patch("animator.provider.requests.delete", return_value=ok) as md:
+        with mock.patch("animator.providers.minimax.requests.delete", return_value=ok) as md:
             p._cancel_active_tasks()
         ids = {c.args[0].rsplit("/", 1)[-1] for c in md.call_args_list}
         self.assertEqual(ids, {"job1", "job2"})
@@ -170,10 +170,10 @@ class TestMiniMax(unittest.TestCase):
         )
         dl = FakeResp({})
         dl.content = b"MP4BYTES"
-        with mock.patch("animator.provider.requests.post", return_value=submit), \
-             mock.patch("animator.provider.requests.get", side_effect=[succeeded, dl]), \
-             mock.patch("animator.provider.time.sleep"), \
-             mock.patch("animator.provider.time.monotonic", side_effect=seq()):
+        with mock.patch("animator.providers.minimax.requests.post", return_value=submit), \
+             mock.patch("animator.providers.minimax.requests.get", side_effect=[succeeded, dl]), \
+             mock.patch("animator.providers.minimax.time.sleep"), \
+             mock.patch("animator.providers.minimax.time.monotonic", side_effect=seq()):
             out = p.generate(build_req(), timeout=600)
         self.assertEqual(out, b"MP4BYTES")
         self.assertEqual(p._active_tasks, set())

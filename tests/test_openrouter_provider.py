@@ -3,7 +3,8 @@ import itertools
 import unittest
 from unittest import mock
 
-from animator.provider import OpenRouterVideoProvider, ReferenceImage, VideoRequest
+from animator.providers import ReferenceImage, VideoRequest, create_video_provider
+from animator.providers.openrouter import OpenRouterVideoProvider
 
 
 def seq():
@@ -94,10 +95,10 @@ class TestOpenRouter(unittest.TestCase):
         completed = FakeResp({"status": "completed", "unsigned_urls": ["https://cdn/x.mp4"], "usage": {"cost": 0.1}})
         dl = FakeResp({})
         dl.content = b"MP4BYTES"
-        with mock.patch("animator.provider.requests.post", return_value=submit) as mp, \
-             mock.patch("animator.provider.requests.get") as mg, \
-             mock.patch("animator.provider.time.sleep"), \
-             mock.patch("animator.provider.time.monotonic", side_effect=seq()):
+        with mock.patch("animator.providers.openrouter.requests.post", return_value=submit) as mp, \
+             mock.patch("animator.providers.openrouter.requests.get") as mg, \
+             mock.patch("animator.providers.openrouter.time.sleep"), \
+             mock.patch("animator.providers.openrouter.time.monotonic", side_effect=seq()):
             mg.side_effect = [poll, completed, dl]
             out = p.generate(build_req(), timeout=600)
         self.assertEqual(out, b"MP4BYTES")
@@ -117,10 +118,10 @@ class TestOpenRouter(unittest.TestCase):
         p = OpenRouterVideoProvider(api_key=KEY)
         submit = FakeResp({"id": "job2", "polling_url": "https://openrouter.ai/api/v1/videos/job2", "status": "pending"})
         failed = FakeResp({"status": "failed", "error": "content policy"})
-        with mock.patch("animator.provider.requests.post", return_value=submit), \
-             mock.patch("animator.provider.requests.get", return_value=failed), \
-             mock.patch("animator.provider.time.sleep"), \
-             mock.patch("animator.provider.time.monotonic", side_effect=seq()):
+        with mock.patch("animator.providers.openrouter.requests.post", return_value=submit), \
+             mock.patch("animator.providers.openrouter.requests.get", return_value=failed), \
+             mock.patch("animator.providers.openrouter.time.sleep"), \
+             mock.patch("animator.providers.openrouter.time.monotonic", side_effect=seq()):
             with self.assertRaises(RuntimeError) as ctx:
                 p.generate(build_req(), timeout=600)
         self.assertIn("content policy", str(ctx.exception))

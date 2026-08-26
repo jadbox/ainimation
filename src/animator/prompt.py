@@ -28,7 +28,7 @@ from animator.config import (
     DEFAULT_RESOLUTION,
 )
 from animator.models import SceneSegment
-from animator.provider import ReferenceImage, VideoRequest
+from animator.providers import ReferenceImage, VideoRequest
 from movie_config import standardize_name
 
 PROTECTED_SPAN_RE = re.compile(r'("[^"]*"|<d>.*?</d>)', flags=re.DOTALL)

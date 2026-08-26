@@ -35,7 +35,7 @@ from animator.media import (
 )
 from animator.models import SceneSegment
 from animator.prompt import add_reference_tags, build_video_request
-from animator.provider import create_video_provider
+from animator.providers import create_video_provider
 from animator.script import (
     find_scene_part_scripts,
     parse_scene_characters,

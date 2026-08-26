@@ -26,8 +26,8 @@ Usage:
 
 from __future__ import annotations
 
-from animator.api import GeminiVideoProvider, extract_video_bytes
 from animator.cli import main, run
+from animator.providers.gemini import GeminiVideoProvider, extract_video_bytes
 from animator.config import (
     ASPECT,
     ASPECT_RATIO_MAP,
@@ -68,7 +68,9 @@ from animator.media import (
 )
 from animator.models import SceneSegment
 from animator.prompt import add_reference_tags, build_direction, build_video_request
-from animator.provider import (
+from animator.providers import (
+    GeminiVideoProvider,
+    MiniMaxVideoProvider,
     OpenRouterVideoProvider,
     ReferenceImage,
     VideoProvider,
@@ -98,6 +100,7 @@ __all__ = [
     "DEFAULT_VIDEO_PROVIDER",
     "FULL_VIDEO_NAME",
     "GeminiVideoProvider",
+    "MiniMaxVideoProvider",
     "OpenRouterVideoProvider",
     "POLL_INTERVAL_SECONDS",
     "RESOLUTION",

@@ -8,7 +8,7 @@ An automated AI-driven art pipeline and production suite for creating 2D animate
 
 This project automates the multi-stage visual development and animation generation workflow:
 
-1. **Character Blueprint Sheets**: Generates cohesive 16:9 character style guides (hero poses, turnarounds, detail callouts) with automated multi-turn vision LLM review loops.
+1. **Character Blueprint Sheets**: Generates cohesive 16:9 character style guides (hero poses, turnarounds, detail callouts) with production-grade visual standards baked directly into prompts.
 2. **Scene Background Plates**: Generates clean, character-free 16:9 production background plates for cel compositing.
 3. **30-Second Scene Scripts**: Expands abridged story beats from the `story:` section of `movie.yml` into structured 30-second scene design documents divided into three 10-second segments.
 4. **Keyframe Proposals**: Generates start and closing keyframe proposal images (`part-<N>-start-proposal.jpg` / `part-<N>-end-proposal.jpg`) ahead of video generation, referencing character blueprints, background plates, and prior keyframes to lock framing and character poses.
@@ -48,7 +48,7 @@ All CLI tools take `--film <slug>` (or honor the `FILM` environment variable) to
      export GEMINI_API_KEY="your-gemini-api-key"
      # or export GOOGLE_API_KEY="..."
      ```
-   * OpenRouter API Key (required when using `--model openrouter` for video, or for OpenRouter review models like Kimi K3):
+   * OpenRouter API Key (required when using `--model openrouter` for video):
      ```bash
      export OPENROUTER_API_KEY="your-openrouter-api-key"
      ```
@@ -87,15 +87,15 @@ uv run python src/animator.py --film <film> --scene <story_scene_name> --parts 0
 
 ### A. Blueprint Generator (`generate-blueprint` / `generate.sh`)
 
-Generates character style guide sheets (`--character`) or scene background plates (`--scene`) using an image generation model and an automated reviewer LLM loop.
+Generates character style guide sheets (`--character`) or scene background plates (`--scene`) in a direct high-fidelity generation pass using Google's Nano Banana 2 image model (`gemini-3.1-flash-image-preview`), baking all production review standards directly into the prompts.
 
 * **CLI Commands**:
   ```bash
   # Generate character style guide
   uv run generate-blueprint --character "<Character Name>"
 
-  # Using helper shell script (positional character name)
-  ./generate.sh "<Character Name>" --max-iterations 3
+  # Force regenerate a character blueprint
+  uv run generate-blueprint --character "<Character Name>" --force
 
   # Generate scene background plates
   uv run generate-blueprint --scene <scene-slug>
@@ -107,18 +107,18 @@ Generates character style guide sheets (`--character`) or scene background plate
   * `--scene NAME`: Scene name or slug from the film's `movie.yml`.
   * `--output DIR`: Custom output path (default: `films/<film>/out/blueprint/<slug>/`).
   * `--image-model MODEL`: Gemini image model ID (default: `gemini-3.1-flash-image-preview`).
-  * `--review-model MODEL`: Reviewer model ID (`gemini-3.6-flash` or OpenRouter e.g. `moonshotai/kimi-k3`). Default: `moonshotai/kimi-k3`.
-  * `--max-iterations N`: Maximum generation/review attempts per subject (1-4, default: 4).
+  * `--force`: Regenerate the blueprint even if an existing style image already exists.
+  * `--new`: Ignore previous run's `prompt.txt` and start from a fresh spec prompt.
 
 * **Output Artifacts** (written to `films/<film>/out/blueprint/<subject-slug>/`):
-  * `<subject-slug>-style.jpg`: Accepted or latest 720p style reference image.
-  * `prompt.txt`: Final prompt used for the image (reloaded automatically on subsequent runs).
-  * `iterations.md`: Full review history, scores, feedback, and prompt adjustments per iteration.
-  * `attempt-01.jpg` ... `attempt-04.jpg`: Retained attempt candidates.
+  * `<subject-slug>-style.jpg`: Primary 720p style reference image.
+  * `attempt-01.jpg`: Reference plate for the animator pipeline.
+  * `prompt.txt`: Production prompt used for the image generation.
+  * `iterations.md`: Summary documentation with model, prompt, and image details.
 
 * **Module Layout**:
   * `src/blueprint.py`: Executable CLI launcher script.
-  * `src/blueprint_generator/`: Package containing the generator execution loop and modular helpers under `utils/` for models, prompts, image processing, reviewer API routing, and dynamic YAML character/scene lookups.
+  * `src/blueprint_generator/`: Package containing the generator execution loop and modular helpers under `utils/` for models, prompts, image processing, and dynamic YAML character/scene lookups.
 
 ---
 
@@ -142,14 +142,14 @@ Expands an abridged story scene from the `story:` section of the film's `movie.y
   * `--film SLUG`: Film folder under `films/<slug>/` to use (default: first film found, or `$FILM`).
    * `--name NAME`: Story scene name from the `story:` section of the film's `movie.yml` (written to `films/<film>/out/scripts/<name>_part0.md`, etc.). Omit to list all available story scenes.
    * `--parts N`: Number of 10-second scene parts to generate (1-10, default: 3).
-   * `--model MODEL`: OpenRouter model slug used to expand the scene (default: `google/gemini-3.7-flash`). The shortcut `gemini` maps to `google/gemini-3.7-flash` on OpenRouter. Requires `OPENROUTER_API_KEY`.
-   * `-v` / `--verbose`: Stream the LLM output from OpenRouter (reasoning/thinking plus final content) as it is generated.
+   * `--model MODEL`: Model slug used to expand the scene (default: `google/gemini-3.8-flash`). The shortcuts `gemini` and `gemini-3.8-flash` map to `google/gemini-3.8-flash` on OpenRouter. Requires `OPENROUTER_API_KEY` or `GEMINI_API_KEY` (`GOOGLE_API_KEY`).
+   * `-v` / `--verbose`: Stream the LLM output (reasoning/thinking plus final content) as it is generated.
    * `--output PATH`: Custom output file or directory base path.
    * `--force`: Overwrite existing scripts if they already exist.
 
-* **Director's Treatment + Simultaneous Multi-Part Generation**: generation is two-phase. First, a **Director's Treatment** pass plans the *entire* scene as one short film (scroll-stopping hook, dramatic question, per-part escalation ladder, the turn, the unforgettable image, a 5–8 line dialogue spine, and the final held frame). Then all requested 10-second segments are generated simultaneously in a single prompt separated by explicit `<PART0>`, `<PART1>`, `<PART2>`, ... sections, prompted with the treatment so every part serves the whole arc and transitions seamlessly. Reasoning effort is set to `high` for deep scene planning and critique.
+* **Director's Treatment + Simultaneous Multi-Part Generation**: generation is two-phase. First, a **Director's Treatment** pass plans the *entire* scene as one short film (scroll-stopping hook, dramatic question, character roles/dynamics, per-part escalation ladder with micro-story arcs and emotional shifts, the turn, the unforgettable image, a 5–8 line dialogue spine, and the final held frame). Then all requested 10-second segments are generated simultaneously in a single prompt separated by explicit `<PART0>`, `<PART1>`, `<PART2>`, ... sections. Thinking level is set to `high` for deep scene planning.
 
-* **Combined Quality Critique & Polish Pass**: after all parts are drafted, a single critic call scores the entire multi-part scene against the treatment (hook strength, escalation across parts, part-to-part continuity, show-don't-tell, attention control, character animation/theatrical acting, audio atmosphere, camera continuity, literalness, length); if any axis scores below 8, all parts are polished simultaneously in one pass before length validation and splitting.
+* **Embedded Quality & Character Directing**: All directorial quality standards are front-loaded directly into the generation prompt — emotional storytelling in every 10-second part, defined active roles for every character present (no idle/passive characters), vivid kinetic action with tactile prop/environment interaction, unbroken continuous camera motion, and strict show-don't-tell mandates.
 
 * **Length Validation & Export Splitting**: each saved segment prompt file (static preamble/mandates + segment body) must stay strictly under the character budget (`MAX_SCRIPT_CHARS`). If any individual part is oversized, `scriptgen` runs a targeted condensation pass for that part up to 3 times. The generated document is then split into individual part export files (`films/<film>/out/scripts/<name>_part<N>.md`) with common static instructions prepended as a prefix.
 

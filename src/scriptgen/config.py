@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
-# OpenRouter models are identified by a vendor/name slug (e.g. "google/gemini-3.7-flash").
+# OpenRouter models are identified by a vendor/name slug (e.g. "google/gemini-3.8-flash").
 OPENROUTER_CHAT_URL = "https://openrouter.ai/api/v1/chat/completions"
 # Shortcut: "--model gemini" maps to Google's flagship Gemini model on OpenRouter.
-GEMINI_OPENROUTER_MODEL = "google/gemini-3.7-flash"
-DEFAULT_MODEL = "google/gemini-3.7-flash"
+GEMINI_OPENROUTER_MODEL = "google/gemini-3.8-flash"
+GEMINI_DIRECT_MODEL = "gemini-3.8-flash"
+DEFAULT_MODEL = "google/gemini-3.8-flash"
 
 # Reasoning effort passed to OpenRouter for reasoning-capable models (the
 # default model).
@@ -35,8 +36,10 @@ def resolve_openrouter_model(model: str) -> str:
     Raises for anything that is neither a recognized shortcut nor a valid
     OpenRouter slug.
     """
-    if model == "gemini":
+    if model in ("gemini", "gemini-flash", "gemini-3.8", "gemini-3.8-flash"):
         return GEMINI_OPENROUTER_MODEL
+    if model == "gemini-direct":
+        return GEMINI_DIRECT_MODEL
     if "/" not in model:
         raise ValueError(
             f"Unknown model {model!r}. Pass an OpenRouter model slug like "

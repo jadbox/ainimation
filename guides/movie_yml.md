@@ -49,7 +49,7 @@ empty only if the film genuinely has no characters/scenes/story.
 | Field | Type | Used by | Description |
 | :--- | :--- | :--- | :--- |
 | `orientation` | string | animator | Output aspect ratio, e.g. `"16:9"`. Defaults to `16:9`. All video providers render at this ratio. Consumed by the animator for the video request aspect ratio. |
-| `style_checklist` | list of items | scriptgen, blueprint (animator via scripts) | Do / Don't checklist. Each item has `category`, `do`, and `don_t`. Consumed by `scriptgen` (system instruction) and by blueprint generation (character sheet prompts and both reviewers' hard style gate). |
+| `style_checklist` | list of items | scriptgen, blueprint (animator via scripts) | Do / Don't checklist. Each item has `category`, `do`, and `don_t`. Consumed by `scriptgen` (system instruction) and by blueprint generation (character sheet and background plate prompts). |
 | `prompt_template` | string | — | A canonical generative prompt template for the film's style — reference material for agents and prompt authors. Not consumed by tooling. |
 
 > **Keep it lean.** The core generation inputs are `style`, `camera_rules`, and
@@ -118,17 +118,15 @@ cel-composited background generation.
 | :--- | :--- | :--- | :--- | :--- |
 | `name` | string | scriptgen, blueprint | **Yes** | Human-readable scene name, e.g. `"Old Barn Field"`. |
 | `slug` | string | scriptgen, animator, blueprint | **Yes** | Unique URL-safe identifier, e.g. `"old-barn-field"`. Referenced by story `scene` entries and output folders. |
-| `logline` | string | scriptgen, blueprint | Yes | One-sentence description of the location's look and dramatic role. |
-| `backgrounds` | list of items | scriptgen, animator, blueprint | No | Background plates. Each item has `key`, `description`, `lighting`, `mood`. |
+| `logline` | string | scriptgen, blueprint | Yes | One-sentence description of the scene's dramatic story and narrative arc, which `scriptgen` breaks down into 10-second parts. |
+| `backgrounds` | list of items | scriptgen, animator, blueprint | No | Background plates. Each item has `key` and a concise `description` (incorporating environment, lighting, and mood). |
 
 ### Background item shape
 
 ```yaml
 backgrounds:
   - key: "field-approach"        # REQUIRED, unique within the scene (drives output folder)
-    description: "..."           # REQUIRED: the plate content at mouse scale
-    lighting: "..."              # REQUIRED: single dominant light source, palette, atmosphere
-    mood: "..."                  # REQUIRED: emotional register of the plate
+    description: "..."           # REQUIRED: concise environment, lighting, and mood description
 ```
 
 ---
@@ -179,16 +177,16 @@ the generated segment scripts); `—` = not used.
 
 | Field | `scriptgen` (scene scripts) | `animator` (video clips) | `blueprint` (character / scene plates) |
 | :--- | :--- | :--- | :--- |
-| `movie.title` | display (CLI header) | logging | reviewer narrative hard-gate |
+| `movie.title` | display (CLI header) | logging | narrative register in prompts |
 | `movie.headline` | Direct (system instruction) | — | — |
-| `movie.style` | Direct (director identity + video-prompt header) | Direct (video-prompt header, via `format.py`) | Direct (image prompts + reviewer identity + scene plate style) |
+| `movie.style` | Direct (director identity + video-prompt header) | Direct (video-prompt header, via `format.py`) | Direct (image prompts + scene plate style) |
 | `movie.camera_rules` | Direct (video-prompt header) | Direct (video-prompt header, via `format.py`) | — |
 | `movie.orientation` | — | Direct (video request aspect ratio) | — |
 | `movie.hard_direction_rules` | Direct (system instruction) | Indirect (baked into scripts) | — |
-| `movie.style_checklist` | Direct (system instruction style bible) | Indirect (baked into scripts) | Direct (character sheet prompt + both reviewers' style gate) |
+| `movie.style_checklist` | Direct (system instruction style bible) | Indirect (baked into scripts) | Direct (character sheet and background plate prompts) |
 | `movie.prompt_template` | — | — | — (reference only) |
 | `characters[*]` | Direct (`name`/`species`/`identity`/`appearance`/`voice` → roster & voices) | Direct (`name` → roster match, blueprint lookup, voice tags) | Direct (`name`/`species`/`identity`/`appearance`/`avoid`) |
-| `scenes[*]` | Direct (`name`/`slug`/`logline`/`backgrounds` → scene context) | Direct (`slug`/`backgrounds[].key` → background plate lookup) | Direct (`name`/`slug`/`logline` + `backgrounds[].description/lighting/mood`) |
+| `scenes[*]` | Direct (`name`/`slug`/`logline`/`backgrounds` → scene story & context) | Direct (`slug`/`backgrounds[].key` → background plate lookup) | Direct (`name`/`slug`/`logline` + `backgrounds[].description`) |
 | `story[*]` | Direct (the beat to expand) | Direct (`scene` → scene-slug mapping) | — |
 
 ### Notes & rationale
@@ -204,8 +202,8 @@ the generated segment scripts); `—` = not used.
   `orientation` (aspect ratio) and uses `story`/`scenes`/`characters` only for
   continuity references and background-plate lookup.
 * **`blueprint`** generates *images* (character sheets + background plates), so it
-  is the other place `style` lives. It consumes `style` (director identity, scene
-  plate style) and `style_checklist` (character sheets and both reviewers). Do not
+  is the other place `style` lives. It consumes `style` (scene plate style)
+  and `style_checklist` (character sheets and background plates). Do not
   rely on the verbose prose fields that were removed — the yml is intentionally
   lean, and the full artistic bible is archived in `movie.depricated.md`.
 

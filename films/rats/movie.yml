@@ -108,21 +108,17 @@ characters:
 scenes:
   - name: "Old Barn Field"
     slug: "old-barn-field"
-    logline: "the vast overgrown field Mrs. Brisby must cross to reach the abandoned barn where Mr. Ages hides, its sagging timbers swallowed by vines"
+    logline: "Mrs. Brisby makes a perilous journey across an immense overgrown field, braving hidden predators and towering wilderness to reach Mr. Ages' abandoned barn shelter before her sick son runs out of time"
     backgrounds:
       - key: "field-approach"
-        description: "an overgrown field at mouse scale: towering grass blades and clover stalks rising like a forest canopy, giant dew-beaded dandelions, thistles and drifting seed tufts catching the light, and at the field's edge a sagging abandoned barn whose weathered gray timbers are swallowed by thick climbing vines and ivy, a black gaping gap beneath its leaning door"
-        lighting: "one low shaft of late golden sunlight spearing down through the cloud cover and striking the barn's vine-covered face as the single dominant practical source, warm amber highlights on grass seed heads against deep teal and indigo shadow at the roots, thin ground mist catching the light in volumetric layers"
-        mood: "vulnerability at small scale; a tiny pilgrim crossing an enormous world toward a beckoning shelter"
+        description: "Overgrown field at mouse scale with towering clover and grass stalks under late golden sunlight spearing through clouds to hit an abandoned, vine-swallowed barn in deep teal shadows; volumetric mist conveys tiny vulnerability against an immense world."
 
   - name: "Mr. Ages' Barn Library"
     slug: "mr-ages-barn-library"
-    logline: "the cavernous barn interior where Mr. Ages keeps his secret library and remedies hidden among the rafters"
+    logline: "Mrs. Frisby enters the cavernous barn library to desperately ask the reclusive Mr. Ages for help and medicine for her son Timothy, who is bedridden with a life-threatening fever"
     backgrounds:
       - key: "barn-library-interior"
-        description: "a cavernous abandoned barn interior at mouse scale: colossal leaning timber posts and shadowed rafters overhead, vines poking through knotholes and cracked boards, and built into the stalls Mr. Ages' secret library — towering stacks of mildewed human books repurposed as walls and staircases, a spool reading desk, corked bottles and jars of dried herbs, hanging bundles of lavender and thyme, scattered parchment scraps, cobweb veils"
-        lighting: "one amber oil lantern glowing on the spool reading desk as the single dominant practical source, warm gold highlights on book spines and bottle glass against deep teal and indigo shadow swallowing the rafters, soft airbrushed bloom around the flame, floating dust motes in a faint cool light leak through the vines"
-        mood: "ancient alchemy and intellectual mystery; cozy but reclusive; reverent awe"
+        description: "Cavernous abandoned barn interior at mouse scale with towering mildewed book stacks, herb vials, and rafters lit by a single amber oil lantern on a spool desk casting warm gold highlights against deep teal shadows and floating dust motes; cozy yet reclusive ancient alchemy and reverent awe."
 
 story:
   - name: "frisby_walks_to_ages_barn"

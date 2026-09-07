@@ -16,3 +16,4 @@ screeenshots/
 *.tmp
 **/out/*
 **/out_old/*
+**/out_old*

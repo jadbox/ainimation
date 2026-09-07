@@ -30,8 +30,8 @@ def _scene() -> SceneSpec:
     return SceneSpec(
         name="Field",
         slug="field",
-        logline="A field.",
-        backgrounds=(BackgroundSpec("main", "Field", "Day", "Calm"),),
+        logline="A field where the hero journeys toward shelter.",
+        backgrounds=(BackgroundSpec("main", "Overgrown grassy field under golden sunlight; calm and quiet."),),
     )
 
 
@@ -100,11 +100,10 @@ class TestScriptgenParts(unittest.TestCase):
         self.assertIn("MANDATES: One unbroken continuous shot", parts[0][0])
         self.assertIn("Characters appearing: MOUSE", parts[1][0])
 
-    @patch("scriptgen.cli._critique", return_value="")
     @patch("scriptgen.cli.build_all_parts_prompt", return_value="multi-part prompt")
     @patch("scriptgen.cli._generate")
     def test_oversized_part_raises_instead_of_writing(
-        self, generate, build_prompt, critique
+        self, generate, build_prompt
     ) -> None:
         huge_body = "x" * (MAX_SCRIPT_CHARS + 200)
         generate.return_value = f"<PART0>\n{huge_body}\n</PART0>"
@@ -124,62 +123,6 @@ class TestScriptgenParts(unittest.TestCase):
                 openrouter_key="test",
                 verbose=False,
             )
-
-    @patch("scriptgen.cli.build_polish_prompt", return_value="polish prompt")
-    @patch("scriptgen.cli._critique", return_value="1. Tighten the hook.")
-    @patch("scriptgen.cli.build_all_parts_prompt", return_value="multi-part prompt")
-    @patch("scriptgen.cli._generate")
-    def test_critique_fixes_trigger_combined_polish_rewrite(
-        self, generate, build_prompt, critique, polish_prompt
-    ) -> None:
-        generate.return_value = MULTI_PART_DOC
-
-        _generate_parts(
-            story=_story(),
-            scene=_scene(),
-            scene_name="example",
-            part_count=2,
-            start_idx=0,
-            treatment="## Hook\nA hook.",
-            existing_parts=None,
-            header="",
-            system_instruction="",
-            model="test",
-            openrouter_key="test",
-            verbose=False,
-        )
-
-        polish_prompt.assert_called_once()
-        self.assertEqual(generate.call_count, 2)
-        self.assertEqual(generate.call_args.args[1], "polish prompt")
-
-    @patch("scriptgen.cli.build_polish_prompt", return_value="polish prompt")
-    @patch("scriptgen.cli._critique")
-    @patch("scriptgen.cli.build_all_parts_prompt", return_value="multi-part prompt")
-    @patch("scriptgen.cli._generate")
-    def test_passing_critique_skips_polish(
-        self, generate, build_prompt, critique, polish_prompt
-    ) -> None:
-        critique.return_value = ""
-        generate.return_value = MULTI_PART_DOC
-
-        _generate_parts(
-            story=_story(),
-            scene=_scene(),
-            scene_name="example",
-            part_count=2,
-            start_idx=0,
-            treatment="## Hook\nA hook.",
-            existing_parts=None,
-            header="",
-            system_instruction="",
-            model="test",
-            openrouter_key="test",
-            verbose=False,
-        )
-
-        polish_prompt.assert_not_called()
-        self.assertEqual(generate.call_count, 1)
 
 
 PART_FILE_TEMPLATE = (
@@ -339,31 +282,25 @@ class TestResumeBehavior(unittest.TestCase):
         self.assertEqual(backup_file.read_text(encoding="utf-8"), old_content)
 
 
-class TestCritiqueScoring(unittest.TestCase):
-    @patch("scriptgen.cli._generate")
-    def test_low_scores_yield_fixes(self, generate) -> None:
-        from scriptgen.cli import _critique
+class TestModelResolution(unittest.TestCase):
+    def test_default_model_is_gemini_3_8_flash(self) -> None:
+        from scriptgen.config import DEFAULT_MODEL, GEMINI_OPENROUTER_MODEL
 
-        generate.return_value = (
-            "SCORES: hook=5, escalation=8, continuity=8, show_dont_tell=7, pacing_rhythm=9, "
-            "dynamism_acting=8, atmosphere_audio=8, camera_continuity=9, literalness=9, length=9\n"
-            "FIXES:\n1. <PART0>: Open on the vial glow.\n2. <PART1>: Remove self-narration line."
+        self.assertEqual(DEFAULT_MODEL, "google/gemini-3.8-flash")
+        self.assertEqual(GEMINI_OPENROUTER_MODEL, "google/gemini-3.8-flash")
+
+    def test_resolve_model_shortcuts(self) -> None:
+        from scriptgen.config import resolve_openrouter_model
+
+        self.assertEqual(resolve_openrouter_model("gemini"), "google/gemini-3.8-flash")
+        self.assertEqual(resolve_openrouter_model("gemini-flash"), "google/gemini-3.8-flash")
+        self.assertEqual(resolve_openrouter_model("gemini-3.8"), "google/gemini-3.8-flash")
+        self.assertEqual(resolve_openrouter_model("gemini-3.8-flash"), "google/gemini-3.8-flash")
+        self.assertEqual(resolve_openrouter_model("gemini-direct"), "gemini-3.8-flash")
+        self.assertEqual(
+            resolve_openrouter_model("google/gemini-3.8-flash"),
+            "google/gemini-3.8-flash",
         )
-        fixes = _critique("treatment", "doc", "m", "sys", "key", False, part_count=2)
-        self.assertIn("<PART0>: Open on the vial glow", fixes)
-        self.assertIn("<PART1>: Remove self-narration line", fixes)
-
-    @patch("scriptgen.cli._generate")
-    def test_all_passing_scores_yield_no_fixes(self, generate) -> None:
-        from scriptgen.cli import _critique
-
-        generate.return_value = (
-            "SCORES: hook=9, escalation=8, continuity=9, show_dont_tell=9, pacing_rhythm=9, "
-            "dynamism_acting=9, atmosphere_audio=8, camera_continuity=9, literalness=8, length=9\n"
-            "FIXES:\nn/a"
-        )
-        fixes = _critique("treatment", "doc", "m", "sys", "key", False, part_count=2)
-        self.assertEqual(fixes, "")
 
 
 class TestParseTaggedParts(unittest.TestCase):
@@ -401,7 +338,7 @@ class TestParseTaggedParts(unittest.TestCase):
 
 
 class TestPromptBuilders(unittest.TestCase):
-    def test_build_all_parts_prompt_contains_tags(self) -> None:
+    def test_build_all_parts_prompt_contains_tags_and_roles(self) -> None:
         from scriptgen.prompts import build_all_parts_prompt
 
         prompt = build_all_parts_prompt(_story(), _scene(), 3, "## Treatment\nTreatment text.")
@@ -409,21 +346,26 @@ class TestPromptBuilders(unittest.TestCase):
         self.assertIn("<PART1>", prompt)
         self.assertIn("<PART2>", prompt)
         self.assertIn("all 3 parts", prompt)
+        self.assertIn("EMOTIONAL STORYTELLING", prompt)
+        self.assertIn("CHARACTER ROLES", prompt)
+        self.assertIn("WONDERFUL VIVID ACTION", prompt)
 
-    def test_build_critique_prompt_reviews_all_parts(self) -> None:
-        from scriptgen.prompts import build_critique_prompt
+    def test_build_system_instruction_enforces_emotional_acting_and_roles(self) -> None:
+        from scriptgen.prompts import build_system_instruction
 
-        critique_p = build_critique_prompt("treatment", "<PART0>p0</PART0><PART1>p1</PART1>", part_count=2)
-        self.assertIn("<PART0>", critique_p)
-        self.assertIn("CONTINUITY", critique_p)
-        self.assertIn("PARTS UNDER REVIEW", critique_p)
+        instruction = build_system_instruction(3)
+        self.assertIn("EMOTIONAL STORYTELLING IN EVERY 10-SECOND PART", instruction)
+        self.assertIn("DISTINCT ROLES FOR EVERY CHARACTER", instruction)
+        self.assertIn("NO IDLE OR PASSIVE CHARACTERS", instruction)
+        self.assertIn("WONDERFUL VIVID ACTION", instruction)
 
-    def test_build_polish_prompt_preserves_tags(self) -> None:
-        from scriptgen.prompts import build_polish_prompt
+    def test_build_treatment_system_instruction_mentions_character_roles(self) -> None:
+        from scriptgen.prompts import build_treatment_system_instruction
 
-        polish_p = build_polish_prompt("<PART0>doc</PART0>", "Fix something")
-        self.assertIn("<PART0>", polish_p)
-        self.assertIn("Fix something", polish_p)
+        treatment_sys = build_treatment_system_instruction(3)
+        self.assertIn("Character Roles & Dynamics", treatment_sys)
+        self.assertIn("Escalation Ladder", treatment_sys)
+        self.assertIn("Micro-Story Arc & Emotional Shift", treatment_sys)
 
     def test_build_condense_prompt_structure(self) -> None:
         from scriptgen.prompts import build_condense_prompt
@@ -431,6 +373,35 @@ class TestPromptBuilders(unittest.TestCase):
         prompt = build_condense_prompt("doc content", 1700, 600, part_index=0, span="0:00-0:10")
         self.assertIn("Part 0", prompt)
         self.assertIn("strictly under 600 characters", prompt)
+        self.assertIn("vivid kinetic action", prompt)
+
+    def test_scene_context_and_treatment_read_loglines_and_single_background_description(self) -> None:
+        from scriptgen.prompts import build_scene_context, build_treatment_prompt, build_treatment_system_instruction
+
+        story = _story()
+        scene = _scene()
+        context = build_scene_context(story, scene)
+        self.assertIn("Scene story & logline: Field — A field where the hero journeys toward shelter.", context)
+        self.assertIn("  - (main) Overgrown grassy field under golden sunlight; calm and quiet.", context)
+        # Should not produce empty Lighting or Mood labels when omitted
+        self.assertNotIn("Lighting:", context)
+        self.assertNotIn("Mood:", context)
+
+        treatment_prompt = build_treatment_prompt(story, scene, 3)
+        self.assertIn("Read the Scene story & logline above as the primary narrative", treatment_prompt)
+
+        treatment_sys = build_treatment_system_instruction(3)
+        self.assertIn("SCENE STORY & LOGLINE AS THE FOUNDATIONAL ARC", treatment_sys)
+
+    def test_blueprint_initial_prompt_uses_single_background_description(self) -> None:
+        from blueprint_generator.utils.prompts import build_scene_initial_prompt
+
+        scene = _scene()
+        bg = scene.backgrounds[0]
+        prompt = build_scene_initial_prompt(scene, bg)
+        self.assertIn("This plate depicts Overgrown grassy field under golden sunlight; calm and quiet.", prompt)
+        self.assertNotIn("Lighting: .", prompt)
+        self.assertNotIn("Mood: .", prompt)
 
 
 if __name__ == "__main__":

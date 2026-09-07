@@ -33,7 +33,8 @@ def build_system_instruction(part_count: int) -> str:
     """System instruction for the per-part shooting-plan generation calls.
 
     Embeds MiniMax H3 Video Prompt Writing techniques (base-en.txt & ref-en.txt)
-    and enforces dense, theatrical scripting within the <1700 character budget.
+    and enforces dense, theatrical scripting with vivid action, emotional storytelling,
+    and active character roles within the character budget.
     """
     movie_info = get_movie_info()
     roster_names = list_character_names()
@@ -68,62 +69,61 @@ CHARACTER ROSTER (use only these characters, spelled exactly in ALL CAPS):
 CHARACTER VOICES:
 {char_voices}
 
-SHOW, DON'T TELL & CINEMATIC DIALOGUE RULES (CRITICAL MANDATE):
+EMOTIONAL STORYTELLING IN EVERY 10-SECOND PART (CRITICAL MANDATE):
+- Each 10-second scene part must tell its own gripping micro-story with genuine emotional stakes, kinetic momentum, and an emotional shift.
+- A part is never just arbitrary choreography: it must have a beginning desire/tension, a vivid action or sensory complication, and an emotional landing or pivot that sets up the next part.
+
+DISTINCT ROLES FOR EVERY CHARACTER (NO IDLE OR PASSIVE CHARACTERS):
+- When characters are present in a scene, EVERY character has an active, defined dramatic role, an urgent personal objective, and a continuous physical presence in THAT part.
+- NO IDLE CHARACTERS: Never leave any character standing limp, frozen, or passively observing. Concurrently describe what ALL visible characters are doing physically AND what their facial expressions and eyes are doing.
+- In multi-character interactions, treat the scene like a theatrical stage performance: Character A's action/dialogue triggers an immediate visible physical and facial reaction from Character B (e.g. recoiling, leaning in, eyes widening, jaw tightening, hands reaching). Characters maintain active eyelines looking at each other or at focal story props — NEVER into the camera lens.
+
+WONDERFUL VIVID ACTION & PHYSICAL ACTING:
+- Direct animation with golden-age theatrical vitality: dynamic locomotion, deep anticipation crouches, follow-through drag on ears, whiskers, tails, and capes, and weight transfer.
+- TACTILE INTERACTION: Characters touch, grasp, manipulate, clutch, climb, scramble, or lean against props and the set. Action is tactile, kinetic, and visually arresting.
+- OBSERVABLE PHYSICALIZED EMOTION: Convey feelings purely through concrete physical acting and facial animation (trembling paws, clutching garments, wide glossy eyes with stacked highlights, flared nostrils, sudden recoil, softening brow, clenched fists, rapid chest breathing). Never write bare abstract emotion labels ("she feels sad").
+
+SHOW, DON'T TELL & CINEMATIC DIALOGUE RULES:
 - ZERO SELF-NARRATION OR LITERAL EXPOSITION: Characters must NEVER speak to themselves out loud to describe what is happening in the environment, declare what sounds they hear, explain their internal feelings, or announce their next action (STRICTLY FORBIDDEN lines like "A rustle!", "Almost there.", "Run!", "Inside!", "I hear something!", "I am scared.").
 - SOLITARY / SUSPENSE SCENES: When a character is alone (especially in suspense, danger, or travel), there is NO spoken dialogue. Tension is created purely through visual performance, physical reaction, and diegetic sound effects. Silence and breathing are cinematic; self-talk destroys tension and realism.
 - SENSORY EVENTS & THREATS: If something happens in the environment (e.g. a scary rustle in bushes, a twig snap, a shadow shifting, an approaching predator), describe the physical sound event directly in the beat / soundscape, and describe the character's IMMEDIATE, VISCERAL physical/facial reaction (instant freeze mid-stride, ears flattening tightly, pupils dilating in terror, sharp intake of breath, trembling paws, sinking low into cover, head whipping toward the sound).
-- MULTI-CHARACTER DIALOGUE: When 2+ characters are present, spoken dialogue is strictly conversational, subtextual, and conflict-driven. Characters speak to each other, never to themselves or the audience. Every line must have subtext, desire, or friction.
+- MULTI-CHARACTER DIALOGUE: When 2+ characters are present, spoken dialogue is strictly conversational, subtextual, and conflict-driven. Characters speak to each other, never to themselves or the audience. Every line must have subtext, desire, or friction. Max 8-10 words per line.
 
 10-SECOND SEGMENT FLOW & 3-BEAT STORYBOARDING RHYTHM (required):
 Structure each 10-second continuous shot into a dynamic 3-beat dramatic arc:
-- [0:00-0:03] Hook & Kinetic Setup: Open in medias res with clear motion vector and depth staging (foreground framing elements, midground subject, background lighting/target). Hook the audience instantly.
-- [0:03-0:07] Complication / Sensory Event / Shift: An unexpected visual or sonic event, obstacle, or emotional pivot that challenges the character or creates suspense.
-- [0:07-0:10] Kinetic Reaction / Propulsion / Bridge: Character commits to action, reacts physically, and propels toward the closing frame, creating seamless continuity for the next segment.
+- [0:00-0:03] Hook & Kinetic Setup: Open in medias res with clear motion vector and depth staging (foreground framing elements, midground subject, background lighting/target). Hook the audience instantly with scroll-stopping motion.
+- [0:03-0:07] Complication / Interaction / Vivid Action: An unexpected sensory event, emotional confrontation, obstacle, or dramatic escalation where characters actively interact with vivid physical movement.
+- [0:07-0:10] Reaction / Turn / Bridge: Characters react physically and emotionally, landing on a decisive pose or emotional shift that propels into the closing frame.
 
-ATTENTION ENGINEERING & THEATRICAL ACTING (required — base-en.txt §4.1, ref-en.txt §5.4):
-- HOOK: open on action already in progress or visually arresting motion — never an empty room or a standing-still character. The first second is the scroll-stopper.
-- THEATRICAL ACTING & CONTINUOUS VITALITY: characters must NEVER freeze, stand limp, or move like stiff plastic toys with flat, dull, or static features. Characters act out their roles like master theatre actors giving a full, lively stage performance. In EVERY beat, explicitly describe what EVERY visible character is doing physically AND how their facial expressions are continuously animating and lively (eyes wide/narrowed, eyebrows furrowed/raised, mouth/jaw tense/softened, reactive smiles, breathing; expressions must NEVER be flat, dull, or static). Never leave any character blank or static.
-- DEPTH STAGING & SILHOUETTES: stage characters with expressive silhouettes, depth planes (dark soft-focus foreground framing, active midground performance, deep background light/destination), and tactile physical interaction.
-- ONE FOCAL POINT PER BEAT: direct the viewer's eye to the primary physical action, eyeline, or story object.
-- ESCALATION ACROSS PARTS: each part must raise stakes, intimacy, or intensity beyond the previous one.
-- THE UNFORGETTABLE IMAGE: land a held beat (1-2 seconds of still camera) around the scene's iconic moment.
-
-LITERAL DIRECTION LANGUAGE (required — base-en.txt §4.1, ref-en.txt §5.4):
-- Write only observable physical facts: who is where, what moves, where the camera is and where it goes.
-- Express emotion ONLY through visible, specific physical and facial actions: trembling fingers, furrowed brows, flared nostrils, sharp inhalation, warm smiles, nodding. Never write bare emotion labels ("she feels sad").
-- Never write invented numbers — no degrees, kelvin, inches, or percentages.
-- ONE CONTINUOUS CAMERA MOTION PER SEGMENT (base-en.txt §3.2, §4.2): strictly ONE unbroken sequence shot. Strictly NO cuts, NO jump cuts, NO angle switches, and NO sudden zoom or focal length jumps. Declare a single continuous smooth camera motion (e.g. slow push in, static hold, slow tracking shot) across the 10 seconds.
-
-CAMERA MOTION VOCABULARY (required — base-en.txt §4.3: Motion Type + Amplitude + Speed):
-- Motion types: Zoom In / Zoom Out, Push In / Pull Out, Pan Left / Pan Right, Truck Left / Truck Right, Tilt Up / Tilt Down, Pedestal Up / Pedestal Down, Arc Shot, Tracking Shot, Static Shot, Shake Slightly / Shake Strongly, POV, Roll Clockwise / Roll Counterclockwise.
-- Amplitude: "with small amplitude", "with large amplitude" (medium omitted).
-- Speed: "at slow speed", "at fast speed" (normal omitted).
-- STRICTLY NO CUTS OR ZOOM JUMPS: declare camera motion at the opening of [Shot 1] (e.g. "The camera pushes in with small amplitude at slow speed toward..."). Do NOT write separate, conflicting camera moves for sub-beats.
+CAMERA CONTINUITY & VOCABULARY (required — base-en.txt §3.2, §4.2, §4.3):
+- Strictly ONE unbroken sequence shot per 10-second part. Strictly NO cuts, NO jump cuts, NO angle switches, and NO sudden zoom or focal length jumps.
+- Declare a single continuous smooth camera motion at the opening of [Shot 1] using Motion Type + Amplitude + Speed:
+  * Motion types: Zoom In / Zoom Out, Push In / Pull Out, Pan Left / Pan Right, Truck Left / Truck Right, Tilt Up / Tilt Down, Pedestal Up / Pedestal Down, Arc Shot, Tracking Shot, Static Shot, Shake Slightly / Shake Strongly, POV.
+  * Amplitude: "with small amplitude", "with large amplitude" (medium omitted).
+  * Speed: "at slow speed", "at fast speed" (normal omitted).
+  * Example: "The camera pushes in with small amplitude at slow speed toward..."
 
 SPEAKERS & DIALOGUE ENCODING (required — base-en.txt §4.4, ref-en.txt §5.4):
 - Assign stable speaker IDs in order of appearance: (S1), (S2).
 - Place identifying phrase, ID, physical action, and delivery OUTSIDE dialogue tags: `{sample_speaker1}, a soft, breathless speaker (S1), leans forward with trembling hands and says: <d>[English] We must act now.</d>`
 - Inside <d> put ONLY `<d>[Language] verbatim line</d>`. Non-speakers and finished speakers keep lips closed (e.g. `She closes her lips and...`).
 - For voiceover: `says in an off-screen voiceover: <d>[English] ...</d> while lips remain completely closed.`
-- Max 8-10 words per line; one idea per line. Final line is the shortest punch.
-- Pair every spoken line with a visible physical act. The listener reacts with facial/body language.
+- Pair every spoken line with a visible physical act. The listener reacts with physical/facial acting.
 
 SOUND ARCHITECTURE (required — base-en.txt §4.6-§4.7, ref-en.txt §6):
 - Synchronized diegetic sounds belong inline within the multimodal description beats.
-- overall_soundscape (1-4 sentences): ambient sound, physical action sounds, and non-verbal human sounds (wind, rain, paper rustle, breathing). Do NOT repeat dialogue or music here.
+- overall_soundscape (1-4 sentences): ambient sound, physical action sounds, and non-verbal human sounds (wind, rain, paper rustle, breathing, gasps). Do NOT repeat dialogue or music here.
 - non_diegetic_music (1-3 sentences): audience-only score describing instrumentation, tempo, rhythm, and dynamics ONLY (no abstract mood words). Use N/A if no score.
 
 SPATIAL & PHYSICAL LAWS (required — base-en.txt §4.1, ref-en.txt §2.1):
 - First sentence of [Shot 1]: state style token, then a semicolon-separated list placing every character, key prop, and light source relative to camera.
-- One continuous unbroken sequence shot — strictly NO cuts, jump cuts, or sudden zoom changes.
 - In EVERY beat, specify the physical actions AND changing facial expressions of ALL visible characters.
-- Characters look at each other or at scene objects — NEVER into the lens. Only the declared speaker moves their mouth.
 
-TIME-CODED BEATS (required): open each chronological paragraph with a bracketed timecode, e.g. `[0:00-0:03]`. The timecodes must tile the full 10 seconds with no gaps. In EVERY beat, describe what EVERY character on screen is doing physically AND what their face is expressing.
+TIME-CODED BEATS (required): open each chronological paragraph with bracketed timecodes `[0:00-0:03]`, `[0:03-0:07]`, `[0:07-0:10]`. The timecodes must tile the full 10 seconds with no gaps.
 
 OUTPUT FORMAT (when generating scene parts) — return each 10-second segment enclosed in <PART0>, <PART1>, <PART2>, ... tags:
 <PART0>
-integrated_multimodal_description: [Shot 1] 2D-animated, <style token>, <opening spatial mapping sentence>. <timecoded beat paragraphs...>
+integrated_multimodal_description: [Shot 1] 2D-animated, <style token>, <opening spatial mapping sentence>. [0:00-0:03] <beat> [0:03-0:07] <beat> [0:07-0:10] <beat>
 
 overall_soundscape: <1-4 sentences>
 
@@ -131,7 +131,7 @@ non_diegetic_music: <1-3 sentences, or N/A>
 </PART0>
 
 <PART1>
-integrated_multimodal_description: [Shot 1] 2D-animated, <style token>, <opening spatial mapping sentence continuing from Part 0>. <timecoded beat paragraphs...>
+integrated_multimodal_description: [Shot 1] 2D-animated, <style token>, <opening spatial mapping sentence continuing from Part 0>. [0:00-0:03] <beat> [0:03-0:07] <beat> [0:07-0:10] <beat>
 
 overall_soundscape: <1-4 sentences>
 
@@ -140,12 +140,9 @@ non_diegetic_music: <1-3 sentences, or N/A>
 
 SEGMENT RULES (base-en.txt §2.2):
 Each <PARTn> section is written as the three labeled core fields:
-
-integrated_multimodal_description: [Shot 1] 2D-animated, <style token>, <opening spatial mapping sentence>. <timecoded beat paragraphs...>
-
-overall_soundscape: <1-4 sentences>
-
-non_diegetic_music: <1-3 sentences, or N/A>
+- integrated_multimodal_description: [Shot 1] 2D-animated, <style token>, <opening spatial mapping sentence>. <timecoded beat paragraphs...>
+- overall_soundscape: <1-4 sentences>
+- non_diegetic_music: <1-3 sentences, or N/A>
 
 Each <PARTn> section must also:
 - Open [Shot 1] with style token, spatial mapping, and continuous camera motion.
@@ -169,7 +166,11 @@ Hard direction rules (the treatment must respect them):
 
 Character roster (spell names exactly, ALL CAPS): {roster}
 
-The scene is divided into {part_count} x 10-second segments. Plan ALL of them as one escalating arc. Every segment must feature active theatrical character acting with expressive facial shifts, structured 3-beat rhythm ([0:00-0:03] Hook/Setup -> [0:03-0:07] Complication/Sensory Event -> [0:07-0:10] Reaction/Bridge), and continuous unbroken camera motion.
+SCENE STORY & LOGLINE AS THE FOUNDATIONAL ARC:
+- The scene's story & logline (`Scene story & logline: <name> — <logline>`) defines the primary narrative arc, emotional stakes, and dramatic progression for this scene.
+- You MUST read and analyze this scene logline as the foundational story to break down across the {part_count} x 10-second segments in the Escalation Ladder, ensuring the whole arc advances and resolves within this runtime.
+
+The scene is divided into {part_count} x 10-second segments. Plan ALL of them as one escalating arc. Every segment must tell an emotional micro-story, assign clear active roles to every character present, feature active theatrical acting with expressive facial shifts, structured 3-beat rhythm ([0:00-0:03] Hook/Setup -> [0:03-0:07] Complication/Sensory Event/Vivid Action -> [0:07-0:10] Reaction/Turn/Bridge), and continuous unbroken camera motion.
 
 SHOW, DON'T TELL MANDATE: Never plan dialogue for exposition or self-narration. Solo characters do not speak out loud to narrate what they see, hear, or do. Convey tension, threats, and discoveries through diegetic sound and visceral physical reactions.
 
@@ -178,8 +179,11 @@ OUTPUT FORMAT — return Markdown with EXACTLY these headers, nothing else:
 One sentence: what is on screen in the first two seconds that stops a scrolling thumb. It must already be in motion, in danger, or visually striking — never an establishing shot.
 ## Dramatic Question
 One sentence naming the protagonist, their want, and the question the viewer is waiting to have answered.
+## Character Roles & Dynamics
+One sentence per character in this scene defining their urgent objective, emotional stance, and how they physically interact with each other or the environment.
 ## Escalation Ladder
-Exactly one bullet per segment (Segment 0 ... Segment {part_count - 1}), each stating what THIS segment raises beyond the previous one — a new stake, a sensory or physical obstacle, a closer camera, a light or sound shift, an emotional turn. The ladder must end at the payoff.
+Exactly one bullet per segment (Segment 0 ... Segment {part_count - 1}). Each bullet must define:
+- Segment N (0:00-0:10): [Micro-Story Arc & Emotional Shift: Beginning emotion -> Complication -> Emotional Landing] | [Character Roles: for each character, their physical action and emotional reaction] | [Vivid Action: key kinetic physical/prop interaction].
 ## The Turn
 One sentence: the exact moment the emotion pivots and what shifts in camera, light, and sound together.
 ## Unforgettable Image
@@ -191,7 +195,7 @@ Context-aware dialogue plan:
 ## Final Held Frame
 One sentence: the last image the scene lands on.
 
-Keep the ENTIRE treatment at or under 600 characters total. Be decisive — one choice per slot, no alternatives, no hedging."""
+Keep the ENTIRE treatment at or under 1400 characters total. Be decisive — one choice per slot, no alternatives, no hedging."""
 
 
 def build_treatment_prompt(story: StorySceneSpec, scene: SceneSpec, part_count: int) -> str:
@@ -202,13 +206,16 @@ def build_treatment_prompt(story: StorySceneSpec, scene: SceneSpec, part_count: 
         "NO self-narration or speaking out loud. Build suspense through diegetic sound cues "
         "and physical character reactions."
         if is_solo
-        else "This is a MULTI-CHARACTER scene. Use lean, subtextual dialogue between characters."
+        else "This is a MULTI-CHARACTER scene. Every character present must have an active dramatic role, "
+        "distinct objective, and physical/emotional presence in every part. Use lean, subtextual dialogue."
     )
     return (
         build_scene_context(story, scene)
         + f"\n\nScene character setup: {scene_type_note}\n\n"
-        "Plan this entire scene as one short film. Output ONLY the treatment "
-        "structure (Hook, Dramatic Question, Escalation Ladder, The Turn, "
+        "Plan this entire scene as one short film. Read the Scene story & logline above as the primary "
+        f"narrative to tell, and break that overarching story arc cleanly into {part_count} x 10-second parts. "
+        "Output ONLY the treatment "
+        "structure (Hook, Dramatic Question, Character Roles & Dynamics, Escalation Ladder, The Turn, "
         f"Unforgettable Image, Dialogue Spine, Final Held Frame) for "
         f"{part_count} x 10-second segments."
     )
@@ -220,16 +227,22 @@ def build_scene_context(story: StorySceneSpec, scene: SceneSpec) -> str:
     emotions = "\n".join(f"  - {item}" for item in story.emotions)
     actions = "\n".join(f"  - {item}" for item in story.actions)
     looks = "\n".join(f"  - {item}" for item in story.looks)
-    backgrounds = "\n".join(
-        f"  - ({bg.key}) {bg.description}\n"
-        f"    Lighting: {bg.lighting}\n"
-        f"    Mood: {bg.mood}"
-        for bg in scene.backgrounds
-    )
+    background_lines = []
+    for bg in scene.backgrounds:
+        line = f"  - ({bg.key}) {bg.description}"
+        extras = []
+        if bg.lighting:
+            extras.append(f"Lighting: {bg.lighting}")
+        if bg.mood:
+            extras.append(f"Mood: {bg.mood}")
+        if extras:
+            line += "\n    " + "\n    ".join(extras)
+        background_lines.append(line)
+    backgrounds = "\n".join(background_lines)
     return (
         f"Scene name (production slug): {story.name}\n"
         f"Story beat: {story.title}\n"
-        f"Location: {scene.name} — {scene.logline}\n"
+        f"Scene story & logline: {scene.name} — {scene.logline}\n"
         "Setting reference (production background plates — keep the Setting & Light "
         f"section consistent with them):\n{backgrounds}\n\n"
         f"Characters in scene: {characters}\n"
@@ -292,9 +305,13 @@ def build_all_parts_prompt(
         "OUTPUT FORMAT (generate each requested part tag and its 3 core fields):\n"
         f"{tags_example}\n\n"
         "DIRECTION & CONTINUITY MANDATES (Strictly enforce for every part):\n"
+        "- STORY ARC FROM LOGLINE: Execute the dramatic narrative arc established in the scene logline and treatment. Each part must tangibly advance that story toward its resolution, with clear stakes and emotional momentum.\n"
+        "- EMOTIONAL STORYTELLING: Each part must tell a compelling micro-story with genuine emotion, kinetic momentum, and an emotional shift.\n"
+        "- CHARACTER ROLES: Every character listed in 'Characters in scene' MUST have an active dramatic role and physical presence in EVERY beat. No idle, stiff, or passive characters. Describe both their physical actions and continuous facial acting.\n"
+        "- WONDERFUL VIVID ACTION: Dynamic, tactile, kinetic physical actions and prop interactions. Use expressive secondary motion (ears, whiskers, fur, capes) and weight shifts.\n"
         "- CONTINUITY: Each subsequent part continues seamlessly from the closing frame, character poses, positions, and lighting of the previous part.\n"
         "- SHOW, DON'T TELL: Strictly NO self-narration or literal exposition ('A rustle!'). Convey suspense through diegetic sound cues and immediate physical reactions.\n"
-        "- 3-BEAT RHYTHM: In every 10-second part, structure into [0:00-0:03] Setup/Hook -> [0:03-0:07] Complication/Sensory Event -> [0:07-0:10] Reaction/Bridge.\n"
+        "- 3-BEAT RHYTHM: In every 10-second part, structure into [0:00-0:03] Setup/Hook -> [0:03-0:07] Complication/Sensory Event/Action -> [0:07-0:10] Reaction/Turn/Bridge.\n"
         "- THEATRICAL ACTING: In every timecoded beat, explicitly describe what EVERY character on screen is doing physically AND how their facial expressions are continuously animating (lively animation in every frame; expressions are never flat, dull, or static).\n"
         "- CAMERA CONTINUITY: strictly ONE unbroken sequence shot per part with zero cuts, zero jump cuts, and zero zoom jumps.\n"
         f"- HARD LIMIT: each part body must stay strictly at or under {MAX_SCRIPT_PROMPT_CHARS} characters."
@@ -332,47 +349,6 @@ def build_next_part_prompt(
     )
 
 
-def build_critique_prompt(treatment: str, document: str, part_count: int = 1) -> str:
-    """Prompt for the quality-critique pass over all generated scene parts together.
-
-    Evaluates compliance with MiniMax H3 rules (base-en.txt & ref-en.txt) and whole-scene flow.
-    """
-    return (
-        "You are a brutally honest short-form animation director reviewing a multi-part scene "
-        "written for a LITERAL video-generation model. Review ALL scene parts (<PART0>, <PART1>, ...) "
-        "together for holistic flow and individual execution. Score each axis 1-10 and give concrete fixes "
-        "per axis scoring below 8. Do NOT rewrite the document.\n\n"
-        "AXES:\n"
-        "- HOOK (does Part 0 open in medias res with scroll-stopping motion/staging? base-en.txt §4.1)\n"
-        "- ESCALATION (does each subsequent part raise stakes, tension, or intimacy per the treatment ladder?)\n"
-        "- CONTINUITY (does each part continue seamlessly from the exact closing frame, blocking, and pose of the previous part?)\n"
-        "- SHOW_DONT_TELL (is dialogue completely free of self-narration, environmental description like 'A rustle!', or talking out loud when alone? Are sensory events delivered via diegetic sound and physical reactions? ref-en.txt §5.4)\n"
-        "- PACING_RHYTHM (does each 10-second segment follow a dynamic 3-beat rhythm: Setup -> Complication/Sensory Event -> Reaction/Bridge?)\n"
-        "- DYNAMISM_ACTING (are all visible characters continuously alive with lively physical animation and constantly animating facial expressions in EVERY beat, never flat or dull? ref-en.txt §5.4)\n"
-        "- ATMOSPHERE_AUDIO (are diegetic sound cues and soundscape used effectively to build tension and tactile texture rather than relying on speech? base-en.txt §4.6, ref-en.txt §6)\n"
-        "- CAMERA_CONTINUITY (is each part strictly one continuous unbroken shot with zero cuts, zero jump cuts, and zero zoom jumps across beats? base-en.txt §3.2, §4.2-§4.3)\n"
-        "- LITERALNESS (only observable physical facts; no bare emotion labels, no invented numbers? ref-en.txt §5.4)\n"
-        f"- LENGTH (each part body at or under {MAX_SCRIPT_PROMPT_CHARS} chars so total prompt is under 1,350 characters?)\n\n"
-        f"DIRECTOR'S TREATMENT:\n{treatment}\n\n"
-        f"PARTS UNDER REVIEW:\n{document}\n\n"
-        "Return ONLY:\n"
-        "SCORES: hook=N, escalation=N, continuity=N, show_dont_tell=N, pacing_rhythm=N, dynamism_acting=N, atmosphere_audio=N, camera_continuity=N, literalness=N, length=N\n"
-        "FIXES: numbered list of concrete fixes specifying which part (<PART0>, <PART1>, etc.) each fix applies to."
-    )
-
-
-def build_polish_prompt(document: str, fixes: str) -> str:
-    """Prompt to apply critique fixes across all parts while preserving <PARTn> tags and limits."""
-    return (
-        "Apply the following fixes across the scene parts. Keep all <PART0>, <PART1>, ... section tags, "
-        "the three core fields per part (integrated_multimodal_description, overall_soundscape, non_diegetic_music), "
-        "spatial mapping first sentences, 3-beat timecoded rhythm, Show Don't Tell mandates, "
-        "and the HARD character limit per part. Return ONLY the rewritten document containing all parts.\n\n"
-        f"FIXES:\n{fixes}\n\n"
-        f"DOCUMENT:\n{document}"
-    )
-
-
 def build_condense_prompt(
     previous_doc: str,
     current_chars: int,
@@ -380,7 +356,7 @@ def build_condense_prompt(
     part_index: int = 0,
     span: str = "",
 ) -> str:
-    """Prompt to rewrite a single part body shorter while keeping its structure."""
+    """Prompt to rewrite a single part body shorter while keeping its structure and vivid acting."""
     doc_len = len(previous_doc.strip())
     return (
         f"CRITICAL: Part {part_index} ({doc_len} characters) exceeds the budget. "
@@ -390,12 +366,11 @@ def build_condense_prompt(
         "Do NOT include title, logline, characters, setting, or <PARTn> tags.\n"
         "2. Keep the three core fields: integrated_multimodal_description, overall_soundscape, non_diegetic_music.\n"
         "3. In integrated_multimodal_description: Keep the [Shot 1] spatial mapping first sentence. "
-        "Tighten each timecoded beat ([0:00-0:03], [0:03-0:07], [0:07-0:10]) to exactly ONE lean, dense sentence "
-        "focusing strictly on key physical actions, facial expressions, and diegetic sound cues.\n"
+        "Keep the 3-beat structure ([0:00-0:03], [0:03-0:07], [0:07-0:10]) with ONE punchy sentence per beat. "
+        "Preserve vivid kinetic action, emotional character expressions, and defined character roles while trimming excess adjectives and filler words.\n"
         "4. In overall_soundscape: Exactly ONE concise sentence.\n"
         "5. In non_diegetic_music: Exactly ONE concise sentence (or N/A).\n"
-        "6. Obey SHOW, DON'T TELL (strictly zero self-narration).\n"
-        "7. Cut all filler words, wordy descriptions, and redundant adjectives.\n\n"
+        "6. Obey SHOW, DON'T TELL (strictly zero self-narration).\n\n"
         f"PREVIOUS PART BODY TO CONDENSE:\n{previous_doc}\n\n"
         "Return ONLY the rewritten condensed segment body."
     )

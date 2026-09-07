@@ -4,16 +4,10 @@ from __future__ import annotations
 
 import os
 
-# Review model constants
-REVIEW_MODEL_GEMINI_FLASH_3_6 = "gemini-3.6-flash"
-REVIEW_MODEL_KIMI_K3 = "moonshotai/kimi-k3"
+# Image model constants - Nano Banana 2 (Gemini 3.1 Flash Image Preview)
+IMAGE_MODEL_NANO_BANANA_2 = "gemini-3.1-flash-image-preview"
+DEFAULT_IMAGE_MODEL = IMAGE_MODEL_NANO_BANANA_2
 
-# Static configuration variables
-REVIEW_MODEL = REVIEW_MODEL_GEMINI_FLASH_3_6 # REVIEW_MODEL_KIMI_K3
-MAX_ITERATIONS = 2
-
-DEFAULT_IMAGE_MODEL = "gemini-3.1-flash-image-preview"
-DEFAULT_REVIEW_MODEL = REVIEW_MODEL
 
 
 def require_environment(name: str, alternate: str | None = None) -> str:

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Expand an abridged story scene from ``movie.yml`` into detailed segment design files.
 
-Uses an OpenRouter text model (default ``google/gemini-3.7-flash``; ``--model gemini``
-is a shortcut for ``google/gemini-3.7-flash``) to turn the ``story:`` section's
+Uses an OpenRouter or Gemini text model (default ``google/gemini-3.8-flash``; ``--model gemini``
+is a shortcut for ``google/gemini-3.8-flash``) to turn the ``story:`` section's
 abridged scene beats (scene reference, characters, key emotions, important
 actions/talking points, and character eyelines/expressions) into production-ready
 segment prompts covering character locations, camera location, camera movement,

@@ -21,9 +21,7 @@ scenes:
     logline: "a sunlit clearing the hero must cross"
     backgrounds:
       - key: "clearing-wide"
-        description: "a grassy clearing framed by towering trees"
-        lighting: "one warm shaft of sunlight"
-        mood: "hopeful"
+        description: "Grassy clearing framed by towering trees under warm shafts of sunlight, casting long shadows; hopeful and inviting atmosphere."
 
 story:
   - name: "hero_crosses_clearing"

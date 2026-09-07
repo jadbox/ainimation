@@ -1,22 +1,9 @@
-"""Data models for blueprint generation attempts and subjects."""
+"""Data models for blueprint generation subjects."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-
-
-@dataclass
-class Attempt:
-    """Record of a single generation/review attempt."""
-
-    number: int
-    score: int | None
-    accepted: bool
-    learning: str
-    feedback: str
-    prompt_change: str
-    prompt_used: str = ""
 
 
 @dataclass
@@ -32,4 +19,4 @@ class Subject:
     output_dir: Path
     style_slug: str
     initial_prompt: str
-    review_instruction: str
+

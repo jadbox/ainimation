@@ -1,43 +1,35 @@
 #!/usr/bin/env python3
-"""Generate, review, and refine style guide blueprints for characters and scene backgrounds.
+"""Generate style guide blueprints for characters and scene backgrounds.
 
-Runs the generate/review loop for a character style guide (--character) or a
-scene's background plates (--scene), writing artifacts to
+Generates character model sheets (--character) or scene background plates (--scene)
+using Google's Nano Banana 2 image model (gemini-3.1-flash-image-preview), baking all visual
+production standards directly into the prompt. Output artifacts are written to
 ``films/<film>/out/blueprint/<subject-slug>/``.
 
 Usage:
     python src/blueprint.py --character "Mrs Brisby"
-    python src/blueprint.py --scene great-owl-hollow
+    python src/blueprint.py --scene old-barn-field
 """
 
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import os
+from pathlib import Path
 
-import requests
 from google import genai
 
 from blueprint_generator.utils.characters import get_character, list_character_names
 from blueprint_generator.utils.scenes import SCENES, get_scene
 from blueprint_generator.utils import (
     DEFAULT_IMAGE_MODEL,
-    DEFAULT_REVIEW_MODEL,
-    MAX_ITERATIONS,
-    REVIEW_MODEL_GEMINI_FLASH_3_6,
-    REVIEW_MODEL_KIMI_K3,
-    Attempt,
     Subject,
     build_subjects,
-    fallback_revision,
     generate_image,
     require_environment,
-    review_image,
     save_jpeg,
     to_jpeg,
-    write_iterations,
 )
 from films import film_blueprint_dir
 from movie_config import get_film, get_movie_info, set_film
@@ -47,174 +39,111 @@ logger = logging.getLogger("blueprint_generator")
 
 def run_subject(
     client: genai.Client,
-    openrouter_key: str | None,
     args: argparse.Namespace,
     subject: Subject,
 ) -> int:
-    """Run the generate/review loop for one blueprint subject.
-
-    Every iteration except the final one is reviewed by the reviewer LLM; the
-    final generation is saved as-is without a review. Returns 0.
-    """
+    """Generate the style guide blueprint for one subject."""
     output = subject.output_dir
     output.mkdir(parents=True, exist_ok=True)
+
+    existing_style = output / f"{subject.style_slug}-style.jpg"
+    existing_prompt_path = output / "prompt.txt"
+
+    if (
+        existing_style.is_file()
+        and not getattr(args, "force", False)
+        and not getattr(args, "new", False)
+    ):
+        logger.info(
+            "Blueprint already exists for %s at %s. Pass --force or --new to regenerate.",
+            subject.label,
+            existing_style,
+        )
+        print(f"Blueprint already exists: {existing_style} (pass --force to regenerate)")
+        return 0
+
+    # Clean out any old attempt files
     for old_attempt in output.glob("attempt-*.jpg"):
-        logger.info("Removing old attempt file: %s", old_attempt)
         old_attempt.unlink()
 
-    existing_prompt_path = output / "prompt.txt"
     existing_prompt = (
         existing_prompt_path.read_text(encoding="utf-8").strip()
         if existing_prompt_path.is_file()
         else ""
     )
-    if existing_prompt and not args.new:
-        current_prompt = existing_prompt
+    if existing_prompt and not getattr(args, "new", False):
+        prompt = existing_prompt
         logger.info(
-            "Loaded existing %s as the initial prompt (%d chars)",
+            "Loaded existing %s as generation prompt (%d chars)",
             existing_prompt_path,
-            len(current_prompt),
+            len(prompt),
         )
     else:
-        if args.new:
+        if getattr(args, "new", False):
             logger.info(
-                "--new: ignoring %s; starting from a fresh initial prompt", existing_prompt_path
+                "--new: ignoring %s; starting from a fresh prompt", existing_prompt_path
             )
-        current_prompt = subject.initial_prompt
-        logger.info("Built fresh initial prompt from the subject spec (%d chars)", len(current_prompt))
-    last_used_prompt = current_prompt
-    attempts: list[Attempt] = []
-    history: list[tuple[Attempt, bytes]] = []
-    accepted = False
+        prompt = subject.initial_prompt
+        logger.info("Built prompt from the subject spec (%d chars)", len(prompt))
 
-    logger.info("=== Starting generation pipeline for %s ===", subject.label)
+    logger.info("=== Generating blueprint for %s ===", subject.label)
     logger.info("Output directory: %s", output)
-
-    for number in range(1, args.max_iterations + 1):
-        logger.info("--- Iteration %d of %d ---", number, args.max_iterations)
-        last_used_prompt = current_prompt
-        logger.info(
-            "Prompt for this iteration (%d chars):\n%s",
-            len(current_prompt),
-            current_prompt[:800] + ("..." if len(current_prompt) > 800 else ""),
-        )
-
-        generated_image = generate_image(client, args.image_model, current_prompt)
-        image_data = to_jpeg(generated_image)
-        attempt_image = output / f"attempt-{number:02d}.jpg"
-        save_jpeg(image_data, attempt_image)
-        logger.info("Saved attempt image: %s (%d bytes)", attempt_image, len(image_data))
-
-        final_iteration = number == args.max_iterations
-        if final_iteration:
-            logger.info("Final iteration; skipping reviewer review.")
-            score = None
-            accepted = True
-            learning = "No review performed on the final generation."
-            feedback = ""
-            prompt_change = "No review; this is the final generation attempt."
-        else:
-            logger.info(
-                "Running reviewer LLM (model=%s) on iteration %d ...", args.review_model, number
-            )
-            review = review_image(
-                client=client,
-                openrouter_key=openrouter_key,
-                model=args.review_model,
-                system_instruction=subject.review_instruction,
-                prompt=current_prompt,
-                image_data=image_data,
-                history=history,
-            )
-            logger.info(
-                "Reviewer response for iteration %d: %s", number, json.dumps(review, indent=2)
-            )
-            score_value = review.get("score")
-            score = score_value if isinstance(score_value, int) else None
-            accepted = review.get("accepted") is True
-            learning = str(review.get("learning") or "No specific lesson supplied.").strip()
-            feedback = str(review.get("feedback") or "No specific feedback supplied.").strip()
-            revised_prompt = review.get("revised_prompt")
-            if accepted:
-                prompt_change = "None; the reviewer accepted this image."
-            elif isinstance(revised_prompt, str) and revised_prompt.strip():
-                current_prompt = revised_prompt.strip()
-                prompt_change = "Replaced with the reviewer's complete revised prompt."
-            else:
-                current_prompt = fallback_revision(current_prompt, feedback)
-                prompt_change = (
-                    "Appended the review feedback because no replacement prompt was supplied."
-                )
-
-        attempt_record = Attempt(
-            number=number,
-            score=score,
-            accepted=accepted,
-            learning=learning,
-            feedback=feedback,
-            prompt_change=prompt_change,
-            prompt_used=last_used_prompt,
-        )
-        attempts.append(attempt_record)
-        history.append((attempt_record, image_data))
-
-        save_jpeg(image_data, output / f"{subject.style_slug}-style.jpg")
-        write_iterations(output / "iterations.md", subject.display_name, attempts, accepted)
-
-        if accepted:
-            logger.info("✓ Iteration %d ACCEPTED (score: %s). Pipeline complete.", number, score)
-            break
-        else:
-            logger.info("✗ Iteration %d REJECTED (score: %s). %s", number, score, prompt_change)
-            logger.info("Updated prompt for next iteration (%d chars)", len(current_prompt))
-
-    (output / "prompt.txt").write_text(last_used_prompt + "\n", encoding="utf-8")
-    print(
-        f"Wrote {output / f'{subject.style_slug}-style.jpg'}, {output / 'prompt.txt'}, and "
-        f"{output / 'iterations.md'} after {len(attempts)} iteration(s)."
+    logger.info(
+        "Prompt (%d chars):\n%s",
+        len(prompt),
+        prompt[:800] + ("..." if len(prompt) > 800 else ""),
     )
-    return 0 if accepted else 2
+
+    generated_image = generate_image(client, args.image_model, prompt)
+    image_data = to_jpeg(generated_image)
+
+    # Save both attempt-01.jpg (for animator tool compatibility) and <style_slug>-style.jpg
+    attempt_image = output / "attempt-01.jpg"
+    save_jpeg(image_data, attempt_image)
+    style_image = output / f"{subject.style_slug}-style.jpg"
+    save_jpeg(image_data, style_image)
+
+    existing_prompt_path.write_text(prompt + "\n", encoding="utf-8")
+
+    iterations_file = output / "iterations.md"
+    iterations_content = (
+        f"# Blueprint Style Guide: {subject.display_name}\n\n"
+        f"- **Model**: `{args.image_model}`\n"
+        f"- **Output Style Image**: `{subject.style_slug}-style.jpg`\n"
+        f"- **Primary Reference Plate**: `attempt-01.jpg` ({len(image_data)} bytes)\n\n"
+        "## Production Prompt\n\n"
+        "```\n"
+        f"{prompt}\n"
+        "```\n"
+    )
+    iterations_file.write_text(iterations_content, encoding="utf-8")
+
+    print(
+        f"Wrote {style_image}, {attempt_image}, and {existing_prompt_path}."
+    )
+    return 0
 
 
 def run(args: argparse.Namespace) -> int:
-    """Execute the blueprint generation and review pipeline across selected subjects."""
-    if not 1 <= args.max_iterations <= MAX_ITERATIONS:
-        raise ValueError(f"--max-iterations must be between 1 and {MAX_ITERATIONS}.")
-
+    """Execute the blueprint generation pipeline across selected subjects."""
     subjects = build_subjects(args)
 
     gemini_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
-    openrouter_key = os.environ.get("OPENROUTER_API_KEY")
-
-    if "/" in args.review_model:
-        if not openrouter_key:
-            raise RuntimeError(
-                "Set OPENROUTER_API_KEY before running with an OpenRouter review model."
-            )
-    else:
-        if not gemini_key:
-            require_environment("GEMINI_API_KEY", "GOOGLE_API_KEY")
-
     if not gemini_key:
         require_environment("GEMINI_API_KEY", "GOOGLE_API_KEY")
 
     client = genai.Client(api_key=gemini_key)
 
     logger.info(
-        "Image model: %s | Review model: %s | Max iterations: %d",
+        "Image model: %s | Subjects to generate: %d (%s)",
         args.image_model,
-        args.review_model,
-        args.max_iterations,
-    )
-    logger.info(
-        "Subjects to generate: %d (%s)",
         len(subjects),
         ", ".join(subject.label for subject in subjects),
     )
 
     exit_code = 0
     for subject in subjects:
-        result = run_subject(client, openrouter_key, args, subject)
+        result = run_subject(client, args, subject)
         if result != 0:
             exit_code = result
     return exit_code
@@ -234,13 +163,14 @@ def main() -> None:
         set_film(pre_args.film)
     except ValueError as error:
         pre.error(str(error))
+
     available_characters = ", ".join(list_character_names())
     available_scenes = ", ".join(f"{spec.name} ({spec.slug})" for spec in SCENES.values())
     movie_info = get_movie_info()
     parser = argparse.ArgumentParser(
         description=(
-            f"Generate and review blueprints for {movie_info.title}: "
-            "either a character style guide (--character) or the 1-2 "
+            f"Generate blueprints for {movie_info.title}: "
+            "either a character style guide (--character) or the "
             "background plates of a scene (--scene)."
         )
     )
@@ -273,24 +203,17 @@ def main() -> None:
     parser.add_argument(
         "--image-model",
         default=DEFAULT_IMAGE_MODEL,
-        help=f"Gemini image model (default: {DEFAULT_IMAGE_MODEL}).",
+        help=f"Gemini image model (Nano Banana 2: {DEFAULT_IMAGE_MODEL}).",
     )
     parser.add_argument(
-        "--review-model",
-        default=DEFAULT_REVIEW_MODEL,
-        help=f"Review model, either Gemini (e.g. {REVIEW_MODEL_GEMINI_FLASH_3_6}) or OpenRouter (e.g. {REVIEW_MODEL_KIMI_K3}) (default: {DEFAULT_REVIEW_MODEL}).",
-    )
-    parser.add_argument(
-        "--max-iterations",
-        type=int,
-        default=MAX_ITERATIONS,
-        help=f"Maximum generation/review attempts per subject, 1-{MAX_ITERATIONS} (default: {MAX_ITERATIONS}).",
+        "--force",
+        action="store_true",
+        help="Regenerate the blueprint even if an existing style image already exists.",
     )
     parser.add_argument(
         "--new",
         action="store_true",
-        help="Ignore the previous run's prompt.txt and start from a fresh initial prompt, "
-        "so no prior attempt influences this generation.",
+        help="Ignore the previous run's prompt.txt and start from a fresh prompt.",
     )
 
     args = parser.parse_args()
@@ -307,12 +230,6 @@ def main() -> None:
 
     try:
         raise SystemExit(run(args))
-    except requests.exceptions.Timeout as error:
-        parser.error(
-            f"API request timed out (the reviewer LLM may be slow or unreachable): {error}"
-        )
-    except requests.exceptions.RequestException as error:
-        parser.error(f"Network error during API call: {error}")
     except (RuntimeError, ValueError) as error:
         parser.error(str(error))
 

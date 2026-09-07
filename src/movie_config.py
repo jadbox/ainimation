@@ -65,8 +65,8 @@ class BackgroundSpec:
 
     key: str
     description: str
-    lighting: str
-    mood: str
+    lighting: str = ""
+    mood: str = ""
 
 
 @dataclass(frozen=True)
@@ -150,8 +150,8 @@ def load_movie_config(
             BackgroundSpec(
                 key=bg["key"],
                 description=bg["description"],
-                lighting=bg["lighting"],
-                mood=bg["mood"],
+                lighting=bg.get("lighting", ""),
+                mood=bg.get("mood", ""),
             )
             for bg in scene_raw.get("backgrounds", [])
         )

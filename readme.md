@@ -12,7 +12,7 @@ This project automates the multi-stage visual development and animation generati
 2. **Scene Background Plates**: Generates clean, character-free 16:9 production background plates for cel compositing.
 3. **30-Second Scene Scripts**: Expands abridged story beats from the `story:` section of `movie.yml` into structured 30-second scene design documents divided into three 10-second segments.
 4. **Keyframe Proposals**: Generates start and closing keyframe proposal images (`part-<N>-start-proposal.jpg` / `part-<N>-end-proposal.jpg`) ahead of video generation, referencing character blueprints, background plates, and prior keyframes to lock framing and character poses.
-5. **Animated Clips (Pluggable Video Provider)**: Generates 720p 24fps video clips per segment with first/last-frame continuity locking (MiniMax H3 via the MiniMax API directly at 768P by default, Google Gemini Omni Flash, or OpenRouter Alibaba Wan 3.0 at 480p), exports each clip's first and last frames as `part-<N>-start.jpg` / `part-<N>-end.jpg`, then concatenates the clips into full scene videos with seamless crossfade transitions.
+5. **Animated Clips (Pluggable Video Provider)**: Generates 720p 24fps video clips per segment with first/last-frame continuity locking (MiniMax H3 via the MiniMax API directly at 768P by default, Google Gemini Omni 1.1, or OpenRouter Alibaba Wan 3.0 at 480p), exports each clip's first and last frames as `part-<N>-start.jpg` / `part-<N>-end.jpg`, then concatenates the clips into full scene videos with seamless crossfade transitions.
 6. **Film Assembly**: The web console can merge available scene `full.mp4` files in story order into `films/<film>/out/animations/film.mp4` and export a midpoint `film-thumb.jpg`.
 7. **Web Console**: A local browser UI over the pipeline (scene tables, script generation, blueprint viewing, animator command copy) — see section 4.E.
 
@@ -48,11 +48,11 @@ All CLI tools take `--film <slug>` (or honor the `FILM` environment variable) to
      export GEMINI_API_KEY="your-gemini-api-key"
      # or export GOOGLE_API_KEY="..."
      ```
-   * OpenRouter API Key (required when using `--provider openrouter` for video, or for OpenRouter review models like Kimi K3):
+   * OpenRouter API Key (required when using `--model openrouter` for video, or for OpenRouter review models like Kimi K3):
      ```bash
      export OPENROUTER_API_KEY="your-openrouter-api-key"
      ```
-   * MiniMax API Key (required when using `--provider minimax` for video):
+   * MiniMax API Key (required when using `--model minimax` for video):
      ```bash
      export MINIMAX_API_KEY="your-minimax-api-key"
      ```
@@ -82,7 +82,7 @@ uv run keyframes --film <film> --scene <story_scene_name> --parts 0 --start
 
 # 5. Generate video for just part 0 of the scene; full.mp4 is composed
 #    automatically as additional parts are made
-uv run python src/animator.py --film <film> --scene <story_scene_name> --parts 0 --provider minimax
+uv run python src/animator.py --film <film> --scene <story_scene_name> --parts 0 --model minimax
 ```
 
 ### A. Blueprint Generator (`generate-blueprint` / `generate.sh`)
@@ -162,7 +162,7 @@ Expands an abridged story scene from the `story:` section of the film's `movie.y
 
 ### C. Animator (`animator` / `src/animator.py`)
 
-Generates animated 720p 24fps video clips for each segment prompt in `films/<film>/out/scripts/<scene>_part<N>.md` using a pluggable video provider — MiniMax H3 via the MiniMax API directly (`MiniMax-H3`) at 768P by default, or Google Gemini Omni Flash (`gemini-omni-flash-preview`) or OpenRouter's async videos API with Alibaba Wan 3.0 (`alibaba/wan-3.0`) at 480p — maintaining frame-0 visual continuity between segments, and combining them into a full video with crossfade transitions.
+Generates animated 720p 24fps video clips for each segment prompt in `films/<film>/out/scripts/<scene>_part<N>.md` using a pluggable video provider — MiniMax H3 via the MiniMax API directly (`MiniMax-H3`) at 768P by default, Google Gemini Omni 1.1 (`gemini-omni-1.1-flash`, 720p) via the Gemini API, or OpenRouter's async videos API with Alibaba Wan 3.0 (`alibaba/wan-3.0`) at 480p — maintaining frame-0 visual continuity between segments, and combining them into a full video with crossfade transitions.
 
 * **CLI Commands**:
   ```bash
@@ -170,10 +170,10 @@ Generates animated 720p 24fps video clips for each segment prompt in `films/<fil
   uv run animator --scene <story_scene_name>
 
   # Generate using the OpenRouter provider (Alibaba Wan 3.0 at 480p)
-  uv run animator --scene <story_scene_name> --provider openrouter
+  uv run animator --scene <story_scene_name> --model openrouter
 
   # Generate using the MiniMax API directly (MiniMax H3 at 768P)
-  uv run animator --scene <story_scene_name> --provider minimax
+  uv run animator --scene <story_scene_name> --model minimax
 
   # Generate only segment 2 (0:20-0:30)
   uv run animator --scene <story_scene_name> --parts 2
@@ -195,8 +195,7 @@ Generates animated 720p 24fps video clips for each segment prompt in `films/<fil
   * `--compose-only`: Skip API calls and combine the highest version of each existing `part-*.mp4` clip into `full.mp4`.
    * `--frame_start PATH` / `--frame-start PATH`: Use an image as the mandatory opening frame for every generated part, overriding automatically discovered prior-part continuity frames.
    * `--frame_end PATH` / `--frame-end PATH`: Use an image as the mandatory closing frame for every generated part.
-  * `--provider NAME`: Video generation provider (`google`, `openrouter` or `minimax`; `gemini` is an alias for `google`). Default: `minimax` (MiniMax H3 via the MiniMax API). The `openrouter` provider uses `OPENROUTER_API_KEY` and defaults to `alibaba/wan-3.0` at `480p`. The `minimax` provider uses `MINIMAX_API_KEY` and defaults to `MiniMax-H3` at `768P`.
-  * `--video-model MODEL`: Video generation model ID (default: `MiniMax-H3` for `minimax`; `gemini-omni-flash-preview` for `google`; OpenRouter e.g. `alibaba/wan-3.0`; MiniMax e.g. `MiniMax-H3`).
+  * `--model MODEL`: Video model spec — a `provider:model-id` pair (e.g. `google:gemini-omni-1.1-flash`, `minimax:MiniMax-H3`, `openrouter:alibaba/wan-3.0`) or a provider shortcut (`google`, `minimax`, `openrouter`; `gemini` aliases `google`). Default: `minimax` (MiniMax H3 via the MiniMax API). The `google` provider uses `GEMINI_API_KEY`/`GOOGLE_API_KEY` and defaults to Gemini Omni 1.1 (`gemini-omni-1.1-flash`) at 720p (supported Omni resolutions: 360p, 720p, 1080p, 4k). The `openrouter` provider uses `OPENROUTER_API_KEY` and defaults to `alibaba/wan-3.0` at `480p`. The `minimax` provider uses `MINIMAX_API_KEY` and defaults to `MiniMax-H3` at `768P`. (The older `--provider` / `--video-model` flags are still accepted as deprecated aliases.)
   * `--duration SECONDS`: Duration per segment (default: 10).
   * `--timeout SECONDS`: Polling timeout per video request (default: 600).
   * `--scripts-dir DIR`: Directory containing scene scripts (default: `films/<film>/out/scripts`).
@@ -270,7 +269,7 @@ A local Astro + Tailwind web UI over the pipeline tools — no authentication, i
   * Scene table driven by the `story:` section of the film's `movie.yml`, with live script/blueprint/video status from `films/<film>/out/`.
   * **View scripts** page renders all segment scripts with a sticky index, and hosts script generation: a **Generate scripts** button (when no scripts exist) or **Regenerate scripts** button (when they do), each with a number-of-parts selector, that runs `uv run scriptgen -v --film <film> --name <scene>` on the server and streams output into a terminal panel.
   * **Blueprint pages** view character and background design sheets and can trigger `generate-blueprint`.
-  * **Animate page** presents one command per part and opens the CLI terminal modal to run it (streaming output) or copy it to your terminal; the scene page's **copy animator cmd** copies `uv run animator --film <film> --scene <scene>` to the clipboard.
+  * **Animate page** presents one command per part with a GENERATE dropdown (model selection: Google Omni 1.1, MiniMax H3, or OpenRouter Wan 3.0; plus video length and keyframe frame overrides) and opens the CLI terminal modal to run it (streaming output) or copy it to your terminal; the scene page's **copy animator cmd** copies `uv run animator --film <film> --scene <scene>` to the clipboard.
 
 * See [`web/README.md`](./web/README.md) for details (production build, environment overrides).
 

@@ -12,3 +12,4 @@
 6. NEVER run animator.py or generate movies. Instead request the user to run commands to test any video generation action or test.
 7. NEVER update out/scripts contents directly. This should always be written to only by scriptgen.py.
 8. Assume the dev server is already loaded and running on http://127.0.0.1:4321.
+9. Always use Bun for run commands (package management, build, and JavaScript/TypeScript execution).

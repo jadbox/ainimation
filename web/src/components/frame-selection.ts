@@ -379,7 +379,80 @@ export function initDurationSelectors(film: string, scene: string): void {
 }
 
 /**
- * Initialize GENERATE video buttons per scene part with active frame selections and duration.
+ * Default model selection ("provider:model" spec).
+ */
+export const DEFAULT_VIDEO_MODEL_SELECTION = "minimax:MiniMax-H3";
+
+/**
+ * Return the unique localStorage key for the model selection scoped to the film, scene, and part.
+ */
+export function getModelStorageKey(film: string, scene: string, part: number): string {
+  return `selected_video_model:${film}:${scene}:${part}`;
+}
+
+/**
+ * Load the saved model selection from localStorage for a given part.
+ */
+export function loadSavedModel(
+  film: string,
+  scene: string,
+  part: number,
+  fallback = DEFAULT_VIDEO_MODEL_SELECTION,
+): string {
+  try {
+    const raw = localStorage.getItem(getModelStorageKey(film, scene, part));
+    if (raw && raw.includes(":")) {
+      return raw;
+    }
+  } catch (e) {
+    console.warn("Failed to load saved model from localStorage", e);
+  }
+  return fallback;
+}
+
+/**
+ * Save the model selection to localStorage for a given part.
+ */
+export function saveModel(
+  film: string,
+  scene: string,
+  part: number,
+  selection: string,
+): void {
+  try {
+    const key = getModelStorageKey(film, scene, part);
+    localStorage.setItem(key, selection);
+  } catch (e) {
+    console.warn("Failed to save model to localStorage", e);
+  }
+}
+
+/**
+ * Initialize model selectors for all parts from saved localStorage values.
+ */
+export function initModelSelectors(film: string, scene: string): void {
+  document.querySelectorAll<HTMLSelectElement>("[data-model-select]").forEach((select) => {
+    const container = select.closest<HTMLElement>("[data-generate-details]");
+    const partAttr = container?.dataset.part ?? select.dataset.part;
+    if (partAttr === undefined) return;
+    const part = Number(partAttr);
+    if (Number.isNaN(part)) return;
+
+    const savedModel = loadSavedModel(film, scene, part);
+    if (select.querySelector(`option[value="${CSS.escape(savedModel)}"]`)) {
+      select.value = savedModel;
+    }
+
+    select.addEventListener("change", () => {
+      if (select.value.includes(":")) {
+        saveModel(film, scene, part, select.value);
+      }
+    });
+  });
+}
+
+/**
+ * Initialize GENERATE video buttons per scene part with active frame selections, duration, and model.
  */
 export function initGeneratePartHandlers(): void {
   document.querySelectorAll<HTMLButtonElement>("[data-generate-part]").forEach((button) => {
@@ -398,6 +471,12 @@ export function initGeneratePartHandlers(): void {
 
       saveDuration(film, name, part, duration);
 
+      const modelSelect = button
+        .closest("[data-generate-details]")
+        ?.querySelector<HTMLSelectElement>("[data-model-select]");
+      const model = modelSelect?.value || loadSavedModel(film, name, part);
+      saveModel(film, name, part, model);
+
       // Close the dropdown popup
       const details = button.closest<HTMLDetailsElement>("details");
       if (details) {
@@ -406,6 +485,7 @@ export function initGeneratePartHandlers(): void {
 
       const command = [
         `uv run animator --film ${film} --scene ${name} --parts ${part} --duration ${duration}`,
+        model ? `--model ${model}` : "",
         state.frameStart ? `--frame_start ${state.frameStart}` : "",
         state.frameEnd ? `--frame_end ${state.frameEnd}` : "",
       ]
@@ -419,6 +499,7 @@ export function initGeneratePartHandlers(): void {
           name,
           parts: part,
           duration,
+          model,
           frameStart: state.frameStart,
           frameEnd: state.frameEnd,
         },

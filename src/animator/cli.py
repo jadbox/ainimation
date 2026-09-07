@@ -16,14 +16,15 @@ import requests
 from animator.config import (
     DEFAULT_ASPECT_RATIO,
     DEFAULT_DURATION_SECONDS,
+    DEFAULT_FAL_VIDEO_MODEL,
+    DEFAULT_GOOGLE_VIDEO_MODEL,
     DEFAULT_MINIMAX_VIDEO_MODEL,
+    DEFAULT_MODEL_SPEC,
     DEFAULT_OPENROUTER_VIDEO_MODEL,
     DEFAULT_RESOLUTION,
     DEFAULT_TIMEOUT_SECONDS,
-    DEFAULT_VIDEO_MODEL,
-    DEFAULT_VIDEO_PROVIDER,
     FULL_VIDEO_NAME,
-    VIDEO_PROVIDERS,
+    parse_model_spec,
 )
 from animator.media import (
     combine_parts,
@@ -190,6 +191,20 @@ def ensure_background_plate(
     return plate
 
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+"""Repository root, used to resolve frame paths regardless of the current working directory."""
+
+
+def _resolve_frame_path(frame_path: Path) -> Path:
+    """Resolve a frame path against the repo root when it doesn't exist relative to cwd."""
+    if frame_path.is_absolute() or frame_path.is_file():
+        return frame_path
+    candidate = PROJECT_ROOT / frame_path
+    if candidate.is_file():
+        return candidate
+    return frame_path
+
+
 def run(args: argparse.Namespace) -> int:
     """Execute the animation generation or composition pipeline."""
     ensure_log_capture()
@@ -199,11 +214,35 @@ def run(args: argparse.Namespace) -> int:
     try:
         frame_start_value = getattr(args, "frame_start", None)
         frame_end_value = getattr(args, "frame_end", None)
-        frame_start = Path(frame_start_value) if frame_start_value else None
-        frame_end = Path(frame_end_value) if frame_end_value else None
+        frame_start = (
+            _resolve_frame_path(Path(frame_start_value)) if frame_start_value else None
+        )
+        frame_end = (
+            _resolve_frame_path(Path(frame_end_value)) if frame_end_value else None
+        )
         for option, frame_path in (("--frame-start", frame_start), ("--frame-end", frame_end)):
             if frame_path is not None and not frame_path.is_file():
                 raise ValueError(f"{option} must point to an existing image file: {frame_path}")
+
+        model_spec = getattr(args, "model", None)
+        deprecated_provider = getattr(args, "deprecated_provider", None) or getattr(args, "provider", None)
+        deprecated_video_model = getattr(args, "deprecated_video_model", None) or getattr(args, "video_model", None)
+        if deprecated_provider or deprecated_video_model:
+            logger.warning(
+                "--provider/--video-model are deprecated; use "
+                "--model 'provider:model-id' (e.g. --model %s).",
+                DEFAULT_MODEL_SPEC,
+            )
+            if model_spec is None:
+                if deprecated_provider and deprecated_video_model:
+                    model_spec = (
+                        deprecated_video_model
+                        if ":" in deprecated_video_model
+                        else f"{deprecated_provider}:{deprecated_video_model}"
+                    )
+                else:
+                    model_spec = deprecated_provider or deprecated_video_model
+        provider_name, video_model = parse_model_spec(model_spec)
 
         default_scripts_dir = film_scripts_dir(get_film())
         scripts_dir = Path(args.scripts_dir) if args.scripts_dir else default_scripts_dir
@@ -292,11 +331,12 @@ def run(args: argparse.Namespace) -> int:
                 )
 
         if pending:
-            provider_obj = create_video_provider(
-                getattr(args, "provider", DEFAULT_VIDEO_PROVIDER),
-                model=args.video_model,
+            provider_obj = create_video_provider(provider_name, model=video_model)
+            logger.info(
+                "Using video provider: %s (model: %s)",
+                provider_obj.name,
+                video_model,
             )
-            logger.info("Using video provider: %s", provider_obj.name)
 
             references = [
                 (character, ensure_character_reference(character, blueprint_dir))
@@ -526,29 +566,36 @@ def main() -> None:
         ),
     )
     parser.add_argument(
-        "--video-model",
+        "--model",
         default=None,
+        metavar="MODEL",
         help=(
-            "Video generation model ID (override; when omitted each provider "
-            "uses its own default: google -> %s, openrouter -> %s, minimax -> %s)."
+            "Video model spec: 'provider:model-id' (e.g. google:%s, "
+            "minimax:%s, openrouter:%s, fal:%s) or a provider shortcut "
+            "('google', 'minimax', 'openrouter', 'fal'; 'gemini' aliases 'google'). "
+            "Default: %%(default)s."
             % (
-                DEFAULT_VIDEO_MODEL,
-                DEFAULT_OPENROUTER_VIDEO_MODEL,
+                DEFAULT_GOOGLE_VIDEO_MODEL,
                 DEFAULT_MINIMAX_VIDEO_MODEL,
+                DEFAULT_OPENROUTER_VIDEO_MODEL,
+                DEFAULT_FAL_VIDEO_MODEL,
             )
         ),
     )
     parser.add_argument(
+        "--video-model",
+        "--video_model",
+        dest="deprecated_video_model",
+        default=None,
+        metavar="MODEL",
+        help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
         "--provider",
-        choices=list(VIDEO_PROVIDERS),
-        default=DEFAULT_VIDEO_PROVIDER,
-        help=(
-            "Video generation provider (default: %(default)s, MiniMax H3 via the "
-            "MiniMax API at 768P). 'google' (alias 'gemini') uses the Gemini API. "
-            "'openrouter' uses the async OpenRouter videos API (alibaba/wan-3.0, "
-            "480p default) with the OpenRouter API key. 'minimax' uses the MiniMax "
-            "API directly (MiniMax H3, 768P default) with the MINIMAX_API_KEY."
-        ),
+        dest="deprecated_provider",
+        default=None,
+        metavar="NAME",
+        help=argparse.SUPPRESS,
     )
     parser.add_argument(
         "--duration",

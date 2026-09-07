@@ -7,6 +7,7 @@ New code should import directly from ``animator.providers`` (or its submodules).
 from __future__ import annotations
 
 from animator.providers import (
+    FalVideoProvider,
     GeminiVideoProvider,
     MiniMaxVideoProvider,
     OPENROUTER_MODELS_SUPPORTING_LAST_FRAME,
@@ -18,6 +19,7 @@ from animator.providers import (
 )
 
 __all__ = [
+    "FalVideoProvider",
     "GeminiVideoProvider",
     "MiniMaxVideoProvider",
     "OPENROUTER_MODELS_SUPPORTING_LAST_FRAME",

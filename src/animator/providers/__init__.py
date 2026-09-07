@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from animator.providers.base import ReferenceImage, VideoProvider, VideoRequest
 from animator.providers.factory import create_video_provider
+from animator.providers.fal import FalVideoProvider
 from animator.providers.gemini import GeminiVideoProvider
 from animator.providers.minimax import MiniMaxVideoProvider
 from animator.providers.openrouter import (
@@ -28,6 +29,7 @@ from animator.providers.openrouter import (
 )
 
 __all__ = [
+    "FalVideoProvider",
     "GeminiVideoProvider",
     "MiniMaxVideoProvider",
     "OPENROUTER_MODELS_SUPPORTING_LAST_FRAME",

@@ -23,6 +23,11 @@ from movie_config import set_film
 class TestKeyframes(unittest.TestCase):
     def setUp(self) -> None:
         set_film("rats")
+        self._env_patch = patch.dict("os.environ", {"GEMINI_API_KEY": "test-key"})
+        self._env_patch.start()
+
+    def tearDown(self) -> None:
+        self._env_patch.stop()
 
     def test_proposal_paths(self) -> None:
         scene_dir = Path("/tmp/test_scene")

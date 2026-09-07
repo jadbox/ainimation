@@ -1,4 +1,4 @@
-"""Google Gemini Omni Flash video generation provider."""
+"""Google Gemini Omni video generation provider."""
 
 from __future__ import annotations
 
@@ -14,8 +14,10 @@ from google import genai
 from animator.config import (
     CLOSING_MESSAGE,
     CONTINUITY_MESSAGE,
-    DEFAULT_VIDEO_MODEL,
+    DEFAULT_GOOGLE_RESOLUTION,
+    DEFAULT_GOOGLE_VIDEO_MODEL,
     POLL_INTERVAL_SECONDS,
+    SUPPORTED_GOOGLE_RESOLUTIONS,
 )
 from animator.providers.base import ReferenceImage, VideoProvider, VideoRequest
 
@@ -107,12 +109,23 @@ def build_gemini_input_items(request: VideoRequest) -> list[dict[str, Any]]:
 
 
 class GeminiVideoProvider(VideoProvider):
-    """Video generation via Google Gemini Omni Flash (``interactions`` API)."""
+    """Video generation via Google Gemini Omni (``interactions`` API).
+
+    Targets Gemini Omni 1.1 (``gemini-omni-1.1-flash``) by default; the
+    legacy ``gemini-omni-flash-preview`` model id remains usable via the
+    ``--model google:<model-id>`` spec.
+    """
 
     name = "google"
 
-    def __init__(self, model: str | None = None, api_key: str | None = None) -> None:
-        self.model = model or DEFAULT_VIDEO_MODEL
+    def __init__(
+        self,
+        model: str | None = None,
+        api_key: str | None = None,
+        resolution: str | None = None,
+    ) -> None:
+        self.model = model or DEFAULT_GOOGLE_VIDEO_MODEL
+        self.resolution = resolution or DEFAULT_GOOGLE_RESOLUTION
         key = (
             api_key
             or os.environ.get("GEMINI_API_KEY")
@@ -128,17 +141,23 @@ class GeminiVideoProvider(VideoProvider):
     def generate(self, request: VideoRequest, timeout: int) -> bytes:
         t0 = time.monotonic()
         input_items = build_gemini_input_items(request)
+        resolution = (
+            request.resolution
+            if request.resolution in SUPPORTED_GOOGLE_RESOLUTIONS
+            else self.resolution
+        )
         interaction = create_video_interaction(
             self._client,
             self.model,
             input_items,
             request.duration,
             request.aspect_ratio,
+            resolution,
         )
         interaction = wait_for_completion(self._client, interaction, timeout)
         video = extract_video_bytes(interaction)
         logger.info(
-            "Google Gemini Omni Flash video generation completed in %.1fs.",
+            "Google Gemini Omni video generation completed in %.1fs.",
             time.monotonic() - t0,
         )
         return video
@@ -150,14 +169,22 @@ def create_video_interaction(
     input_items: list[dict[str, Any]],
     duration: int,
     aspect_ratio: str,
+    resolution: str,
 ) -> Any:
-    """Request the video from Omni Flash, falling back to a minimal request.
+    """Request the video from Gemini Omni, falling back to a minimal request.
 
     The full request asks for the reference_to_video task with an inline
-    video response matching the request's aspect ratio; if the API
-    rejects those parameters, retry with just the model and input.
+    video response matching the request's aspect ratio and resolution; if
+    the API rejects those parameters, retry with just the model and input.
+    Note: Gemini Omni does not support temperature, top_p, system
+    instructions, or negative prompts (see the Omni docs limitations), so
+    no sampling controls are sent.
     """
-    logger.info("Requesting video generation from model=%s ...", model)
+    logger.info(
+        "Requesting video generation from model=%s (resolution=%s) ...",
+        model,
+        resolution,
+    )
     t0 = time.monotonic()
     try:
         interaction = client.interactions.create(
@@ -166,13 +193,13 @@ def create_video_interaction(
             response_modalities=["video"],
             generation_config={
                 "video_config": {"task": "reference_to_video"},
-                "temperature": 0.7,
             },
             response_format={
                 "type": "video",
                 "aspect_ratio": aspect_ratio,
                 "delivery": "inline",
                 "duration": f"{duration}s",
+                "resolution": resolution,
             },
         )
     except Exception as error:
@@ -185,7 +212,6 @@ def create_video_interaction(
         interaction = client.interactions.create(
             model=model,
             input=input_items,
-            generation_config={"temperature": 0.7},
         )
     logger.info(
         "Video request accepted in %.1fs (interaction id: %s, status: %s)",

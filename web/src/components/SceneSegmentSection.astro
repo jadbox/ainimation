@@ -97,6 +97,20 @@ const canUseNextSceneFrame = index === partsCount - 1 && nextFrame;
           </summary>
           <div class="absolute right-0 z-20 mt-2 w-56 rounded-lg border border-line bg-panel p-3 shadow-xl shadow-black/40 backdrop-blur-sm">
             <label class="block text-xs text-muted">
+              Model / provider
+              <select
+                data-model-select
+                data-part={part}
+                class="mt-1.5 w-full rounded-md border border-line bg-panel-2 px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-teal-shadow"
+              >
+                <option value="google:gemini-omni-1.1-flash">Omni 1.1 · Google</option>
+                <option value="minimax:MiniMax-H3">MiniMax H3 · MiniMax</option>
+                <option value="openrouter:alibaba/wan-3.0">Wan 3.0 · OpenRouter</option>
+                <option value="fal:minimax/h3-max/image-to-video">H3 Max Image · fal.ai</option>
+                <option value="fal:minimax/h3-max/reference-to-video">H3 Max Reference · fal.ai</option>
+              </select>
+            </label>
+            <label class="mt-2 block text-xs text-muted">
               Video length
               <select
                 data-duration-select

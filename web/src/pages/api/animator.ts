@@ -1,6 +1,9 @@
 import { spawn } from "node:child_process";
 import { PROJECT_ROOT, isValidFilm, isValidStoryName } from "../../lib/movie";
 
+const MODEL_SHORTCUTS = new Set(["google", "gemini", "minimax", "openrouter", "fal"]);
+const MODEL_SPEC_PATTERN = /^(google|gemini|minimax|openrouter|fal):.+/i;
+
 export const prerender = false;
 
 export async function POST({ request }: { request: Request }) {
@@ -9,6 +12,7 @@ export async function POST({ request }: { request: Request }) {
     name?: string;
     parts?: number;
     duration?: number;
+    model?: string;
     frameStart?: string;
     frameEnd?: string;
   };
@@ -31,6 +35,20 @@ export async function POST({ request }: { request: Request }) {
     body.duration <= 15
       ? body.duration
       : 5;
+  const model = typeof body.model === "string" ? body.model.trim() : "";
+  if (
+    model &&
+    !MODEL_SHORTCUTS.has(model.toLowerCase()) &&
+    !MODEL_SPEC_PATTERN.test(model)
+  ) {
+    return new Response(
+      JSON.stringify({
+        error:
+          "Invalid model: use 'provider:model-id' (e.g. minimax:MiniMax-H3, fal:minimax/h3-max/reference-to-video) or a provider shortcut (google, minimax, openrouter, fal).",
+      }),
+      { status: 400, headers: { "Content-Type": "application/json" } },
+    );
+  }
   const frameStart = typeof body.frameStart === "string" ? body.frameStart.trim() : "";
   const frameEnd = typeof body.frameEnd === "string" ? body.frameEnd.trim() : "";
 
@@ -66,10 +84,12 @@ export async function POST({ request }: { request: Request }) {
     "--duration",
     String(duration),
   ];
+  if (model) args.push("--model", model);
   if (frameStart) args.push("--frame_start", frameStart);
   if (frameEnd) args.push("--frame_end", frameEnd);
 
   const command = `uv run animator --film ${film} --scene ${name} --parts ${parts} --duration ${duration}` +
+    (model ? ` --model ${model}` : "") +
     (frameStart ? ` --frame_start ${frameStart}` : "") +
     (frameEnd ? ` --frame_end ${frameEnd}` : "");
 

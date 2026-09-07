@@ -23,16 +23,23 @@ def get_aspect_ratio(aspect: str = ASPECT) -> str:
     return ASPECT_RATIO_MAP[key]
 
 
-DEFAULT_VIDEO_MODEL = "gemini-omni-flash-preview"
-"""Default video model for the Gemini provider."""
+DEFAULT_GOOGLE_VIDEO_MODEL = "gemini-omni-1.1-flash"
+"""Default video model for the Gemini provider (Google Gemini Omni 1.1 Flash)."""
+
+SUPPORTED_GOOGLE_RESOLUTIONS = ("360p", "720p", "1080p", "4k")
+"""Output resolutions accepted by Gemini Omni's ``response_format``."""
+
+DEFAULT_GOOGLE_RESOLUTION = "720p"
+"""Default output resolution for the Gemini provider (Omni 1.1 default)."""
 
 DEFAULT_VIDEO_PROVIDER = "minimax"
 """Default video generation provider (MiniMax H3 via the MiniMax API directly).
-Options: 'google' (or its 'gemini' alias), 'openrouter' or 'minimax'."""
+Options: 'google' (or its 'gemini' alias), 'openrouter', 'minimax' or 'fal'."""
 
-VIDEO_PROVIDERS = ("google", "openrouter", "minimax", "gemini")
-"""Valid video provider names usable with the ``--provider`` CLI flag.
-'gemini' is a backward-compatible alias for 'google'."""
+VIDEO_PROVIDERS = ("google", "openrouter", "minimax", "gemini", "fal")
+"""Canonical video provider names. 'gemini' is a backward-compatible alias for
+'google'. See :data:`MODEL_SHORTCUTS` and :func:`parse_model_spec` for the
+unified ``--model provider:model`` interface."""
 
 DEFAULT_OPENROUTER_VIDEO_MODEL = "alibaba/wan-3.0"
 """Default OpenRouter video model (Alibaba Wan 3.0)."""
@@ -45,6 +52,58 @@ DEFAULT_MINIMAX_VIDEO_MODEL = "MiniMax-H3"
 
 DEFAULT_MINIMAX_RESOLUTION = "768P"
 """Output resolution requested for the MiniMax video provider (MiniMax H3)."""
+
+DEFAULT_FAL_VIDEO_MODEL = "minimax/h3-max/image-to-video"
+"""Default Fal.ai video model (MiniMax H3 Max image-to-video)."""
+
+DEFAULT_FAL_RESOLUTION = "480P"
+"""Default output resolution for the Fal provider (480P)."""
+
+PROVIDER_ALIASES = {"gemini": "google"}
+"""Alternative provider names accepted in model specs, mapped to canonical names."""
+
+MODEL_SHORTCUTS = {
+    "google": f"google:{DEFAULT_GOOGLE_VIDEO_MODEL}",
+    "gemini": f"google:{DEFAULT_GOOGLE_VIDEO_MODEL}",
+    "minimax": f"minimax:{DEFAULT_MINIMAX_VIDEO_MODEL}",
+    "openrouter": f"openrouter:{DEFAULT_OPENROUTER_VIDEO_MODEL}",
+    "fal": f"fal:{DEFAULT_FAL_VIDEO_MODEL}",
+}
+"""Bare ``--model`` shortcuts expanded to canonical ``provider:model`` specs."""
+
+DEFAULT_MODEL_SPEC = MODEL_SHORTCUTS[DEFAULT_VIDEO_PROVIDER]
+"""Default model spec: MiniMax H3 via the MiniMax API (``minimax:MiniMax-H3``)."""
+
+
+def parse_model_spec(spec: str | None = None) -> tuple[str, str]:
+    """Resolve a ``--model`` value into a ``(provider, model_id)`` pair.
+
+    Accepts a ``provider:model`` spec (e.g. ``openrouter:alibaba/wan-3.0``),
+    a bare shortcut (``google``, ``gemini``, ``minimax``, ``openrouter``, ``fal``),
+    or a bare model ID (assumed to belong to the default provider). Raises
+    :class:`ValueError` on an unknown provider prefix or an empty model ID.
+    """
+    value = (spec or DEFAULT_MODEL_SPEC).strip()
+    if not value:
+        value = DEFAULT_MODEL_SPEC
+    if ":" not in value:
+        shortcut = MODEL_SHORTCUTS.get(value.lower())
+        if shortcut:
+            value = shortcut
+        else:
+            value = f"{DEFAULT_VIDEO_PROVIDER}:{value}"
+    provider, _, model = value.partition(":")
+    provider = PROVIDER_ALIASES.get(provider.lower(), provider.lower())
+    if provider not in ("google", "minimax", "openrouter", "fal"):
+        shortcuts = ", ".join(f"'{k}'" for k in ("google", "minimax", "openrouter", "fal"))
+        raise ValueError(
+            f"Unknown video provider {provider!r} in --model {spec!r}. "
+            f"Use a 'provider:model' spec or one of the shortcuts {shortcuts} "
+            "(e.g. 'openrouter:alibaba/wan-3.0', 'fal:minimax/h3-max/reference-to-video')."
+        )
+    if not model:
+        raise ValueError(f"Missing model ID after ':' in --model {spec!r}.")
+    return provider, model
 
 DEFAULT_DURATION_SECONDS = 5
 DEFAULT_RESOLUTION = RESOLUTION

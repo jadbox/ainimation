@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from animator.config import (
+    DEFAULT_FAL_RESOLUTION,
+    DEFAULT_GOOGLE_RESOLUTION,
     DEFAULT_MINIMAX_RESOLUTION,
     DEFAULT_OPENROUTER_RESOLUTION,
     DEFAULT_VIDEO_PROVIDER,
@@ -43,6 +45,18 @@ def create_video_provider(
     if name in ("google", "gemini"):
         from animator.providers.gemini import GeminiVideoProvider
 
-        return GeminiVideoProvider(model=model, api_key=api_key)
+        return GeminiVideoProvider(
+            model=model,
+            api_key=api_key,
+            resolution=resolution or DEFAULT_GOOGLE_RESOLUTION,
+        )
+    if name == "fal":
+        from animator.providers.fal import FalVideoProvider
+
+        return FalVideoProvider(
+            model=model,
+            api_key=api_key,
+            resolution=resolution or DEFAULT_FAL_RESOLUTION,
+        )
     valid = ", ".join(VIDEO_PROVIDERS)
     raise ValueError(f"Unknown video provider {name!r}. Expected one of: {valid}.")

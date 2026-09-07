@@ -231,6 +231,7 @@ const nextFrame =
     initFrameSelectors,
     initGeneratePartHandlers,
     initModelSelectors,
+    initPartVideoSelectionHandlers,
   } from "../../../components/frame-selection";
 
   const rootEl = document.getElementById("animate-scene-root");
@@ -249,4 +250,5 @@ const nextFrame =
   initModelSelectors(currentFilm, currentSceneName);
   initDeleteHandlers();
   initGeneratePartHandlers();
+  initPartVideoSelectionHandlers();
 </script>

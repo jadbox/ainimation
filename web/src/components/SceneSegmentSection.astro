@@ -154,9 +154,17 @@ const canUseNextSceneFrame = index === partsCount - 1 && nextFrame;
         <div class="flex flex-wrap items-end gap-3">
           {segVideo.versions.map((ver) => {
             const isLatest = ver.version === segVideo.versions[segVideo.versions.length - 1].version;
+            const isSelected = !!ver.selected;
             const videoSlug = ver.version > 0 ? `${name}_part_${part}_v${ver.version}` : `${name}_part_${part}`;
             return (
-              <div class="group relative block w-[280px] overflow-hidden rounded-lg border border-line bg-ink/40 transition-colors hover:border-amber-key/50">
+              <div
+                class:list={[
+                  "group relative block w-[280px] overflow-hidden rounded-lg border bg-ink/40 transition-all",
+                  isSelected
+                    ? "border-amber-key/70 ring-1 ring-amber-key/50 shadow-md shadow-black/40"
+                    : "border-line hover:border-amber-key/40",
+                ]}
+              >
                 <button
                   type="button"
                   data-delete-video
@@ -171,6 +179,14 @@ const canUseNextSceneFrame = index === partsCount - 1 && nextFrame;
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                   </svg>
                 </button>
+
+                {isSelected && (
+                  <span class="absolute top-1.5 left-1.5 z-10 inline-flex items-center gap-1 rounded bg-black/80 px-2 py-0.5 text-[10px] font-semibold text-amber-soft ring-1 ring-amber-key/60 backdrop-blur-sm shadow">
+                    <span class="h-1.5 w-1.5 rounded-full bg-amber-key animate-pulse"></span>
+                    In Full Scene
+                  </span>
+                )}
+
                 <a
                   href={`/${film}/video/${videoSlug}`}
                   title={`View Part ${part} ${ver.label}`}
@@ -188,22 +204,51 @@ const canUseNextSceneFrame = index === partsCount - 1 && nextFrame;
                       Part {part} {ver.label}
                     </div>
                   )}
-                  <figcaption class="border-t border-line px-2.5 py-2">
-                    <div class="flex items-center justify-between">
-                      <span class="block truncate text-xs text-slate-200 font-medium">
-                        Part {part} {ver.label}
-                      </span>
-                      {isLatest && segVideo.versions.length > 1 && (
-                        <span class="rounded bg-teal-shadow/20 px-1.5 py-0.5 font-mono text-[9px] text-teal-shadow">
-                          Latest
-                        </span>
-                      )}
-                    </div>
-                    <span class="mt-0.5 block truncate font-mono text-[10px] text-muted">
-                      {ver.filename}
-                    </span>
-                  </figcaption>
                 </a>
+
+                <div class="border-t border-line px-2.5 py-2">
+                  <div class="flex items-center justify-between">
+                    <a
+                      href={`/${film}/video/${videoSlug}`}
+                      class="block truncate text-xs text-slate-200 font-medium hover:text-amber-soft transition-colors"
+                      title={`View Part ${part} ${ver.label}`}
+                    >
+                      Part {part} {ver.label}
+                    </a>
+                    {isLatest && segVideo.versions.length > 1 && (
+                      <span class="rounded bg-teal-shadow/20 px-1.5 py-0.5 font-mono text-[9px] text-teal-shadow">
+                        Latest
+                      </span>
+                    )}
+                  </div>
+                  <span class="mt-0.5 block truncate font-mono text-[10px] text-muted">
+                    {ver.filename}
+                  </span>
+                  <div class="mt-2.5 flex items-center justify-between border-t border-line/60 pt-2">
+                    {isSelected ? (
+                      <span class="inline-flex items-center gap-1.5 text-[11px] font-semibold text-amber-soft">
+                        <svg class="h-3.5 w-3.5 fill-current text-amber-key" viewBox="0 0 24 24">
+                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                        </svg>
+                        Selected for Full
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        data-select-part-video
+                        data-film={film}
+                        data-name={name}
+                        data-part={part}
+                        data-filename={ver.filename}
+                        class="inline-flex items-center gap-1.5 rounded bg-panel-2 px-2.5 py-1 text-[11px] font-medium text-slate-300 ring-1 ring-line hover:text-amber-soft hover:bg-amber-key/10 hover:ring-amber-key/40 transition-colors cursor-pointer"
+                        title={`Use ${ver.filename} when combining the full scene video`}
+                      >
+                        <span class="h-2 w-2 rounded-full border border-slate-500"></span>
+                        Use for Full Scene
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
             );
           })}

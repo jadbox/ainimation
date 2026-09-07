@@ -518,3 +518,58 @@ export function initGeneratePartHandlers(): void {
     }
   });
 }
+
+/**
+ * Attach click handlers to "Use for Full Scene" buttons to change Part video selections
+ * and re-compose full.mp4.
+ */
+export function initPartVideoSelectionHandlers(): void {
+  document.querySelectorAll<HTMLButtonElement>("[data-select-part-video]").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const film = btn.dataset.film!;
+      const name = btn.dataset.name!;
+      const part = Number(btn.dataset.part);
+      const filename = btn.dataset.filename!;
+
+      if (!film || !name || Number.isNaN(part) || !filename) return;
+
+      const originalHtml = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = `
+        <svg class="h-3 w-3 animate-spin text-amber-key" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+        </svg>
+        <span>Combining full...</span>
+      `;
+
+      // Disable other selection buttons while recombining
+      const allSelectBtns = document.querySelectorAll<HTMLButtonElement>("[data-select-part-video]");
+      allSelectBtns.forEach((b) => {
+        b.disabled = true;
+      });
+
+      try {
+        const res = await fetch("/api/select-part-video", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ film, name, part, filename }),
+        });
+
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || `HTTP ${res.status}: Failed to recombine full scene`);
+        }
+
+        // Successfully updated selection and recombined full.mp4
+        window.location.reload();
+      } catch (err) {
+        alert((err as Error).message);
+        btn.innerHTML = originalHtml;
+        allSelectBtns.forEach((b) => {
+          b.disabled = false;
+        });
+      }
+    });
+  });
+}

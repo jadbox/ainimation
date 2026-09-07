@@ -58,12 +58,17 @@ from animator.media import (
     latest_end_frame_path,
     latest_part_path,
     latest_start_frame_path,
+    load_part_selections,
     metadata_path,
     next_frame,
     next_part_paths,
     part_path,
     previous_frame,
     prompt_path,
+    save_part_selections,
+    selected_part_path,
+    selections_path,
+    set_selected_part_video,
     start_frame_path,
 )
 from animator.models import SceneSegment
@@ -128,6 +133,7 @@ __all__ = [
     "latest_end_frame_path",
     "latest_part_path",
     "latest_start_frame_path",
+    "load_part_selections",
     "main",
     "metadata_path",
     "next_frame",
@@ -140,6 +146,10 @@ __all__ = [
     "previous_frame",
     "prompt_path",
     "run",
+    "save_part_selections",
+    "selected_part_path",
+    "selections_path",
+    "set_selected_part_video",
     "start_frame_path",
 ]
 

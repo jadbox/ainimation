@@ -33,6 +33,8 @@ from animator.media import (
     latest_part_path,
     next_part_paths,
     previous_frame,
+    selected_part_path,
+    set_selected_part_video,
 )
 from animator.models import SceneSegment
 from animator.prompt import add_reference_tags, build_video_request
@@ -281,12 +283,12 @@ def run(args: argparse.Namespace) -> int:
             present = [
                 segment
                 for segment in segments
-                if latest_part_path(scene_dir, segment.index) is not None
+                if selected_part_path(scene_dir, segment.index) is not None
             ]
             missing = [
                 segment
                 for segment in segments
-                if latest_part_path(scene_dir, segment.index) is None
+                if selected_part_path(scene_dir, segment.index) is None
             ]
             if missing:
                 logger.info(
@@ -414,6 +416,7 @@ def run(args: argparse.Namespace) -> int:
                 )
                 video_bytes = provider_obj.generate(request, args.timeout)
                 video_dst.write_bytes(video_bytes)
+                set_selected_part_video(scene_dir, segment.index, video_dst.name)
                 logger.info(
                     "Wrote segment %d clip: %s (%d bytes)",
                     segment.index,
@@ -429,12 +432,12 @@ def run(args: argparse.Namespace) -> int:
         present = [
             segment
             for segment in segments
-            if latest_part_path(scene_dir, segment.index) is not None
+            if selected_part_path(scene_dir, segment.index) is not None
         ]
         missing = [
             segment
             for segment in segments
-            if latest_part_path(scene_dir, segment.index) is None
+            if selected_part_path(scene_dir, segment.index) is None
         ]
         if len(present) >= 2:
             if missing:

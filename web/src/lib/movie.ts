@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { load as loadYaml } from "js-yaml";
@@ -607,11 +607,13 @@ export interface VideoVersionItem {
   thumb: string | null;
   startThumb: string | null;
   endThumb: string | null;
+  selected?: boolean;
 }
 
 export interface SegmentVideo {
   part: number;
   video: string;
+  selectedVideo?: string;
   thumb: string | null;
   startThumb: string | null;
   endThumb: string | null;
@@ -621,6 +623,93 @@ export interface SegmentVideo {
 export interface SceneVideos {
   full: { thumb: string | null } | null;
   segments: SegmentVideo[];
+}
+
+export function sceneSelectionsPath(film: string, name: string): string {
+  return path.join(animationsDir(film), name, "selections.json");
+}
+
+export function loadSceneSelections(
+  film: string,
+  name: string,
+): Record<number, string> {
+  const file = sceneSelectionsPath(film, name);
+  if (!fs.existsSync(file)) return {};
+  try {
+    const raw = JSON.parse(fs.readFileSync(file, "utf8"));
+    const result: Record<number, string> = {};
+    for (const [k, v] of Object.entries(raw)) {
+      const part = Number(k);
+      if (Number.isInteger(part) && typeof v === "string") {
+        result[part] = v;
+      }
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
+export function saveSceneSelections(
+  film: string,
+  name: string,
+  selections: Record<number, string>,
+): void {
+  const dir = path.join(animationsDir(film), name);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  const file = sceneSelectionsPath(film, name);
+  const sorted: Record<string, string> = {};
+  for (const k of Object.keys(selections)
+    .map(Number)
+    .sort((a, b) => a - b)) {
+    sorted[String(k)] = selections[k];
+  }
+  fs.writeFileSync(file, JSON.stringify(sorted, null, 2) + "\n", "utf8");
+}
+
+export async function composeSceneVideo(
+  film: string,
+  name: string,
+): Promise<{ success: boolean; output: string }> {
+  return new Promise((resolve, reject) => {
+    const args = [
+      "run",
+      "animator",
+      "--film",
+      film,
+      "--scene",
+      name,
+      "--compose-only",
+    ];
+    const child = spawn("uv", args, {
+      cwd: PROJECT_ROOT,
+      env: process.env,
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let output = "";
+    child.stdout?.on("data", (chunk) => {
+      output += chunk.toString();
+    });
+    child.stderr?.on("data", (chunk) => {
+      output += chunk.toString();
+    });
+    child.on("error", (err) => {
+      reject(err);
+    });
+    child.on("close", (code) => {
+      if (code === 0) {
+        resolve({ success: true, output });
+      } else {
+        reject(
+          new Error(
+            `Failed to compose scene full.mp4 (exit code ${code}):\n${output}`,
+          ),
+        );
+      }
+    });
+  });
 }
 
 function pickThumb(files: Set<string>, base: string): string | null {
@@ -679,13 +768,25 @@ export function sceneVideos(film: string, name: string): SceneVideos {
     }
   }
 
+  const selections = loadSceneSelections(film, name);
+
   const segments: SegmentVideo[] = [];
   for (const [part, versionList] of partMap.entries()) {
     versionList.sort((a, b) => a.version - b.version);
     const latest = versionList[versionList.length - 1];
+    const selectedFilename =
+      selections[part] && files.has(selections[part])
+        ? selections[part]
+        : latest.filename;
+
+    for (const item of versionList) {
+      item.selected = item.filename === selectedFilename;
+    }
+
     segments.push({
       part,
       video: latest.filename,
+      selectedVideo: selectedFilename,
       thumb: latest.thumb,
       startThumb: latest.startThumb,
       endThumb: latest.endThumb,

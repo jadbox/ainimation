@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 import shutil
 import subprocess
 from pathlib import Path
 
 from animator.config import FULL_VIDEO_NAME, TRANSITION_SECONDS
 from animator.models import SceneSegment
-
-import re
 
 logger = logging.getLogger("animator.media")
 
@@ -107,6 +107,54 @@ def latest_part_path(scene_dir: Path, segment_index: int) -> Path | None:
                 highest_file = item
 
     return highest_file
+
+
+def selections_path(scene_dir: Path) -> Path:
+    """Return the path to the part selections JSON file for the scene."""
+    return scene_dir / "selections.json"
+
+
+def load_part_selections(scene_dir: Path) -> dict[int, str]:
+    """Load the mapping of segment index to selected video filename for the scene."""
+    sel_file = selections_path(scene_dir)
+    if not sel_file.is_file():
+        return {}
+    try:
+        data = json.loads(sel_file.read_text(encoding="utf-8"))
+        if isinstance(data, dict):
+            return {
+                int(k): str(v)
+                for k, v in data.items()
+                if str(k).isdigit() and isinstance(v, str)
+            }
+    except (json.JSONDecodeError, ValueError, OSError) as e:
+        logger.warning("Failed to parse selections from %s: %s", sel_file, e)
+    return {}
+
+
+def save_part_selections(scene_dir: Path, selections: dict[int, str]) -> None:
+    """Save the mapping of segment index to selected video filename for the scene."""
+    scene_dir.mkdir(parents=True, exist_ok=True)
+    sel_file = selections_path(scene_dir)
+    formatted = {str(k): selections[k] for k in sorted(selections.keys())}
+    sel_file.write_text(json.dumps(formatted, indent=2) + "\n", encoding="utf-8")
+
+
+def set_selected_part_video(scene_dir: Path, segment_index: int, filename: str) -> None:
+    """Set and persist the selected video filename for a specific segment index."""
+    selections = load_part_selections(scene_dir)
+    selections[segment_index] = filename
+    save_part_selections(scene_dir, selections)
+
+
+def selected_part_path(scene_dir: Path, segment_index: int) -> Path | None:
+    """Return the chosen video path for a segment index, falling back to latest if unselected or missing."""
+    selections = load_part_selections(scene_dir)
+    if segment_index in selections:
+        chosen = scene_dir / selections[segment_index]
+        if chosen.is_file():
+            return chosen
+    return latest_part_path(scene_dir, segment_index)
 
 
 def latest_end_frame_path(scene_dir: Path, segment_index: int) -> Path | None:
@@ -325,7 +373,11 @@ def concat_copy(scene_dir: Path, part_files: list[Path], full_path: Path) -> Non
         concat_file.unlink(missing_ok=True)
 
 
-def combine_parts(scene_dir: Path, segments: list[SceneSegment]) -> Path | None:
+def combine_parts(
+    scene_dir: Path,
+    segments: list[SceneSegment],
+    part_files: list[Path] | None = None,
+) -> Path | None:
     """Concatenate part clips in order into full.mp4 with 0.2s crossfades.
 
     full.mp4 is always (re)written so it reflects the current part clips.
@@ -342,16 +394,17 @@ def combine_parts(scene_dir: Path, segments: list[SceneSegment]) -> Path | None:
         )
         return None
 
-    part_files: list[Path] = []
-    for segment in segments:
-        part = latest_part_path(scene_dir, segment.index)
-        if part and part.exists():
-            part_files.append(part)
-        else:
-            logger.warning(
-                "Part %d clip missing; excluded from the combination.",
-                segment.index,
-            )
+    if part_files is None:
+        part_files = []
+        for segment in segments:
+            part = selected_part_path(scene_dir, segment.index)
+            if part and part.exists():
+                part_files.append(part)
+            else:
+                logger.warning(
+                    "Part %d clip missing; excluded from the combination.",
+                    segment.index,
+                )
     if not part_files:
         raise RuntimeError(f"No part-*.mp4 clips found in {scene_dir} to combine.")
 

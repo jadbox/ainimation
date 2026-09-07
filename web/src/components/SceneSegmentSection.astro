@@ -11,7 +11,7 @@
  */
 import PartFrameSelectors from "./PartFrameSelectors.astro";
 import { animationFileUrl } from "../lib/movie";
-import type { SceneVideoItem, SceneVideosResult } from "../lib/movie";
+import type { SegmentVideo, StoryScene } from "../lib/movie";
 
 export interface Props {
   film: string;
@@ -20,19 +20,19 @@ export interface Props {
   index: number;
   partsCount: number;
   script: string | null;
-  segVideo?: SceneVideoItem;
+  segVideo?: SegmentVideo;
   proposals: {
     start: { filename: string; path: string; label: string; version: number }[];
     end: { filename: string; path: string; label: string; version: number }[];
   };
   previousFrame: string | null;
-  previousStory?: { name: string; title: string };
+  previousStory?: StoryScene;
   previousPart?: number;
   nextFrame: string | null;
-  nextStory?: { name: string; title: string };
+  nextStory?: StoryScene;
   nextPart?: number;
-  priorSegment: SceneVideoItem | null;
-  nextSegment: SceneVideoItem | null;
+  priorSegment: SegmentVideo | null;
+  nextSegment: SegmentVideo | null;
   priorProposals: {
     start: { filename: string; path: string; label: string; version: number }[];
     end: { filename: string; path: string; label: string; version: number }[];

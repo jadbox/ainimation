@@ -24,6 +24,7 @@ from scriptgen.config import (
     MAX_SCRIPT_CHARS,
     MAX_SCRIPT_PROMPT_CHARS,
     MIN_PARTS,
+    calculate_body_budget,
     resolve_openrouter_model,
     segment_span,
 )
@@ -42,6 +43,7 @@ from scriptgen.parse import (
 from scriptgen.prompts import (
     build_all_parts_prompt,
     build_condense_prompt,
+    build_condense_system_instruction,
     build_next_part_prompt,
     build_part0_prompt,
     build_system_instruction,
@@ -105,6 +107,77 @@ def backup_part_file(scripts_dir: Path, part_file: Path, part_idx: int) -> Path 
         shutil.copy2(txt_meta, backup_dir / txt_meta.name)
     logger.info("Backed up existing part %d script to: %s", part_idx, backup_dir)
     return backup_dir
+
+
+def trim_segment_body_to_budget(body: str, max_body_chars: int) -> str:
+    """Deterministically trim optional elements in a segment body to fit within budget.
+
+    Prioritizes:
+    1. Trimming non_diegetic_music description to N/A.
+    2. Trimming overall_soundscape to its first sentence.
+    3. Trimming narrative description cleanly to the nearest sentence boundary.
+    """
+    if len(body) <= max_body_chars:
+        return body
+
+    trimmed = body
+
+    # 1. Try simplifying non_diegetic_music to N/A if present and not already N/A
+    music_match = re.search(r"(non_diegetic_music:\s*)(.+)$", trimmed, flags=re.DOTALL | re.IGNORECASE)
+    if music_match and not music_match.group(2).strip().upper().startswith("N/A"):
+        candidate = trimmed[:music_match.start()] + "non_diegetic_music: N/A"
+        if len(candidate) <= max_body_chars:
+            return candidate
+        trimmed = candidate
+
+    # 2. Try trimming overall_soundscape to its first sentence
+    sound_match = re.search(
+        r"(overall_soundscape:\s*)(.+?)(?=\n\s*non_diegetic_music:|$)",
+        trimmed,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+    if sound_match:
+        sound_text = sound_match.group(2).strip()
+        sentences = re.split(r"(?<=[.!?])\s+", sound_text)
+        if len(sentences) > 1:
+            candidate = (
+                trimmed[:sound_match.start(2)]
+                + sentences[0]
+                + trimmed[sound_match.end(2):]
+            )
+            if len(candidate) <= max_body_chars:
+                return candidate
+            trimmed = candidate
+
+    # 3. If still over, trim narrative description to the closest sentence boundary before the budget limit
+    desc_match = re.search(
+        r"(integrated_multimodal_description:\s*)(.+?)(?=\n\s*overall_soundscape:|$)",
+        trimmed,
+        flags=re.DOTALL | re.IGNORECASE,
+    )
+    if desc_match:
+        desc_prefix = trimmed[:desc_match.start(2)]
+        desc_text = desc_match.group(2).strip()
+        desc_suffix = trimmed[desc_match.end(2):]
+        available_desc_chars = max(100, max_body_chars - len(desc_prefix) - len(desc_suffix))
+        if len(desc_text) > available_desc_chars:
+            sentences = re.split(r"(?<=[.!?])\s+", desc_text)
+            accumulated: list[str] = []
+            cur_len = 0
+            for s in sentences:
+                add_len = len(s) + (1 if accumulated else 0)
+                if cur_len + add_len <= available_desc_chars:
+                    accumulated.append(s)
+                    cur_len += add_len
+                else:
+                    break
+            if accumulated:
+                candidate = desc_prefix + " ".join(accumulated) + desc_suffix
+                if len(candidate) <= max_body_chars:
+                    return candidate
+                trimmed = candidate
+
+    return trimmed
 
 
 def run(args: argparse.Namespace) -> int:
@@ -180,6 +253,8 @@ def run(args: argparse.Namespace) -> int:
                 start_idx - 1, start_idx, args.parts - 1,
             )
 
+        max_chars = getattr(args, "max_chars", None) or MAX_SCRIPT_CHARS
+
         generated = _generate_parts(
             story=story,
             scene=scene,
@@ -193,6 +268,7 @@ def run(args: argparse.Namespace) -> int:
             model=model,
             openrouter_key=api_key,
             verbose=args.verbose,
+            max_chars=max_chars,
         )
 
         for idx in range(start_idx, args.parts):
@@ -308,8 +384,9 @@ def _generate_parts(
     model: str,
     openrouter_key: str,
     verbose: bool,
+    max_chars: int = MAX_SCRIPT_CHARS,
 ) -> dict[int, tuple[str, str]]:
-    """Generate all requested parts simultaneously and ensure each part fits within MAX_SCRIPT_CHARS.
+    """Generate all requested parts simultaneously and ensure each part fits within max_chars.
 
     Returns a dict mapping part_index -> (rendered_content, segment_body).
     """
@@ -344,18 +421,33 @@ def _generate_parts(
         )
 
         # Validate character budget and condense if needed
-        if len(content) > MAX_SCRIPT_CHARS:
+        empty_content = _render_part(
+            scene_name=scene_name,
+            characters=story.characters,
+            span=span,
+            body="",
+            header=header,
+        )
+        static_header_len = len(empty_content)
+        max_allowed_body = max_chars - static_header_len
+
+        if len(content) > max_chars:
+            condense_sys_instruction = build_condense_system_instruction()
             for attempt in range(MAX_RETRIES):
-                target_body_budget = max(350, MAX_SCRIPT_PROMPT_CHARS - attempt * 60)
+                target_body_budget = calculate_body_budget(
+                    total_limit=max_chars,
+                    header_len=static_header_len,
+                    safety_margin=300 + attempt * 100,
+                )
                 logger.warning(
                     "Part %d too long (%d chars, limit %d, target body %d chars); condensing (%d/%d).",
-                    idx, len(content), MAX_SCRIPT_CHARS, target_body_budget, attempt + 1, MAX_RETRIES,
+                    idx, len(content), max_chars, target_body_budget, attempt + 1, MAX_RETRIES,
                 )
                 condense_p = build_condense_prompt(
                     body, len(content), target_body_budget, part_index=idx, span=span
                 )
                 condensed_doc = _generate(
-                    model, condense_p, system_instruction, openrouter_key, verbose
+                    model, condense_p, condense_sys_instruction, openrouter_key, verbose
                 )
                 body = extract_segment_body(condensed_doc)
                 content = _render_part(
@@ -365,14 +457,29 @@ def _generate_parts(
                     body=body,
                     header=header,
                 )
-                if len(content) <= MAX_SCRIPT_CHARS:
+                if len(content) <= max_chars:
                     break
             else:
-                raise RuntimeError(
-                    f"Part {idx} is still {len(content)} characters after {MAX_RETRIES} "
-                    f"condense attempts (limit {MAX_SCRIPT_CHARS}). Aborting without "
-                    "writing — rerun or regenerate with --force."
+                # Deterministic fallback trimming if still slightly over
+                body = trim_segment_body_to_budget(body, max_allowed_body)
+                content = _render_part(
+                    scene_name=scene_name,
+                    characters=story.characters,
+                    span=span,
+                    body=body,
+                    header=header,
                 )
+                if len(content) <= max_chars:
+                    logger.warning(
+                        "Part %d deterministically trimmed to fit budget (%d chars, limit %d).",
+                        idx, len(content), max_chars,
+                    )
+                else:
+                    raise RuntimeError(
+                        f"Part {idx} is still {len(content)} characters after {MAX_RETRIES} "
+                        f"condense attempts and fallback trimming (limit {max_chars}). Aborting without "
+                        "writing — rerun or regenerate with --force."
+                    )
 
         results[idx] = (content, body)
 
@@ -394,6 +501,7 @@ def _generate_part(
     model: str = "",
     openrouter_key: str = "",
     verbose: bool = False,
+    max_chars: int = MAX_SCRIPT_CHARS,
 ) -> tuple[str, str, tuple[str, str, list[str]]]:
     """Compatibility helper to generate a single part."""
     existing_parts = {idx - 1: prev_body} if prev_body and idx > 0 else None
@@ -410,6 +518,7 @@ def _generate_part(
         model=model,
         openrouter_key=openrouter_key,
         verbose=verbose,
+        max_chars=max_chars,
     )
     content, body = parts[idx]
     return content, body, ("", "", list(story.characters))
@@ -518,6 +627,14 @@ def _build_parser() -> argparse.ArgumentParser:
             "Regenerate all parts from scratch, ignoring existing scripts. "
             "Without --force, existing contiguous parts are kept and generation "
             "resumes at the next missing part."
+        ),
+    )
+    parser.add_argument(
+        "--max-chars",
+        type=int,
+        default=MAX_SCRIPT_CHARS,
+        help=(
+            f"Maximum total character budget per rendered part file (default: {MAX_SCRIPT_CHARS})."
         ),
     )
     return parser

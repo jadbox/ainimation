@@ -89,11 +89,13 @@ SHOW, DON'T TELL & CINEMATIC DIALOGUE RULES:
 - SENSORY EVENTS & THREATS: If something happens in the environment (e.g. a scary rustle in bushes, a twig snap, a shadow shifting, an approaching predator), describe the physical sound event directly in the beat / soundscape, and describe the character's IMMEDIATE, VISCERAL physical/facial reaction (instant freeze mid-stride, ears flattening tightly, pupils dilating in terror, sharp intake of breath, trembling paws, sinking low into cover, head whipping toward the sound).
 - MULTI-CHARACTER DIALOGUE: When 2+ characters are present, spoken dialogue is strictly conversational, subtextual, and conflict-driven. Characters speak to each other, never to themselves or the audience. Every line must have subtext, desire, or friction. Max 8-10 words per line.
 
-10-SECOND SEGMENT FLOW & 3-BEAT STORYBOARDING RHYTHM (required):
-Structure each 10-second continuous shot into a dynamic 3-beat dramatic arc:
-- [0:00-0:03] Hook & Kinetic Setup: Open in medias res with clear motion vector and depth staging (foreground framing elements, midground subject, background lighting/target). Hook the audience instantly with scroll-stopping motion.
-- [0:03-0:07] Complication / Interaction / Vivid Action: An unexpected sensory event, emotional confrontation, obstacle, or dramatic escalation where characters actively interact with vivid physical movement.
-- [0:07-0:10] Reaction / Turn / Bridge: Characters react physically and emotionally, landing on a decisive pose or emotional shift that propels into the closing frame.
+
+10-SECOND SEGMENT FLOW & CHRONOLOGICAL BEATS (required):
+Structure each 10-second continuous shot as ONE single narrative paragraph describing the beats in the chronological order they occur:
+- Beat 1 (Setup & Hook): Opens in medias res with clear motion vector and depth staging. Hooks the viewer instantly with scroll-stopping motion. (Budget: 1-2 punchy sentences, ~25-35 words).
+- Beat 2 (Complication & Action): An unexpected sensory event, emotional friction, obstacle, or vivid kinetic action where characters actively interact with props and each other. (Budget: 1-2 punchy sentences, ~30-40 words).
+- Beat 3 (Reaction & Turn): Characters react physically and emotionally, landing on a decisive pose or emotional shift that propels into the closing frame. (Budget: 1-2 punchy sentences, ~25-35 words).
+Do NOT include bracketed timestamps (such as [0:00-0:03]). Weave all beats into ONE continuous narrative paragraph in the order they occur.
 
 CAMERA CONTINUITY & VOCABULARY (required — base-en.txt §3.2, §4.2, §4.3):
 - Strictly ONE unbroken sequence shot per 10-second part. Strictly NO cuts, NO jump cuts, NO angle switches, and NO sudden zoom or focal length jumps.
@@ -112,43 +114,43 @@ SPEAKERS & DIALOGUE ENCODING (required — base-en.txt §4.4, ref-en.txt §5.4):
 
 SOUND ARCHITECTURE (required — base-en.txt §4.6-§4.7, ref-en.txt §6):
 - Synchronized diegetic sounds belong inline within the multimodal description beats.
-- overall_soundscape (1-4 sentences): ambient sound, physical action sounds, and non-verbal human sounds (wind, rain, paper rustle, breathing, gasps). Do NOT repeat dialogue or music here.
-- non_diegetic_music (1-3 sentences): audience-only score describing instrumentation, tempo, rhythm, and dynamics ONLY (no abstract mood words). Use N/A if no score.
+- overall_soundscape: exactly 1-2 sentences of ambient sound, physical action sounds, and non-verbal human sounds (wind, rain, paper rustle, breathing, gasps). Do NOT repeat dialogue or music here.
+- non_diegetic_music: exactly 1 sentence of audience-only score describing instrumentation, tempo, rhythm, and dynamics ONLY (no abstract mood words). Use N/A if no score.
 
 SPATIAL & PHYSICAL LAWS (required — base-en.txt §4.1, ref-en.txt §2.1):
-- First sentence of [Shot 1]: state style token, then a semicolon-separated list placing every character, key prop, and light source relative to camera.
-- In EVERY beat, specify the physical actions AND changing facial expressions of ALL visible characters.
+- First sentence of [Shot 1]: state style token, then a semicolon-separated list placing every character, key prop, and light source relative to camera, followed by continuous camera motion.
+- In every beat, specify the physical actions AND changing facial expressions of ALL visible characters.
 
-TIME-CODED BEATS (required): open each chronological paragraph with bracketed timecodes `[0:00-0:03]`, `[0:03-0:07]`, `[0:07-0:10]`. The timecodes must tile the full 10 seconds with no gaps.
+SINGLE CONTINUOUS PARAGRAPH (required): Write integrated_multimodal_description as ONE continuous paragraph in chronological order without timecode brackets or timestamps.
 
 OUTPUT FORMAT (when generating scene parts) — return each 10-second segment enclosed in <PART0>, <PART1>, <PART2>, ... tags:
 <PART0>
-integrated_multimodal_description: [Shot 1] 2D-animated, <style token>, <opening spatial mapping sentence>. [0:00-0:03] <beat> [0:03-0:07] <beat> [0:07-0:10] <beat>
+integrated_multimodal_description: [Shot 1] 2D-animated, <style token>, <opening spatial mapping and camera motion sentence>. <Beat 1 action and dialogue>. <Beat 2 complication and reaction>. <Beat 3 landing pose and transition>.
 
-overall_soundscape: <1-4 sentences>
+overall_soundscape: <1-2 sentences>
 
-non_diegetic_music: <1-3 sentences, or N/A>
+non_diegetic_music: <1 sentence, or N/A>
 </PART0>
 
 <PART1>
-integrated_multimodal_description: [Shot 1] 2D-animated, <style token>, <opening spatial mapping sentence continuing from Part 0>. [0:00-0:03] <beat> [0:03-0:07] <beat> [0:07-0:10] <beat>
+integrated_multimodal_description: [Shot 1] 2D-animated, <style token>, <opening spatial mapping and camera motion continuing from Part 0>. <Beat 1 action and dialogue>. <Beat 2 complication and reaction>. <Beat 3 landing pose and transition>.
 
-overall_soundscape: <1-4 sentences>
+overall_soundscape: <1-2 sentences>
 
-non_diegetic_music: <1-3 sentences, or N/A>
+non_diegetic_music: <1 sentence, or N/A>
 </PART1>
 
 SEGMENT RULES (base-en.txt §2.2):
 Each <PARTn> section is written as the three labeled core fields:
-- integrated_multimodal_description: [Shot 1] 2D-animated, <style token>, <opening spatial mapping sentence>. <timecoded beat paragraphs...>
-- overall_soundscape: <1-4 sentences>
-- non_diegetic_music: <1-3 sentences, or N/A>
+- integrated_multimodal_description: [Shot 1] 2D-animated, <style token>, <opening spatial mapping and camera motion sentence>. Followed by the three beats in sequential order within ONE continuous paragraph (~100-150 words total).
+- overall_soundscape: 1-2 sentences.
+- non_diegetic_music: 1 sentence, or N/A.
 
 Each <PARTn> section must also:
 - Open [Shot 1] with style token, spatial mapping, and continuous camera motion.
-- Follow 3-beat rhythm: [0:00-0:03], [0:03-0:07], [0:07-0:10].
+- Progress seamlessly through Beat 1 (Setup/Hook) -> Beat 2 (Complication/Action) -> Beat 3 (Reaction/Bridge) in order without bracketed timestamps.
 - Be FULLY SELF-CONTAINED per segment.
-- MAXIMUM CONCISION: every sentence must be lean, dense, and punchy. HARD LIMIT: each Segment body MUST stay at or under {MAX_SCRIPT_PROMPT_CHARS} characters so the total saved prompt stays strictly under 1,350 characters (leaving safety margin under the 1,700 character ceiling).
+- ECONOMY OF LANGUAGE: every sentence must be lean, dense, and punchy. HARD LIMIT: each Segment body MUST stay at or under {MAX_SCRIPT_PROMPT_CHARS} characters.
 """
 
 
@@ -170,7 +172,7 @@ SCENE STORY & LOGLINE AS THE FOUNDATIONAL ARC:
 - The scene's story & logline (`Scene story & logline: <name> — <logline>`) defines the primary narrative arc, emotional stakes, and dramatic progression for this scene.
 - You MUST read and analyze this scene logline as the foundational story to break down across the {part_count} x 10-second segments in the Escalation Ladder, ensuring the whole arc advances and resolves within this runtime.
 
-The scene is divided into {part_count} x 10-second segments. Plan ALL of them as one escalating arc. Every segment must tell an emotional micro-story, assign clear active roles to every character present, feature active theatrical acting with expressive facial shifts, structured 3-beat rhythm ([0:00-0:03] Hook/Setup -> [0:03-0:07] Complication/Sensory Event/Vivid Action -> [0:07-0:10] Reaction/Turn/Bridge), and continuous unbroken camera motion.
+The scene is divided into {part_count} x 10-second segments. Plan ALL of them as one escalating arc. Every segment must tell an emotional micro-story, assign clear active roles to every character present, feature active theatrical acting with expressive facial shifts, structured chronological progression (Hook/Setup -> Complication/Action -> Reaction/Bridge), and continuous unbroken camera motion.
 
 SHOW, DON'T TELL MANDATE: Never plan dialogue for exposition or self-narration. Solo characters do not speak out loud to narrate what they see, hear, or do. Convey tension, threats, and discoveries through diegetic sound and visceral physical reactions.
 
@@ -271,9 +273,9 @@ def build_all_parts_prompt(
     parts_to_gen = list(range(start_part, part_count))
     tags_example = "\n\n".join(
         f"<PART{i}>\n"
-        f"integrated_multimodal_description: [Shot 1] 2D-animated, storybook style; ... [{segment_span(i)}] ...\n\n"
-        "overall_soundscape: ...\n\n"
-        "non_diegetic_music: ...\n"
+        f"integrated_multimodal_description: [Shot 1] 2D-animated, storybook style; <spatial layout and camera motion>. <Beat 1 action and dialogue>. <Beat 2 complication and reaction>. <Beat 3 landing pose and transition>.\n\n"
+        "overall_soundscape: <1-2 sentences>\n\n"
+        "non_diegetic_music: <1 sentence, or N/A>\n"
         f"</PART{i}>"
         for i in parts_to_gen
     )
@@ -311,10 +313,11 @@ def build_all_parts_prompt(
         "- WONDERFUL VIVID ACTION: Dynamic, tactile, kinetic physical actions and prop interactions. Use expressive secondary motion (ears, whiskers, fur, capes) and weight shifts.\n"
         "- CONTINUITY: Each subsequent part continues seamlessly from the closing frame, character poses, positions, and lighting of the previous part.\n"
         "- SHOW, DON'T TELL: Strictly NO self-narration or literal exposition ('A rustle!'). Convey suspense through diegetic sound cues and immediate physical reactions.\n"
-        "- 3-BEAT RHYTHM: In every 10-second part, structure into [0:00-0:03] Setup/Hook -> [0:03-0:07] Complication/Sensory Event/Action -> [0:07-0:10] Reaction/Turn/Bridge.\n"
-        "- THEATRICAL ACTING: In every timecoded beat, explicitly describe what EVERY character on screen is doing physically AND how their facial expressions are continuously animating (lively animation in every frame; expressions are never flat, dull, or static).\n"
-        "- CAMERA CONTINUITY: strictly ONE unbroken sequence shot per part with zero cuts, zero jump cuts, and zero zoom jumps.\n"
-        f"- HARD LIMIT: each part body must stay strictly at or under {MAX_SCRIPT_PROMPT_CHARS} characters."
+        "- CHRONOLOGICAL BEAT PROGRESSION: In every 10-second part, weave Beat 1 (Setup/Hook) -> Beat 2 (Complication/Action) -> Beat 3 (Reaction/Bridge) in chronological order within ONE continuous paragraph without timestamps (~25-40 words per beat).\n"
+        "- THEATRICAL ACTING: Explicitly describe what EVERY character on screen is doing physically AND how their facial expressions are continuously animating (lively animation in every frame; expressions are never flat, dull, or static).\n"
+        "- CAMERA CONTINUITY: Strictly ONE unbroken sequence shot per part with zero cuts, zero jump cuts, and zero zoom jumps.\n"
+        "- LEAN AUDIO: Exactly 1-2 sentences for overall_soundscape and 1 sentence for non_diegetic_music.\n"
+        f"- HARD LIMIT: Each part body must stay strictly at or under {MAX_SCRIPT_PROMPT_CHARS} characters."
     )
 
 
@@ -349,6 +352,18 @@ def build_next_part_prompt(
     )
 
 
+def build_condense_system_instruction() -> str:
+    """Lightweight, dedicated system instruction for condensation passes."""
+    return (
+        "You are an expert film script editor. Your only task is to tighten and trim the provided "
+        "animation scene segment prompt so that it fits strictly within the given character budget. "
+        "Preserve the three core fields (integrated_multimodal_description, overall_soundscape, "
+        "non_diegetic_music), all key story actions, camera movements, and dialogue. "
+        "Strip redundant adjectives, consolidate sentences, and enforce concision. "
+        "Never add commentary, explanation, or preamble."
+    )
+
+
 def build_condense_prompt(
     previous_doc: str,
     current_chars: int,
@@ -365,14 +380,17 @@ def build_condense_prompt(
         f"1. Output ONLY the condensed segment body for Part {part_index} ({span or segment_span(part_index)}). "
         "Do NOT include title, logline, characters, setting, or <PARTn> tags.\n"
         "2. Keep the three core fields: integrated_multimodal_description, overall_soundscape, non_diegetic_music.\n"
-        "3. In integrated_multimodal_description: Keep the [Shot 1] spatial mapping first sentence. "
-        "Keep the 3-beat structure ([0:00-0:03], [0:03-0:07], [0:07-0:10]) with ONE punchy sentence per beat. "
-        "Preserve vivid kinetic action, emotional character expressions, and defined character roles while trimming excess adjectives and filler words.\n"
+        "3. In integrated_multimodal_description: Keep as ONE continuous paragraph in chronological order. "
+        "Keep the [Shot 1] spatial mapping and continuous camera motion first sentence (~20-25 words). "
+        "Follow with the chronological beats: Setup/Hook (~25-30 words), Complication/Action (~25-35 words), and Reaction/Landing (~20-30 words). "
+        "Preserve vivid kinetic action, emotional expressions, and dialogue while trimming excess adjectives and filler words. "
+        "Do NOT use timestamps or bracketed timecodes.\n"
         "4. In overall_soundscape: Exactly ONE concise sentence.\n"
         "5. In non_diegetic_music: Exactly ONE concise sentence (or N/A).\n"
         "6. Obey SHOW, DON'T TELL (strictly zero self-narration).\n\n"
         f"PREVIOUS PART BODY TO CONDENSE:\n{previous_doc}\n\n"
         "Return ONLY the rewritten condensed segment body."
     )
+
 
 

@@ -37,12 +37,12 @@ def _scene() -> SceneSpec:
 
 MULTI_PART_DOC = (
     "<PART0>\n"
-    "integrated_multimodal_description: [Shot 1] 2D-animated; MOUSE in midground. [0:00-0:03] MOUSE starts. [0:03-0:07] MOUSE stops. [0:07-0:10] MOUSE leaps.\n\n"
+    "integrated_multimodal_description: [Shot 1] 2D-animated, cel-shaded; MOUSE in midground cautiously looks around. MOUSE starts creeping forward through tall grass. MOUSE suddenly stops as a shadow passes overhead. MOUSE leaps forward into the hollow log.\n\n"
     "overall_soundscape: Soft grass rustle.\n\n"
     "non_diegetic_music: N/A\n"
     "</PART0>\n\n"
     "<PART1>\n"
-    "integrated_multimodal_description: [Shot 1] 2D-animated; MOUSE continuing motion. [0:00-0:03] MOUSE runs. [0:03-0:07] MOUSE slides. [0:07-0:10] MOUSE enters burrow.\n\n"
+    "integrated_multimodal_description: [Shot 1] 2D-animated, cel-shaded; MOUSE continuing motion from the hollow log. MOUSE runs along the fallen mossy branch. MOUSE slides under an exposed root cluster. MOUSE enters the hidden burrow shelter and turns to look back.\n\n"
     "overall_soundscape: Quick pawsteps.\n\n"
     "non_diegetic_music: N/A\n"
     "</PART1>"
@@ -54,13 +54,35 @@ class TestScriptgenParts(unittest.TestCase):
         args = _build_parser().parse_args(["--name", "example", "--parts", "5"])
         self.assertEqual(args.parts, 5)
 
+    def test_parser_accepts_max_chars(self) -> None:
+        args = _build_parser().parse_args(["--name", "example", "--max-chars", "4000"])
+        self.assertEqual(args.max_chars, 4000)
+
     def test_segment_span_uses_ten_second_parts(self) -> None:
         self.assertEqual(segment_span(0), "0:00-0:10")
         self.assertEqual(segment_span(5), "0:50-1:00")
 
     def test_budget_constants_reserve_video_model_headroom(self) -> None:
-        self.assertEqual(MAX_SCRIPT_CHARS, 1600)
-        self.assertEqual(MAX_SCRIPT_PROMPT_CHARS, 800)
+        self.assertEqual(MAX_SCRIPT_CHARS, 5800)
+        self.assertEqual(MAX_SCRIPT_PROMPT_CHARS, 2400)
+
+    def test_calculate_body_budget(self) -> None:
+        from scriptgen.config import calculate_body_budget
+        budget = calculate_body_budget(total_limit=5800, header_len=500, safety_margin=400)
+        self.assertEqual(budget, 4900)
+
+    def test_trim_segment_body_to_budget(self) -> None:
+        from scriptgen.cli import trim_segment_body_to_budget
+        body = (
+            "integrated_multimodal_description: [Shot 1] 2D animated. Mrs Brisby runs fast. She jumps over a log. She lands safely.\n\n"
+            "overall_soundscape: Wind howling softly. Distant owl hooting.\n\n"
+            "non_diegetic_music: Orchestral strings playing an anxious crescendo."
+        )
+        # Trimming should simplify music to N/A first if needed
+        trimmed = trim_segment_body_to_budget(body, max_body_chars=len(body) - 30)
+        self.assertIn("non_diegetic_music: N/A", trimmed)
+        self.assertLessEqual(len(trimmed), len(body) - 30)
+
 
     @patch("scriptgen.cli.build_all_parts_prompt", return_value="multi-part prompt")
     @patch("scriptgen.cli._generate")

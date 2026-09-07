@@ -693,9 +693,13 @@ export function sceneVideos(film: string, name: string): SceneVideos {
     });
   }
 
-  segments.sort((a, b) => a.part - b.part);
+  const fullThumb =
+    (files.has("full-thumb.jpg") ? "full-thumb.jpg" : null) ??
+    (files.has("full.jpg") ? "full.jpg" : null) ??
+    pickThumb(files, "part-0") ??
+    (files.has("part-0-start.jpg") ? "part-0-start.jpg" : null);
   const full = files.has("full.mp4")
-    ? { thumb: pickThumb(files, "part-0") }
+    ? { thumb: fullThumb }
     : null;
   return { full, segments };
 }

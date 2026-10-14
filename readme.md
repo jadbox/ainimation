@@ -304,3 +304,12 @@ A local Astro + Tailwind web UI over the pipeline tools — no authentication, i
           ▼
 [ ffmpeg Crossfade Pass ] ──► Combined Final Scene Video (films/<film>/out/animations/<scene>/full.mp4)
 ```
+
+---
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+Author attribution is required if this project is forked or used:
+**Jonathan Dunlap (Github @jadbox)**
